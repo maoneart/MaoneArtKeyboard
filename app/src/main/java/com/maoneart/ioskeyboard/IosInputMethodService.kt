@@ -51,9 +51,10 @@ class IosInputMethodService : InputMethodService() {
     private var lastShiftPressTime: Long = 0
     private var lastSpacePressTime: Long = 0
 
-    // Sentence-level Live Translate Buffer
+    // Samsung-Style Live Translate Input Panel State
+    private var isTranslatePanelOpen = false
+    private val translatePanelBuffer = StringBuilder()
     private val composingWord = StringBuilder()
-    private val currentSentenceBuffer = StringBuilder()
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
 
     // View References
@@ -63,9 +64,13 @@ class IosInputMethodService : InputMethodService() {
     private var candidate2: TextView? = null
     private var candidate3: TextView? = null
     private var badgeLanguage: TextView? = null
-    private var translateStrip: LinearLayout? = null
+
+    // Samsung-Style Translate Panel Views
+    private var translatePanel: LinearLayout? = null
+    private var tvTranslateLangPair: TextView? = null
     private var tvTranslateStatus: TextView? = null
-    private var btnActionTranslate: TextView? = null
+    private var tvTranslateInputBox: TextView? = null
+    private var btnTranslateSend: TextView? = null
     private var btnCloseTranslate: TextView? = null
 
     override fun onCreate() {
@@ -98,9 +103,13 @@ class IosInputMethodService : InputMethodService() {
             candidate2 = view.findViewById(R.id.candidate2)
             candidate3 = view.findViewById(R.id.candidate3)
             badgeLanguage = view.findViewById(R.id.badgeLanguage)
-            translateStrip = view.findViewById(R.id.translateStrip)
+
+            // Setup Translate Panel
+            translatePanel = view.findViewById(R.id.translatePanel)
+            tvTranslateLangPair = view.findViewById(R.id.tvTranslateLangPair)
             tvTranslateStatus = view.findViewById(R.id.tvTranslateStatus)
-            btnActionTranslate = view.findViewById(R.id.btnActionTranslate)
+            tvTranslateInputBox = view.findViewById(R.id.tvTranslateInputBox)
+            btnTranslateSend = view.findViewById(R.id.btnTranslateSend)
             btnCloseTranslate = view.findViewById(R.id.btnCloseTranslate)
 
             val btnQuickTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
@@ -110,7 +119,7 @@ class IosInputMethodService : InputMethodService() {
             btnQuickTranslate?.setOnClickListener {
                 audioHaptic.playClickSound(it)
                 audioHaptic.triggerHapticFeedback(it)
-                toggleLiveTranslate()
+                toggleTranslatePanel()
             }
 
             btnQuickClipboard?.setOnClickListener {
@@ -147,20 +156,31 @@ class IosInputMethodService : InputMethodService() {
             candidate2?.setOnClickListener { selectCandidate(candidate2?.text?.toString()) }
             candidate3?.setOnClickListener { selectCandidate(candidate3?.text?.toString()) }
 
-            // Sentence Translate Button Click
-            btnActionTranslate?.setOnClickListener {
+            // Samsung-Style Translate Panel Actions
+            tvTranslateLangPair?.setOnClickListener {
                 audioHaptic.playClickSound(it)
                 audioHaptic.triggerHapticFeedback(it)
-                translateCurrentSentence()
+                // Swap translation direction
+                val temp = prefs.translateSourceLang
+                prefs.translateSourceLang = prefs.translateTargetLang
+                prefs.translateTargetLang = temp
+                updateTranslatePanelUI()
+            }
+
+            btnTranslateSend?.setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                sendTranslatedSentence()
             }
 
             btnCloseTranslate?.setOnClickListener {
-                prefs.isLiveTranslateEnabled = false
-                updateTranslateStripUI()
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                closeTranslatePanel()
             }
 
             updateLanguageBadge()
-            updateTranslateStripUI()
+            updateTranslatePanelUI()
             applyThemeStyling(view)
             renderCurrentLayout()
 
@@ -189,10 +209,9 @@ class IosInputMethodService : InputMethodService() {
         super.onStartInputView(info, restarting)
         try {
             composingWord.clear()
-            currentSentenceBuffer.clear()
             updateSuggestions()
             updateLanguageBadge()
-            updateTranslateStripUI()
+            updateTranslatePanelUI()
             rootView?.let { applyThemeStyling(it) }
             renderCurrentLayout()
         } catch (t: Throwable) {
@@ -225,6 +244,10 @@ class IosInputMethodService : InputMethodService() {
             keyboardRoot?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_bg_dark else R.color.ios_bg_light))
             topToolbar?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
 
+            translatePanel?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
+            tvTranslateInputBox?.setBackgroundResource(if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+            tvTranslateInputBox?.setTextColor(textColor)
+
             candidate1?.setTextColor(textColor)
             candidate2?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
             candidate3?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
@@ -246,30 +269,66 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
-    private fun updateTranslateStripUI() {
+    private fun toggleTranslatePanel() {
+        isTranslatePanelOpen = !isTranslatePanelOpen
+        updateTranslatePanelUI()
+    }
+
+    private fun closeTranslatePanel() {
+        isTranslatePanelOpen = false
+        translatePanelBuffer.clear()
+        updateTranslatePanelUI()
+    }
+
+    private fun updateTranslatePanelUI() {
         try {
-            if (prefs.isLiveTranslateEnabled) {
-                translateStrip?.visibility = View.VISIBLE
+            if (isTranslatePanelOpen) {
+                translatePanel?.visibility = View.VISIBLE
                 val src = prefs.translateSourceLang.uppercase()
                 val tgt = prefs.translateTargetLang.uppercase()
-                if (currentSentenceBuffer.isEmpty()) {
-                    tvTranslateStatus?.text = "🌐 $src ➔ $tgt: Ketik kalimat..."
+                tvTranslateLangPair?.text = "$src ⇄ $tgt"
+
+                if (translatePanelBuffer.isEmpty()) {
+                    tvTranslateInputBox?.text = ""
+                    tvTranslateStatus?.text = "Ketik kalimat di kotak, lalu tap Kirim"
                 } else {
-                    val preview = currentSentenceBuffer.toString()
-                    val truncated = if (preview.length > 25) preview.take(25) + "…" else preview
-                    tvTranslateStatus?.text = "🌐 $src ➔ $tgt: \"$truncated\""
+                    tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                    tvTranslateStatus?.text = "Kalimat siap ($src ➔ $tgt)"
                 }
             } else {
-                translateStrip?.visibility = View.GONE
+                translatePanel?.visibility = View.GONE
+                translatePanelBuffer.clear()
+                tvTranslateInputBox?.text = ""
             }
         } catch (_: Throwable) {}
     }
 
-    private fun toggleLiveTranslate() {
-        try {
-            prefs.isLiveTranslateEnabled = !prefs.isLiveTranslateEnabled
-            updateTranslateStripUI()
-        } catch (_: Throwable) {}
+    private fun sendTranslatedSentence() {
+        val sentence = translatePanelBuffer.toString().trim()
+        if (sentence.isEmpty()) {
+            tvTranslateStatus?.text = "Ketik kalimat terlebih dahulu..."
+            return
+        }
+
+        tvTranslateStatus?.text = "⏳ Sedang menerjemahkan..."
+
+        serviceScope.launch {
+            try {
+                val translated = translateManager.translateText(
+                    sentence,
+                    prefs.translateSourceLang,
+                    prefs.translateTargetLang
+                )
+                // Commit translated sentence directly into the host app (WhatsApp, etc.)
+                currentInputConnection?.commitText("$translated ", 1)
+
+                translatePanelBuffer.clear()
+                tvTranslateInputBox?.text = ""
+                tvTranslateStatus?.text = "✓ Terkirim ke obrolan!"
+            } catch (_: Throwable) {
+                tvTranslateStatus?.text = "Gagal menerjemahkan (periksa koneksi)"
+            }
+        }
     }
 
     private fun switchMode(mode: Mode) {
@@ -373,11 +432,15 @@ class IosInputMethodService : InputMethodService() {
 
     private fun handleCharacterInput(charStr: String) {
         try {
-            currentInputConnection?.commitText(charStr, 1)
-            composingWord.append(charStr)
-            currentSentenceBuffer.append(charStr)
-            updateSuggestions()
-            updateTranslateStripUI()
+            if (isTranslatePanelOpen) {
+                translatePanelBuffer.append(charStr)
+                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                tvTranslateStatus?.text = "Kalimat siap (${prefs.translateSourceLang.uppercase()} ➔ ${prefs.translateTargetLang.uppercase()})"
+            } else {
+                currentInputConnection?.commitText(charStr, 1)
+                composingWord.append(charStr)
+                updateSuggestions()
+            }
 
             if (isShifted && !isCapsLock) {
                 isShifted = false
@@ -390,76 +453,50 @@ class IosInputMethodService : InputMethodService() {
 
     private fun handleBackspace() {
         try {
+            if (isTranslatePanelOpen) {
+                if (translatePanelBuffer.isNotEmpty()) {
+                    translatePanelBuffer.deleteCharAt(translatePanelBuffer.length - 1)
+                    tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                }
+                return
+            }
+
             if (composingWord.isNotEmpty()) {
                 composingWord.deleteCharAt(composingWord.length - 1)
             }
-            if (currentSentenceBuffer.isNotEmpty()) {
-                currentSentenceBuffer.deleteCharAt(currentSentenceBuffer.length - 1)
-            }
             currentInputConnection?.deleteSurroundingText(1, 0)
             updateSuggestions()
-            updateTranslateStripUI()
         } catch (_: Throwable) {}
     }
 
     private fun handleSpace() {
         try {
-            val now = System.currentTimeMillis()
+            if (isTranslatePanelOpen) {
+                translatePanelBuffer.append(" ")
+                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                return
+            }
 
+            val now = System.currentTimeMillis()
             if (prefs.isDoubleSpacePeriodEnabled && (now - lastSpacePressTime < 500) && composingWord.isEmpty()) {
                 currentInputConnection?.deleteSurroundingText(1, 0)
                 currentInputConnection?.commitText(". ", 1)
-                if (currentSentenceBuffer.isNotEmpty()) {
-                    currentSentenceBuffer.deleteCharAt(currentSentenceBuffer.length - 1)
-                }
-                currentSentenceBuffer.append(". ")
                 lastSpacePressTime = 0
-                updateTranslateStripUI()
                 return
             }
 
             lastSpacePressTime = now
             currentInputConnection?.commitText(" ", 1)
             composingWord.clear()
-            currentSentenceBuffer.append(" ")
             updateSuggestions()
-            updateTranslateStripUI()
         } catch (_: Throwable) {}
-    }
-
-    // Translate full sentence buffer
-    private fun translateCurrentSentence() {
-        val sentence = currentSentenceBuffer.toString().trim()
-        if (sentence.isEmpty()) return
-
-        tvTranslateStatus?.text = "⏳ Menerjemahkan kalimat..."
-
-        serviceScope.launch {
-            try {
-                val translated = translateManager.translateText(
-                    sentence,
-                    prefs.translateSourceLang,
-                    prefs.translateTargetLang
-                )
-                // Delete the original sentence from the input connection
-                currentInputConnection?.deleteSurroundingText(sentence.length, 0)
-                // Insert the full translated sentence
-                currentInputConnection?.commitText("$translated ", 1)
-
-                currentSentenceBuffer.clear()
-                composingWord.clear()
-                tvTranslateStatus?.text = "✓ Selesai diterjemahkan"
-            } catch (_: Throwable) {
-                tvTranslateStatus?.text = "Gagal menerjemahkan (periksa koneksi)"
-            }
-        }
     }
 
     private fun handleReturn() {
         try {
-            // If Live Translate is active and has a typed sentence, translate before return
-            if (prefs.isLiveTranslateEnabled && currentSentenceBuffer.isNotBlank()) {
-                translateCurrentSentence()
+            if (isTranslatePanelOpen && translatePanelBuffer.isNotBlank()) {
+                sendTranslatedSentence()
+                return
             }
 
             val ic = currentInputConnection ?: return
@@ -474,9 +511,7 @@ class IosInputMethodService : InputMethodService() {
             }
 
             composingWord.clear()
-            currentSentenceBuffer.clear()
             updateSuggestions()
-            updateTranslateStripUI()
         } catch (_: Throwable) {}
     }
 
@@ -495,11 +530,14 @@ class IosInputMethodService : InputMethodService() {
 
     private fun commitDirectText(text: String) {
         try {
-            currentInputConnection?.commitText(text, 1)
-            composingWord.clear()
-            currentSentenceBuffer.append(text)
-            updateSuggestions()
-            updateTranslateStripUI()
+            if (isTranslatePanelOpen) {
+                translatePanelBuffer.append(text)
+                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+            } else {
+                currentInputConnection?.commitText(text, 1)
+                composingWord.clear()
+                updateSuggestions()
+            }
         } catch (_: Throwable) {}
     }
 
@@ -527,19 +565,21 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.playClickSound()
             audioHaptic.triggerHapticFeedback()
 
-            val lengthToDelete = composingWord.length
-            currentInputConnection?.deleteSurroundingText(lengthToDelete, 0)
-            currentInputConnection?.commitText("$candidate ", 1)
-
-            // Adjust sentence buffer
-            if (currentSentenceBuffer.length >= lengthToDelete) {
-                currentSentenceBuffer.setLength(currentSentenceBuffer.length - lengthToDelete)
+            if (isTranslatePanelOpen) {
+                val lengthToDelete = composingWord.length
+                if (translatePanelBuffer.length >= lengthToDelete) {
+                    translatePanelBuffer.setLength(translatePanelBuffer.length - lengthToDelete)
+                }
+                translatePanelBuffer.append("$candidate ")
+                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+            } else {
+                val lengthToDelete = composingWord.length
+                currentInputConnection?.deleteSurroundingText(lengthToDelete, 0)
+                currentInputConnection?.commitText("$candidate ", 1)
             }
-            currentSentenceBuffer.append("$candidate ")
 
             composingWord.clear()
             updateSuggestions()
-            updateTranslateStripUI()
         } catch (_: Throwable) {}
     }
 }

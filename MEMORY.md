@@ -21,5 +21,9 @@
 - **28 Okt 2026**:
   - Inisialisasi proyek, arsitektur modul, perbaikan styling XML & Kotlin textStyle (Release v1.0.3).
   - Investigasi & perbaikan tuntas masalah Force Close: resolusi tema context IME (`ContextThemeWrapper`), penggantian `?attr/` dengan `@drawable/btn_icon_ripple`, eliminasi widget `Button` menjadi `TextView` di `KeyboardLayout`.
-  - Redesign total antarmuka Pengaturan (Cupertino Inset Grouped Settings): penambahan squircle icon warna-warni ala iOS, kartu status aktivasi interaktif 2-langkah dengan auto-detect centang hijau (`isImeEnabled()` / `isImeSelected()`), switch hijau Apple, dan kotak uji coba ketik yang rapi.
-  - CI/CD build sukses di GitHub Actions run #40694429935 (Release v1.0.5), dan berkas APK terbaru berhasil diunduh ke `/sdcard/Download/iOSKeyboard.apk` (5.3 MB).
+  - Redesign total antarmuka Pengaturan (Cupertino Inset Grouped Settings): penambahan squircle icon warna-warni ala iOS, kartu status aktivasi interaktif 2-langkah dengan auto-detect centang hijau (`isImeEnabled()` / `isImeSelected()`), switch hijau Apple, dan kotak uji coba ketik yang rapi (Release v1.0.5).
+  - Peningkatan performa & UX lanjutan:
+    1. **0ms Touch Down Response**: Menghilangkan latency sentuh dengan `MotionEvent.ACTION_DOWN` murni, pembaruan Shift/Caps instan tanpa rebuild view hierarchy.
+    2. **Hapus Ngebut (Rapid Repeating Backspace)**: Auto-repeat akselerasi saat tombol backspace ditekan lama (320ms delay awal -> 60ms -> akselerasi ke 35ms per karakter).
+    3. **Live Translate Per Kalimat**: Tombol `⚡ Terjemahkan` dan buffer kalimat otomatis menerjemahkan satu kalimat penuh secara kontekstual, bukan perkata.
+    4. **Ikon Emoji Apple Jelas**: Tombol emoji kini menampilkan smiley Apple asli `😊` yang jernih dan berwarna (bukan siluet globe yang tampak seperti titik hitam).

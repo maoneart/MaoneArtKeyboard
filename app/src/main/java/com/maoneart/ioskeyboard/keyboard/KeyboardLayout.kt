@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.OvershootInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -115,7 +116,7 @@ class KeyboardLayout(private val context: Context) {
         r3Layout.addView(btnBackspace)
         root.addView(r3Layout)
 
-        // Row 4 (123 + Emoji/Globe + Space + Return)
+        // Row 4 (123 + Emoji Smiley + Space + Return)
         val r4Layout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -140,18 +141,32 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btn123)
 
-        // Emoji / Globe Button
-        val btnGlobe = ImageButton(context).apply {
+        // Emoji Button (Apple Emoji Smiley with Tactile Bounce)
+        val btnEmoji = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
-            setImageResource(R.drawable.ic_globe)
-            setColorFilter(textColor)
+            text = "😊"
+            textSize = 21f
+            gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.animate().scaleX(1.35f).scaleY(1.35f).setDuration(100).setInterpolator(OvershootInterpolator(2.5f)).start()
+                        onKeyAction("ACTION_EMOJI")
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120).start()
+                        true
+                    }
+                    else -> false
+                }
+            }
         }
-        r4Layout.addView(btnGlobe)
+        r4Layout.addView(btnEmoji)
 
         // Space Button (with active language indicator)
         val langLabel = if (activeLanguage == "en") "English" else "Indonesia"
@@ -290,17 +305,31 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnAbc)
 
-        val btnGlobe = ImageButton(context).apply {
+        val btnEmoji = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
-            setImageResource(R.drawable.ic_globe)
-            setColorFilter(textColor)
+            text = "😊"
+            textSize = 21f
+            gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.animate().scaleX(1.35f).scaleY(1.35f).setDuration(100).setInterpolator(OvershootInterpolator(2.5f)).start()
+                        onKeyAction("ACTION_EMOJI")
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120).start()
+                        true
+                    }
+                    else -> false
+                }
+            }
         }
-        r4.addView(btnGlobe)
+        r4.addView(btnEmoji)
 
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.4f)
@@ -334,7 +363,7 @@ class KeyboardLayout(private val context: Context) {
         return root
     }
 
-    // --- 3. APPLE EMOJI BOARD LAYOUT ---
+    // --- 3. APPLE EMOJI BOARD LAYOUT (with Animated Bounce on Touch) ---
     fun createEmojiView(
         isDark: Boolean,
         onEmojiAction: (String) -> Unit,
@@ -379,11 +408,35 @@ class KeyboardLayout(private val context: Context) {
                 val btn = TextView(context).apply {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
                     text = emo
-                    textSize = 24f
+                    textSize = 25f
                     gravity = Gravity.CENTER
                     isClickable = true
                     isFocusable = false
-                    setupInstantTouch(this) { onEmojiAction(emo) }
+
+                    // Apple Animated Emoji Spring Bounce on Touch ("Animasi Emoji Gerak")
+                    setOnTouchListener { v, event ->
+                        when (event.action) {
+                            MotionEvent.ACTION_DOWN -> {
+                                v.animate()
+                                    .scaleX(1.45f)
+                                    .scaleY(1.45f)
+                                    .setDuration(120)
+                                    .setInterpolator(OvershootInterpolator(3.0f))
+                                    .start()
+                                onEmojiAction(emo)
+                                true
+                            }
+                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                v.animate()
+                                    .scaleX(1.0f)
+                                    .scaleY(1.0f)
+                                    .setDuration(150)
+                                    .start()
+                                true
+                            }
+                            else -> false
+                        }
+                    }
                 }
                 row.addView(btn)
                 count++

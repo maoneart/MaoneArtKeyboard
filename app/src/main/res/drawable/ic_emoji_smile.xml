@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="26dp"
+    android:height="26dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- iOS Outline Smiling Face -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M12,2C6.47,2 2,6.47 2,12s4.47,10 10,10 10,-4.47 10,-10S17.53,2 12,2zm0,18.2c-4.52,0 -8.2,-3.68 -8.2,-8.2S7.48,3.8 12,3.8s8.2,3.68 8.2,8.2 -3.68,8.2 -8.2,8.2zM8.5,10.25c0.69,0 1.25,-0.56 1.25,-1.25S9.19,7.75 8.5,7.75 7.25,8.31 7.25,9s0.56,1.25 1.25,1.25zm7,0c0.69,0 1.25,-0.56 1.25,-1.25S16.19,7.75 15.5,7.75s-1.25,0.56 -1.25,1.25 0.56,1.25 1.25,1.25zm-3.5,6.25c2.33,0 4.29,-1.56 4.92,-3.75H7.08c0.63,2.19 2.59,3.75 4.92,3.75z"/>
+</vector>
