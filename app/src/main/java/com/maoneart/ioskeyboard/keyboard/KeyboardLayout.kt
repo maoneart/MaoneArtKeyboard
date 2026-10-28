@@ -250,6 +250,7 @@ class KeyboardLayout(private val context: Context) {
         }
         returnButtonRef = btnReturn
         r4Layout.addView(btnReturn)
+        root.addView(r4Layout)
 
         return root
     }
@@ -411,6 +412,7 @@ class KeyboardLayout(private val context: Context) {
         }
         returnButtonRef = btnReturn
         r4.addView(btnReturn)
+        root.addView(r4)
 
         return root
     }
