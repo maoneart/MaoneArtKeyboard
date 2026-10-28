@@ -23,6 +23,8 @@ android {
             storePassword "maoneart_key_2026"
             keyAlias "maoneart"
             keyPassword "maoneart_key_2026"
+            v1SigningEnabled true
+            v2SigningEnabled true
         }
     }
 
