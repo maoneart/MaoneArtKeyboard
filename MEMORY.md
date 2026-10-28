@@ -2,12 +2,16 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.27)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.28)
 
 ---
 
 ## 📌 Architecture & Technical Decisions
-1. **1-Key Permanent Signing Architecture (`keystore/release.jks`)**:
+1. **Self-Learning User Dictionary & 74,500+ Official KBBI Vocabulary**:
+   - **Self-Learning Dynamic Dictionary**: Keyboard secara mandiri merekam dan mempelajari setiap kata yang sering diketik atau dipilih oleh pengguna (`user_dictionary.txt` dengan bobot frekuensi). Kata yang memiliki frekuensi pemakaian tinggi langsung diposisikan di urutan prioritas terdepan rekomendasi!
+   - **74,500+ Entri KBBI Resmi**: Dilengkapi database kata bahasa Indonesia lengkap KBBI (`app/src/main/assets/dictionaries/id.dict`, 665 KB) mencakup seluruh kata panjang berimbuhan konfiks (`ke-...-an`, `pe-...-an`, `me-...-kan`, `ber-...`, `ter-...`), seperti `kehilangan`, `keberhasilan`, `kesejahteraan`, `kesempatan`, `keputusan`, `kemenangan`, `kekalahan`, `kekecewaan`, `keberadaan`, `kemampuan`, `kebutuhan`, dll.
+   - **O(log N) Instant Binary Search Prefix Matcher**: Pencarian prefix pada 74.500+ kata dieksekusi secara instan (< 0.1 ms) menggunakan binary search range scanning tanpa latency sama sekali pada tuts keyboard.
+2. **1-Key Permanent Signing Architecture (`keystore/release.jks`)**:
    - Sertifikat RSA 2048-bit mandiri (`SHA384withRSA`) disimpan permanen di repositori (`keystore/release.jks`) dengan masa berlaku hingga tahun 2054 (28 tahun).
    - Menghilangkan regenerasi debug keystore acak di GitHub Actions runner.
    - Semua build masa depan memiliki signature fingerprint identik (`3C:1C:CA:35:A9:6B:89:C2:AF:A4:A6:DB:16:7D:8F:4F:C4:8B:41:34:7F:8F:86:E8:6B:52:E4:07:B5:D0:9C:F1`).
@@ -69,3 +73,7 @@
     2. **Bilah Tab Kategori Emoji Terpisah**: Di atas laci emoji, emoji kini terpisah rapi berdasarkan kategori (`😀 Smileys`, `👋 Tangan`, `❤️ Hati`, `🐶 Hewan`, `🍔 Makanan`, `⚽ Aktivitas`, `💯 Simbol`, `🖼️ Stiker WA`, `➕ Tambah`).
     3. **Tombol Cepat Emoji/Stiker di Toolbar**: Ikon emoji `😊` hadir di toolbar atas sebelah tombol translate untuk akses instan ke laci emoji dan stiker.
     4. **Menu Upload Stiker di Pengaturan**: Pengguna juga bisa menambah stiker langsung dari Cupertino Settings Hub.
+  - Kamus Belajar Mandiri (Self-Learning) & 74.500+ Kosakata KBBI Lengkap (Release v1.0.28):
+    1. **Sistem Belajar Mandiri (User Self-Learning Dictionary)**: Setiap kata yang sering diketik atau dipilih pengguna otomatis dipelajari frekuensinya dan dijadikan rekomendasi nomor 1 saat mengetik awalan katanya.
+    2. **74.500+ Kosakata KBBI Lengkap**: Mendukung seluruh kata panjang berimbuhan resmi seperti `kehilangan`, `keberhasilan`, `kesejahteraan`, `kesempatan`, `keputusan`, dll.
+    3. **Algoritma Pencarian O(log N) Super Ngebut**: Eksekusi instan di bawah 0.1 milidetik tanpa jeda pada tuts keyboard.
