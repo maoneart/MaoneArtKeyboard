@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Color
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
@@ -66,6 +65,8 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_shift)
             setColorFilter(if (isShifted) ContextCompat.getColor(context, R.color.ios_blue) else textColor)
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_SHIFT") }
         }
         r3Layout.addView(btnShift)
@@ -82,6 +83,8 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_backspace)
             setColorFilter(textColor)
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_BACKSPACE") }
         }
         r3Layout.addView(btnBackspace)
@@ -98,14 +101,16 @@ class KeyboardLayout(private val context: Context) {
         }
 
         // 123 Button
-        val btn123 = Button(context).apply {
+        val btn123 = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.3f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = "123"
             setTextColor(textColor)
-            textSize = 14.5f
-            isAllCaps = false
+            textSize = 15f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_SYMBOLS") }
         }
         r4Layout.addView(btn123)
@@ -117,33 +122,39 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_globe)
             setColorFilter(textColor)
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_EMOJI") }
         }
         r4Layout.addView(btnGlobe)
 
         // Space Button (with active language indicator)
         val langLabel = if (activeLanguage == "en") "English" else "Indonesia"
-        val btnSpace = Button(context).apply {
+        val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.4f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = langLabel
-            setTextColor(if (isDark) Color.GRAY else Color.DKGRAY)
-            textSize = 13.5f
-            isAllCaps = false
+            setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+            textSize = 14f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction(" ") }
         }
         r4Layout.addView(btnSpace)
 
         // Return Action Button (iOS Blue)
-        val btnReturn = Button(context).apply {
+        val btnReturn = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.0f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             text = "return"
             setTextColor(Color.WHITE)
-            textSize = 14.0f
-            isAllCaps = false
+            textSize = 14.5f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_RETURN") }
         }
         r4Layout.addView(btnReturn)
@@ -199,14 +210,16 @@ class KeyboardLayout(private val context: Context) {
             ).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) }
         }
 
-        val btnToggleMore = Button(context).apply {
+        val btnToggleMore = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.4f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = if (!isMoreSymbols) "#+=" else "123"
             setTextColor(textColor)
-            isAllCaps = false
-            textSize = 13.5f
+            textSize = 14f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction(if (!isMoreSymbols) "ACTION_MORE_SYMBOLS" else "ACTION_SYMBOLS") }
         }
         r3.addView(btnToggleMore)
@@ -221,6 +234,8 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_backspace)
             setColorFilter(textColor)
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_BACKSPACE") }
         }
         r3.addView(btnBackspace)
@@ -236,14 +251,16 @@ class KeyboardLayout(private val context: Context) {
             ).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) }
         }
 
-        val btnAbc = Button(context).apply {
+        val btnAbc = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.3f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = "ABC"
             setTextColor(textColor)
-            textSize = 14.5f
-            isAllCaps = false
+            textSize = 15f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_ABC") }
         }
         r4.addView(btnAbc)
@@ -254,30 +271,36 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_globe)
             setColorFilter(textColor)
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_EMOJI") }
         }
         r4.addView(btnGlobe)
 
-        val btnSpace = Button(context).apply {
+        val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.4f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = "space"
-            setTextColor(if (isDark) Color.GRAY else Color.DKGRAY)
-            isAllCaps = false
-            textSize = 13.5f
+            setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+            textSize = 14f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction(" ") }
         }
         r4.addView(btnSpace)
 
-        val btnReturn = Button(context).apply {
+        val btnReturn = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.0f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             text = "return"
             setTextColor(Color.WHITE)
-            textSize = 14.0f
-            isAllCaps = false
+            textSize = 14.5f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction("ACTION_RETURN") }
         }
         r4.addView(btnReturn)
@@ -298,20 +321,6 @@ class KeyboardLayout(private val context: Context) {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-        }
-
-        // Category Tab Row
-        val categoryTabs = HorizontalScrollView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(36)
-            )
-            isHorizontalScrollBarEnabled = false
-        }
-        val tabLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), 0, dp(8), 0)
         }
 
         val scrollContainer = ScrollView(context).apply {
@@ -347,6 +356,8 @@ class KeyboardLayout(private val context: Context) {
                     text = emo
                     textSize = 24f
                     gravity = Gravity.CENTER
+                    isClickable = true
+                    isFocusable = false
                     setOnClickListener { onEmojiAction(emo) }
                 }
                 row.addView(btn)
@@ -374,13 +385,15 @@ class KeyboardLayout(private val context: Context) {
             ).apply { setMargins(dp(6), dp(2), dp(6), dp(4)) }
         }
 
-        val btnAbc = Button(context).apply {
+        val btnAbc = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(dp(70), LinearLayout.LayoutParams.MATCH_PARENT)
             background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
             text = "ABC"
             setTextColor(if (isDark) Color.WHITE else Color.BLACK)
-            textSize = 14f
-            isAllCaps = false
+            textSize = 15f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onBackAction() }
         }
         bottomBar.addView(btnAbc)
@@ -395,6 +408,8 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
             setImageResource(R.drawable.ic_backspace)
             setColorFilter(if (isDark) Color.WHITE else Color.BLACK)
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onEmojiAction("ACTION_BACKSPACE") }
         }
         bottomBar.addView(btnBackspace)
@@ -437,13 +452,15 @@ class KeyboardLayout(private val context: Context) {
         }
         headerRow.addView(title)
 
-        val btnClose = Button(context).apply {
+        val btnClose = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(dp(70), dp(32))
             background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             text = "Tutup"
             setTextColor(Color.WHITE)
-            textSize = 12f
-            isAllCaps = false
+            textSize = 13f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onCloseAction() }
         }
         headerRow.addView(btnClose)
@@ -482,6 +499,8 @@ class KeyboardLayout(private val context: Context) {
                         if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light
                     )
                     setPadding(dp(12), dp(10), dp(12), dp(10))
+                    isClickable = true
+                    isFocusable = false
                     setOnClickListener { onPasteAction(textSnippet) }
                 }
 
@@ -530,14 +549,16 @@ class KeyboardLayout(private val context: Context) {
         textColor: Int,
         onKeyAction: (String) -> Unit
     ): View {
-        return Button(context).apply {
+        return TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = label
             setTextColor(textColor)
-            textSize = 21f
-            isAllCaps = false
+            textSize = 22f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
             setOnClickListener { onKeyAction(label) }
         }
     }

@@ -59,33 +59,37 @@ class SmartCorrectionEngine(private val context: Context) {
         val word = input.trim().lowercase()
         if (word.isEmpty()) return emptyList()
 
-        val dict = when (lang) {
-            "en" -> englishWords + customWords
-            else -> indonesianWords + customWords
+        return try {
+            val dict = when (lang) {
+                "en" -> englishWords + customWords
+                else -> indonesianWords + customWords
+            }
+
+            // 1. Exact match or prefix matches
+            val exactOrPrefix = dict.filter { it.startsWith(word) }.sortedBy { it.length }
+
+            // 2. Levenshtein fuzzy match if no direct prefix matches
+            val candidates = if (exactOrPrefix.isNotEmpty()) {
+                exactOrPrefix.take(3)
+            } else {
+                dict.map { Pair(it, levenshtein(word, it)) }
+                    .filter { it.second <= 2 }
+                    .sortedBy { it.second }
+                    .map { it.first }
+                    .take(3)
+            }
+
+            val result = mutableListOf<String>()
+            if (candidates.isNotEmpty()) {
+                result.addAll(candidates)
+            } else {
+                result.add(input)
+            }
+
+            result
+        } catch (_: Throwable) {
+            listOf(input)
         }
-
-        // 1. Exact match or prefix matches
-        val exactOrPrefix = dict.filter { it.startsWith(word) }.sortedBy { it.length }
-
-        // 2. Levenshtein fuzzy match if no direct prefix matches
-        val candidates = if (exactOrPrefix.isNotEmpty()) {
-            exactOrPrefix.take(3)
-        } else {
-            dict.map { Pair(it, levenshtein(word, it)) }
-                .filter { it.second <= 2 }
-                .sortedBy { it.second }
-                .map { it.first }
-                .take(3)
-        }
-
-        val result = mutableListOf<String>()
-        if (candidates.isNotEmpty()) {
-            result.addAll(candidates)
-        } else {
-            result.add(input)
-        }
-
-        return result
     }
 
     private fun levenshtein(s1: String, s2: String): Int {

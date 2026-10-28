@@ -12,21 +12,36 @@ import com.maoneart.ioskeyboard.preferences.KeyboardPreferences
 
 class AudioHapticManager(private val context: Context, private val prefs: KeyboardPreferences) {
 
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-    private val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-        vibratorManager?.defaultVibrator
-    } else {
-        @Suppress("DEPRECATION")
-        context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+    private val audioManager = try {
+        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    } catch (_: Throwable) {
+        null
+    }
+
+    private val vibrator = try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vibratorManager?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
+    } catch (_: Throwable) {
+        null
     }
 
     fun playClickSound(view: View? = null) {
         if (!prefs.isSoundEnabled) return
         try {
             audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, prefs.soundVolume)
-        } catch (_: Exception) {
-            view?.playSoundEffect(android.view.SoundEffectConstants.CLICK)
+        } catch (_: Throwable) {
+            try {
+                audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD)
+            } catch (_: Throwable) {
+                try {
+                    view?.playSoundEffect(android.view.SoundEffectConstants.CLICK)
+                } catch (_: Throwable) {}
+            }
         }
     }
 
@@ -43,12 +58,16 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
                 val effect = VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
                 vibrator?.vibrate(effect)
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val effect = VibrationEffect.createOneShot(prefs.hapticStrength.toLong(), VibrationEffect.DEFAULT_AMPLITUDE)
+                val effect = VibrationEffect.createOneShot(prefs.hapticStrength.toLong().coerceAtLeast(10L), VibrationEffect.DEFAULT_AMPLITUDE)
                 vibrator?.vibrate(effect)
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(prefs.hapticStrength.toLong())
+                vibrator?.vibrate(prefs.hapticStrength.toLong().coerceAtLeast(10L))
             }
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {
+            try {
+                view?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            } catch (_: Throwable) {}
+        }
     }
 }
