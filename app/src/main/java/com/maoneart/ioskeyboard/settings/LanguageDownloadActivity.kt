@@ -85,7 +85,7 @@ class LanguageDownloadActivity : AppCompatActivity() {
                 text = "${pack.name} (${pack.nativeName})"
                 textSize = 15.5f
                 setTextColor(Color.BLACK)
-                textStyle = android.graphics.Typeface.BOLD
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
             }
             val tvSubtitle = TextView(this).apply {
                 text = "Ukuran Paket: ${pack.size}"
@@ -103,7 +103,7 @@ class LanguageDownloadActivity : AppCompatActivity() {
                     text = "Terpasang ✓"
                     setTextColor(ContextCompat.getColor(this@LanguageDownloadActivity, R.color.ios_green))
                     textSize = 14f
-                    textStyle = android.graphics.Typeface.BOLD
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
                     setPadding(dp(8), dp(4), dp(8), dp(4))
                 }
                 itemRow.addView(tvInstalled)

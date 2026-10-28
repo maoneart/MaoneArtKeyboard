@@ -433,7 +433,7 @@ class KeyboardLayout(private val context: Context) {
             text = "📋 Riwayat Salinan (Clipboard)"
             setTextColor(if (isDark) Color.WHITE else Color.BLACK)
             textSize = 14f
-            textStyle = android.graphics.Typeface.BOLD
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         headerRow.addView(title)
 
