@@ -2,10 +2,12 @@ package com.maoneart.ioskeyboard.keyboard
 
 import android.content.Context
 import android.graphics.Color
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -16,6 +18,24 @@ import com.maoneart.ioskeyboard.emoji.EmojiBoardManager
 
 class KeyboardLayout(private val context: Context) {
 
+    private val letterKeyViews = mutableListOf<Pair<TextView, String>>()
+    private var shiftButtonRef: ImageButton? = null
+
+    // Update letter cases in 0.1ms without rebuilding views
+    fun updateShiftState(isShifted: Boolean) {
+        for ((tv, baseChar) in letterKeyViews) {
+            tv.text = if (isShifted) baseChar.uppercase() else baseChar.lowercase()
+        }
+    }
+
+    fun updateShiftButtonVisual(isShifted: Boolean, isCapsLock: Boolean, isDark: Boolean) {
+        shiftButtonRef?.let { btn ->
+            val activeColor = ContextCompat.getColor(context, R.color.ios_blue)
+            val normalColor = if (isDark) Color.WHITE else Color.BLACK
+            btn.setColorFilter(if (isShifted || isCapsLock) activeColor else normalColor)
+        }
+    }
+
     // --- 1. QWERTY LAYOUT ---
     fun createQwertyView(
         isShifted: Boolean,
@@ -23,6 +43,8 @@ class KeyboardLayout(private val context: Context) {
         activeLanguage: String,
         onKeyAction: (String) -> Unit
     ): View {
+        letterKeyViews.clear()
+
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = FrameLayout.LayoutParams(
@@ -67,16 +89,19 @@ class KeyboardLayout(private val context: Context) {
             setColorFilter(if (isShifted) ContextCompat.getColor(context, R.color.ios_blue) else textColor)
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_SHIFT") }
+            setupInstantTouch(this) { onKeyAction("ACTION_SHIFT") }
         }
+        shiftButtonRef = btnShift
         r3Layout.addView(btnShift)
 
         for (ch in row3) {
             val label = if (isShifted) ch.uppercase() else ch
-            r3Layout.addView(createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction))
+            val keyBtn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction)
+            letterKeyViews.add(Pair(keyBtn, ch))
+            r3Layout.addView(keyBtn)
         }
 
-        // Backspace Button
+        // Backspace Button with High-Speed Auto Repeat ("Hapus Ngebut")
         val btnBackspace = ImageButton(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.4f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
@@ -85,7 +110,7 @@ class KeyboardLayout(private val context: Context) {
             setColorFilter(textColor)
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_BACKSPACE") }
+            setupRapidBackspaceTouch(this) { onKeyAction("ACTION_BACKSPACE") }
         }
         r3Layout.addView(btnBackspace)
         root.addView(r3Layout)
@@ -111,7 +136,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_SYMBOLS") }
+            setupInstantTouch(this) { onKeyAction("ACTION_SYMBOLS") }
         }
         r4Layout.addView(btn123)
 
@@ -124,7 +149,7 @@ class KeyboardLayout(private val context: Context) {
             setColorFilter(textColor)
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_EMOJI") }
+            setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
         }
         r4Layout.addView(btnGlobe)
 
@@ -140,7 +165,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction(" ") }
+            setupInstantTouch(this) { onKeyAction(" ") }
         }
         r4Layout.addView(btnSpace)
 
@@ -155,7 +180,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_RETURN") }
+            setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
         }
         r4Layout.addView(btnReturn)
         root.addView(r4Layout)
@@ -220,7 +245,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction(if (!isMoreSymbols) "ACTION_MORE_SYMBOLS" else "ACTION_SYMBOLS") }
+            setupInstantTouch(this) { onKeyAction(if (!isMoreSymbols) "ACTION_MORE_SYMBOLS" else "ACTION_SYMBOLS") }
         }
         r3.addView(btnToggleMore)
 
@@ -236,7 +261,7 @@ class KeyboardLayout(private val context: Context) {
             setColorFilter(textColor)
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_BACKSPACE") }
+            setupRapidBackspaceTouch(this) { onKeyAction("ACTION_BACKSPACE") }
         }
         r3.addView(btnBackspace)
         root.addView(r3)
@@ -261,7 +286,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_ABC") }
+            setupInstantTouch(this) { onKeyAction("ACTION_ABC") }
         }
         r4.addView(btnAbc)
 
@@ -273,7 +298,7 @@ class KeyboardLayout(private val context: Context) {
             setColorFilter(textColor)
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_EMOJI") }
+            setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
         }
         r4.addView(btnGlobe)
 
@@ -287,7 +312,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction(" ") }
+            setupInstantTouch(this) { onKeyAction(" ") }
         }
         r4.addView(btnSpace)
 
@@ -301,7 +326,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction("ACTION_RETURN") }
+            setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
         }
         r4.addView(btnReturn)
         root.addView(r4)
@@ -358,7 +383,7 @@ class KeyboardLayout(private val context: Context) {
                     gravity = Gravity.CENTER
                     isClickable = true
                     isFocusable = false
-                    setOnClickListener { onEmojiAction(emo) }
+                    setupInstantTouch(this) { onEmojiAction(emo) }
                 }
                 row.addView(btn)
                 count++
@@ -394,7 +419,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onBackAction() }
+            setupInstantTouch(this) { onBackAction() }
         }
         bottomBar.addView(btnAbc)
 
@@ -410,7 +435,7 @@ class KeyboardLayout(private val context: Context) {
             setColorFilter(if (isDark) Color.WHITE else Color.BLACK)
             isClickable = true
             isFocusable = false
-            setOnClickListener { onEmojiAction("ACTION_BACKSPACE") }
+            setupRapidBackspaceTouch(this) { onEmojiAction("ACTION_BACKSPACE") }
         }
         bottomBar.addView(btnBackspace)
         root.addView(bottomBar)
@@ -461,7 +486,7 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onCloseAction() }
+            setupInstantTouch(this) { onCloseAction() }
         }
         headerRow.addView(btnClose)
         root.addView(headerRow)
@@ -501,7 +526,7 @@ class KeyboardLayout(private val context: Context) {
                     setPadding(dp(12), dp(10), dp(12), dp(10))
                     isClickable = true
                     isFocusable = false
-                    setOnClickListener { onPasteAction(textSnippet) }
+                    setupInstantTouch(this) { onPasteAction(textSnippet) }
                 }
 
                 val snippetView = TextView(context).apply {
@@ -528,18 +553,21 @@ class KeyboardLayout(private val context: Context) {
         textColor: Int,
         onKeyAction: (String) -> Unit
     ): LinearLayout {
-        return LinearLayout(context).apply {
+        val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1.0f
             ).apply { setMargins(dp(2), dp(2), dp(2), dp(2)) }
-            for (k in keys) {
-                val label = if (isShifted) k.uppercase() else k
-                addView(createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction))
-            }
         }
+        for (k in keys) {
+            val label = if (isShifted) k.uppercase() else k.lowercase()
+            val btn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction)
+            letterKeyViews.add(Pair(btn, k))
+            row.addView(btn)
+        }
+        return row
     }
 
     private fun createKeyButton(
@@ -548,7 +576,7 @@ class KeyboardLayout(private val context: Context) {
         keyBg: Int,
         textColor: Int,
         onKeyAction: (String) -> Unit
-    ): View {
+    ): TextView {
         return TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
@@ -559,7 +587,63 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setOnClickListener { onKeyAction(label) }
+            setupInstantTouch(this) { onKeyAction(text.toString()) }
+        }
+    }
+
+    // 0ms Latency Instant Touch Down Listener
+    private fun setupInstantTouch(view: View, onTrigger: () -> Unit) {
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    onTrigger()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    // High-Speed Auto Repeat Backspace ("Hapus Ngebut")
+    private fun setupRapidBackspaceTouch(view: View, onBackspace: () -> Unit) {
+        val handler = Handler(Looper.getMainLooper())
+        var repeatRunnable: Runnable? = null
+        var deleteCount = 0
+
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    deleteCount = 0
+                    // 1. Delete character immediately
+                    onBackspace()
+
+                    // 2. Start repeating delete job
+                    repeatRunnable = object : Runnable {
+                        override fun run() {
+                            deleteCount++
+                            onBackspace()
+                            // Accelerate: after 8 deletions switch from 60ms to 35ms (super ngebut!)
+                            val nextDelay = if (deleteCount > 8) 35L else 60L
+                            handler.postDelayed(this, nextDelay)
+                        }
+                    }
+                    handler.postDelayed(repeatRunnable!!, 320L)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    repeatRunnable?.let { handler.removeCallbacks(it) }
+                    repeatRunnable = null
+                    true
+                }
+                else -> false
+            }
         }
     }
 

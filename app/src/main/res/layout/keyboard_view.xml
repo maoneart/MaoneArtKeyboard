@@ -119,12 +119,12 @@
     <LinearLayout
         android:id="@+id/translateStrip"
         android:layout_width="match_parent"
-        android:layout_height="38dp"
+        android:layout_height="42dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="#15007AFF"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
         android:visibility="gone">
 
         <TextView
@@ -132,21 +132,41 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Live Translate: ID ➔ EN"
+            android:text="🌐 ID ➔ EN: Ketik kalimat..."
             android:textColor="@color/ios_blue"
             android:textSize="13sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
-        <Button
-            android:id="@+id/btnCloseTranslate"
+        <TextView
+            android:id="@+id/btnActionTranslate"
             android:layout_width="wrap_content"
-            android:layout_height="28dp"
-            android:text="Selesai"
-            android:textSize="11sp"
-            android:textColor="#FFFFFF"
+            android:layout_height="30dp"
             android:background="@drawable/key_bg_blue"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp" />
+            android:gravity="center"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:text="⚡ Terjemahkan"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="false"
+            android:layout_marginEnd="6dp" />
+
+        <TextView
+            android:id="@+id/btnCloseTranslate"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="@drawable/btn_icon_ripple"
+            android:gravity="center"
+            android:text="✕"
+            android:textColor="#8E8E93"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="false" />
     </LinearLayout>
 
     <!-- Dynamic Keyboard Body Frame -->

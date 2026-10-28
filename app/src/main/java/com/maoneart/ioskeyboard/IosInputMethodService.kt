@@ -51,7 +51,9 @@ class IosInputMethodService : InputMethodService() {
     private var lastShiftPressTime: Long = 0
     private var lastSpacePressTime: Long = 0
 
+    // Sentence-level Live Translate Buffer
     private val composingWord = StringBuilder()
+    private val currentSentenceBuffer = StringBuilder()
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
 
     // View References
@@ -63,7 +65,8 @@ class IosInputMethodService : InputMethodService() {
     private var badgeLanguage: TextView? = null
     private var translateStrip: LinearLayout? = null
     private var tvTranslateStatus: TextView? = null
-    private var btnCloseTranslate: View? = null
+    private var btnActionTranslate: TextView? = null
+    private var btnCloseTranslate: TextView? = null
 
     override fun onCreate() {
         try {
@@ -79,7 +82,7 @@ class IosInputMethodService : InputMethodService() {
             clipboardManager = ClipboardHistoryManager(this)
             layoutEngine = KeyboardLayout(this)
         } catch (t: Throwable) {
-            Log.e("IosInputMethodService", "Error during onCreate", t)
+            Log.e("IosInputMethodService", "Error in onCreate", t)
         }
     }
 
@@ -97,13 +100,13 @@ class IosInputMethodService : InputMethodService() {
             badgeLanguage = view.findViewById(R.id.badgeLanguage)
             translateStrip = view.findViewById(R.id.translateStrip)
             tvTranslateStatus = view.findViewById(R.id.tvTranslateStatus)
+            btnActionTranslate = view.findViewById(R.id.btnActionTranslate)
             btnCloseTranslate = view.findViewById(R.id.btnCloseTranslate)
 
             val btnQuickTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnQuickClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnQuickSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
 
-            // Setup Quick Toolbar Buttons
             btnQuickTranslate?.setOnClickListener {
                 audioHaptic.playClickSound(it)
                 audioHaptic.triggerHapticFeedback(it)
@@ -144,6 +147,13 @@ class IosInputMethodService : InputMethodService() {
             candidate2?.setOnClickListener { selectCandidate(candidate2?.text?.toString()) }
             candidate3?.setOnClickListener { selectCandidate(candidate3?.text?.toString()) }
 
+            // Sentence Translate Button Click
+            btnActionTranslate?.setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                translateCurrentSentence()
+            }
+
             btnCloseTranslate?.setOnClickListener {
                 prefs.isLiveTranslateEnabled = false
                 updateTranslateStripUI()
@@ -179,6 +189,7 @@ class IosInputMethodService : InputMethodService() {
         super.onStartInputView(info, restarting)
         try {
             composingWord.clear()
+            currentSentenceBuffer.clear()
             updateSuggestions()
             updateLanguageBadge()
             updateTranslateStripUI()
@@ -241,7 +252,13 @@ class IosInputMethodService : InputMethodService() {
                 translateStrip?.visibility = View.VISIBLE
                 val src = prefs.translateSourceLang.uppercase()
                 val tgt = prefs.translateTargetLang.uppercase()
-                tvTranslateStatus?.text = "Live Translate: $src ➔ $tgt"
+                if (currentSentenceBuffer.isEmpty()) {
+                    tvTranslateStatus?.text = "🌐 $src ➔ $tgt: Ketik kalimat..."
+                } else {
+                    val preview = currentSentenceBuffer.toString()
+                    val truncated = if (preview.length > 25) preview.take(25) + "…" else preview
+                    tvTranslateStatus?.text = "🌐 $src ➔ $tgt: \"$truncated\""
+                }
             } else {
                 translateStrip?.visibility = View.GONE
             }
@@ -322,7 +339,9 @@ class IosInputMethodService : InputMethodService() {
                         isShifted = !isShifted
                     }
                     lastShiftPressTime = now
-                    renderCurrentLayout()
+                    // Instant Shift update without re-inflating views
+                    layoutEngine.updateShiftState(isShifted || isCapsLock)
+                    layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode())
                 }
                 "ACTION_BACKSPACE" -> {
                     handleBackspace()
@@ -356,11 +375,15 @@ class IosInputMethodService : InputMethodService() {
         try {
             currentInputConnection?.commitText(charStr, 1)
             composingWord.append(charStr)
+            currentSentenceBuffer.append(charStr)
             updateSuggestions()
+            updateTranslateStripUI()
 
             if (isShifted && !isCapsLock) {
                 isShifted = false
-                renderCurrentLayout()
+                // Instant update without rebuilding view tree
+                layoutEngine.updateShiftState(false)
+                layoutEngine.updateShiftButtonVisual(false, false, isDarkMode())
             }
         } catch (_: Throwable) {}
     }
@@ -370,8 +393,12 @@ class IosInputMethodService : InputMethodService() {
             if (composingWord.isNotEmpty()) {
                 composingWord.deleteCharAt(composingWord.length - 1)
             }
+            if (currentSentenceBuffer.isNotEmpty()) {
+                currentSentenceBuffer.deleteCharAt(currentSentenceBuffer.length - 1)
+            }
             currentInputConnection?.deleteSurroundingText(1, 0)
             updateSuggestions()
+            updateTranslateStripUI()
         } catch (_: Throwable) {}
     }
 
@@ -382,39 +409,59 @@ class IosInputMethodService : InputMethodService() {
             if (prefs.isDoubleSpacePeriodEnabled && (now - lastSpacePressTime < 500) && composingWord.isEmpty()) {
                 currentInputConnection?.deleteSurroundingText(1, 0)
                 currentInputConnection?.commitText(". ", 1)
+                if (currentSentenceBuffer.isNotEmpty()) {
+                    currentSentenceBuffer.deleteCharAt(currentSentenceBuffer.length - 1)
+                }
+                currentSentenceBuffer.append(". ")
                 lastSpacePressTime = 0
+                updateTranslateStripUI()
                 return
             }
 
             lastSpacePressTime = now
-
-            if (prefs.isLiveTranslateEnabled && composingWord.isNotEmpty()) {
-                val wordToTranslate = composingWord.toString()
-                composingWord.clear()
-                serviceScope.launch {
-                    try {
-                        val translated = translateManager.translateText(
-                            wordToTranslate,
-                            prefs.translateSourceLang,
-                            prefs.translateTargetLang
-                        )
-                        currentInputConnection?.deleteSurroundingText(wordToTranslate.length, 0)
-                        currentInputConnection?.commitText("$translated ", 1)
-                    } catch (_: Throwable) {
-                        currentInputConnection?.commitText(" ", 1)
-                    }
-                }
-            } else {
-                currentInputConnection?.commitText(" ", 1)
-                composingWord.clear()
-            }
-
+            currentInputConnection?.commitText(" ", 1)
+            composingWord.clear()
+            currentSentenceBuffer.append(" ")
             updateSuggestions()
+            updateTranslateStripUI()
         } catch (_: Throwable) {}
+    }
+
+    // Translate full sentence buffer
+    private fun translateCurrentSentence() {
+        val sentence = currentSentenceBuffer.toString().trim()
+        if (sentence.isEmpty()) return
+
+        tvTranslateStatus?.text = "⏳ Menerjemahkan kalimat..."
+
+        serviceScope.launch {
+            try {
+                val translated = translateManager.translateText(
+                    sentence,
+                    prefs.translateSourceLang,
+                    prefs.translateTargetLang
+                )
+                // Delete the original sentence from the input connection
+                currentInputConnection?.deleteSurroundingText(sentence.length, 0)
+                // Insert the full translated sentence
+                currentInputConnection?.commitText("$translated ", 1)
+
+                currentSentenceBuffer.clear()
+                composingWord.clear()
+                tvTranslateStatus?.text = "✓ Selesai diterjemahkan"
+            } catch (_: Throwable) {
+                tvTranslateStatus?.text = "Gagal menerjemahkan (periksa koneksi)"
+            }
+        }
     }
 
     private fun handleReturn() {
         try {
+            // If Live Translate is active and has a typed sentence, translate before return
+            if (prefs.isLiveTranslateEnabled && currentSentenceBuffer.isNotBlank()) {
+                translateCurrentSentence()
+            }
+
             val ic = currentInputConnection ?: return
             val currentEditorInfo = currentInputEditorInfo
             val imeAction = currentEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
@@ -427,7 +474,9 @@ class IosInputMethodService : InputMethodService() {
             }
 
             composingWord.clear()
+            currentSentenceBuffer.clear()
             updateSuggestions()
+            updateTranslateStripUI()
         } catch (_: Throwable) {}
     }
 
@@ -448,7 +497,9 @@ class IosInputMethodService : InputMethodService() {
         try {
             currentInputConnection?.commitText(text, 1)
             composingWord.clear()
+            currentSentenceBuffer.append(text)
             updateSuggestions()
+            updateTranslateStripUI()
         } catch (_: Throwable) {}
     }
 
@@ -480,8 +531,15 @@ class IosInputMethodService : InputMethodService() {
             currentInputConnection?.deleteSurroundingText(lengthToDelete, 0)
             currentInputConnection?.commitText("$candidate ", 1)
 
+            // Adjust sentence buffer
+            if (currentSentenceBuffer.length >= lengthToDelete) {
+                currentSentenceBuffer.setLength(currentSentenceBuffer.length - lengthToDelete)
+            }
+            currentSentenceBuffer.append("$candidate ")
+
             composingWord.clear()
             updateSuggestions()
+            updateTranslateStripUI()
         } catch (_: Throwable) {}
     }
 }
