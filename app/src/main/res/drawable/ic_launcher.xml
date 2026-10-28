@@ -1,0 +1,45 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Squircle Background -->
+    <path
+        android:pathData="M24,12 L84,12 A12,12 0,0,1 96,24 L96,84 A12,12 0,0,1 84,96 L24,96 A12,12 0,0,1 12,84 L12,24 A12,12 0,0,1 24,12 Z"
+        android:fillColor="#007AFF" />
+    
+    <!-- Subtle Inner Dark Shadow / Depth -->
+    <path
+        android:pathData="M12,78 L12,84 A12,12 0,0,0 24,96 L84,96 A12,12 0,0,0 96,84 L96,78 Z"
+        android:fillColor="#0056B3" />
+
+    <!-- Keyboard Frame Background -->
+    <path
+        android:pathData="M24,28 L84,28 A6,6 0,0,1 90,34 L90,74 A6,6 0,0,1 84,80 L24,80 A6,6 0,0,1 18,74 L18,34 A6,6 0,0,1 24,28 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Keyboard Keys Row 1 -->
+    <path
+        android:pathData="M24,34 H32 V42 H24 Z M36,34 H44 V42 H36 Z M48,34 H56 V42 H48 Z M60,34 H68 V42 H60 Z M72,34 H84 V42 H72 Z"
+        android:fillColor="#E5E5EA" />
+
+    <!-- Keyboard Keys Row 2 -->
+    <path
+        android:pathData="M24,46 H34 V54 H24 Z M38,46 H46 V54 H38 Z M50,46 H58 V54 H50 Z M62,46 H70 V54 H62 Z M74,46 H84 V54 H74 Z"
+        android:fillColor="#E5E5EA" />
+
+    <!-- Keyboard Keys Row 3 (Space Bar & Side Keys) -->
+    <path
+        android:pathData="M24,58 H34 V66 H24 Z M74,58 H84 V66 H74 Z"
+        android:fillColor="#D1D1D6" />
+
+    <!-- Space Bar (iOS Blue Accent) -->
+    <path
+        android:pathData="M38,58 H70 V66 H38 Z"
+        android:fillColor="#007AFF" />
+
+    <!-- Apple Globe Accent Dot -->
+    <path
+        android:pathData="M29,62 m-2,0 a2,2 0,1,0 4,0 a2,2 0,1,0 -4,0"
+        android:fillColor="#FFFFFF" />
+</vector>

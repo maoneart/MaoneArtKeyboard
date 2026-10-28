@@ -1,0 +1,62 @@
+name: Build MaoneArt iOS Keyboard APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Android Release APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Android Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Prepare APK Asset
+        run: |
+          mkdir -p release-output
+          cp app/build/outputs/apk/release/app-release.apk release-output/iOSKeyboard.apk
+          ls -la release-output/
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOSKeyboard-apk
+          path: release-output/iOSKeyboard.apk
+          retention-days: 14
+
+      - name: Create GitHub Release & Upload Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/main')
+        with:
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "MaoneArt iOS Keyboard v1.0.${{ github.run_number }}"
+          body: |
+            ### 📱 MaoneArt iOS Keyboard for Android (Release Build)
+            - **Tampilan**: Desain iOS 18 Glassmorphic (Light, Dark, OLED mode)
+            - **Emoji**: Apple Emoji board lengkap dengan tab kategori
+            - **Fitur Pintar**: In-Keyboard Live Translate (Google Translate API)
+            - **Koreksi Teks**: Smart Levenshtein Typo Corrector & Offline Dictionary
+            - **Haptik & Audio**: iOS Tock sound & Taptic Engine tactile feedback
+            - **Pengaturan**: Apple iOS Cupertino Settings UI
+          files: release-output/iOSKeyboard.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

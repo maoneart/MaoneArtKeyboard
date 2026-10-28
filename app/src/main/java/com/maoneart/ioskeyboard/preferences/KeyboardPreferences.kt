@@ -1,0 +1,56 @@
+package com.maoneart.ioskeyboard.preferences
+
+import android.content.Context
+import android.content.SharedPreferences
+
+class KeyboardPreferences(context: Context) {
+    private val prefs: SharedPreferences = context.getSharedPreferences("ios_keyboard_prefs", Context.MODE_PRIVATE)
+
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "auto") ?: "auto"
+        set(value) = prefs.edit().putString("theme_mode", value).apply()
+
+    var isSoundEnabled: Boolean
+        get() = prefs.getBoolean("sound_enabled", true)
+        set(value) = prefs.edit().putBoolean("sound_enabled", value).apply()
+
+    var soundVolume: Float
+        get() = prefs.getFloat("sound_volume", 0.7f)
+        set(value) = prefs.edit().putFloat("sound_volume", value).apply()
+
+    var isHapticEnabled: Boolean
+        get() = prefs.getBoolean("haptic_enabled", true)
+        set(value) = prefs.edit().putBoolean("haptic_enabled", value).apply()
+
+    var hapticStrength: Int
+        get() = prefs.getInt("haptic_strength", 25) // ms
+        set(value) = prefs.edit().putInt("haptic_strength", value).apply()
+
+    var isKeyPopupEnabled: Boolean
+        get() = prefs.getBoolean("key_popup_enabled", true)
+        set(value) = prefs.edit().putBoolean("key_popup_enabled", value).apply()
+
+    var activeLanguage: String
+        get() = prefs.getString("active_language", "id") ?: "id"
+        set(value) = prefs.edit().putString("active_language", value).apply()
+
+    var isAutoCorrectEnabled: Boolean
+        get() = prefs.getBoolean("auto_correct_enabled", true)
+        set(value) = prefs.edit().putBoolean("auto_correct_enabled", value).apply()
+
+    var isDoubleSpacePeriodEnabled: Boolean
+        get() = prefs.getBoolean("double_space_period", true)
+        set(value) = prefs.edit().putBoolean("double_space_period", value).apply()
+
+    var isLiveTranslateEnabled: Boolean
+        get() = prefs.getBoolean("live_translate_enabled", false)
+        set(value) = prefs.edit().putBoolean("live_translate_enabled", value).apply()
+
+    var translateSourceLang: String
+        get() = prefs.getString("translate_source_lang", "id") ?: "id"
+        set(value) = prefs.edit().putString("translate_source_lang", value).apply()
+
+    var translateTargetLang: String
+        get() = prefs.getString("translate_target_lang", "en") ?: "en"
+        set(value) = prefs.edit().putString("translate_target_lang", value).apply()
+}

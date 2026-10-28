@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme -->
+    <theme name="Theme.IosKeyboard" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/ios_blue</item>
+        <item name="colorSecondary">@color/ios_green</item>
+        <item name="android:statusBarColor">@color/ios_settings_bg_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </theme>
+
+    <theme name="Theme.IosKeyboard.Settings" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/ios_blue</item>
+        <item name="colorSecondary">@color/ios_green</item>
+        <item name="android:windowBackground">@color/ios_settings_bg_light</item>
+        <item name="android:statusBarColor">@color/ios_settings_bg_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </theme>
+</resources>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- iOS Standard Light Theme Colors -->
+    <color name="ios_bg_light">#D1D5DB</color>
+    <color name="ios_key_light">#FFFFFF</color>
+    <color name="ios_key_special_light">#B0B5BD</color>
+    <color name="ios_key_text_light">#000000</color>
+    <color name="ios_key_shadow_light">#88000000</color>
+    <color name="ios_toolbar_light">#E5E7EB</color>
+    <color name="ios_settings_bg_light">#F2F2F7</color>
+    <color name="ios_card_light">#FFFFFF</color>
+    <color name="ios_separator_light">#C6C6C8</color>
+    
+    <!-- iOS Standard Dark Theme Colors -->
+    <color name="ios_bg_dark">#1C1C1E</color>
+    <color name="ios_key_dark">#636366</color>
+    <color name="ios_key_special_dark">#48484A</color>
+    <color name="ios_key_text_dark">#FFFFFF</color>
+    <color name="ios_key_shadow_dark">#FF000000</color>
+    <color name="ios_toolbar_dark">#2C2C2E</color>
+    <color name="ios_settings_bg_dark">#000000</color>
+    <color name="ios_card_dark">#1C1C1E</color>
+    <color name="ios_separator_dark">#38383A</color>
+
+    <!-- iOS Signature Accents -->
+    <color name="ios_blue">#007AFF</color>
+    <color name="ios_green">#34C759</color>
+    <color name="ios_orange">#FF9500</color>
+    <color name="ios_red">#FF3B30</color>
+    <color name="ios_purple">#AF52DE</color>
+    <color name="ios_cyan">#32ADE6</color>
+    <color name="ios_key_popup_light">#FFFFFF</color>
+    <color name="ios_key_popup_dark">#505054</color>
+</resources>

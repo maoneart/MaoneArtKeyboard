@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">iOS Keyboard</string>
+    <string name="keyboard_title">MaoneArt iOS Keyboard</string>
+    <string name="subtype_indonesian">Bahasa Indonesia (iOS)</string>
+    <string name="subtype_english">English (iOS)</string>
+    
+    <!-- Settings Screen Strings -->
+    <string name="settings_title">Keyboard Settings</string>
+    <string name="section_appearance">TAMPILAN &amp; TEMA</string>
+    <string name="pref_theme">Tema Keyboard</string>
+    <string name="pref_theme_desc">Pilih antara iOS Light, iOS Dark, atau Otomatis</string>
+    <string name="pref_key_popup">Key Pop-up Preview</string>
+    <string name="pref_key_popup_desc">Perbesar tombol saat ditekan ala iPhone</string>
+    
+    <string name="section_sound_haptic">SUARA &amp; GETARAN</string>
+    <string name="pref_sound">Suara Ketukan iOS</string>
+    <string name="pref_sound_desc">Suara klik halus Tock khas Apple</string>
+    <string name="pref_haptic">Getaran Haptik Apple</string>
+    <string name="pref_haptic_desc">Umpan balik getar Taptic Engine responsif</string>
+    
+    <string name="section_language_dict">BAHASA &amp; KOREKSI</string>
+    <string name="pref_active_language">Bahasa Aktif</string>
+    <string name="pref_auto_correct">Koreksi Kata Otomatis</string>
+    <string name="pref_auto_correct_desc">Perbaiki salah ketik sesuai kamus bahasa</string>
+    <string name="pref_double_space_period">Spasi Ganda Jadi Titik</string>
+    <string name="pref_double_space_period_desc">Tekan spasi 2x otomatis mengetik tanda titik</string>
+    <string name="title_languages">Unduh Paket Bahasa</string>
+    
+    <string name="section_smart_tools">ALAT PINTAR</string>
+    <string name="pref_live_translate">Terjemahan Langsung (Live Translate)</string>
+    <string name="pref_live_translate_desc">Ketik bahasa asal, langsung terkirim bahasa target</string>
+    <string name="pref_clipboard">Manajer Salinan (Clipboard)</string>
+    <string name="pref_clipboard_desc">Simpan riwayat copy-paste di atas keyboard</string>
+    
+    <string name="enable_keyboard_btn">Aktifkan di Pengaturan Android</string>
+    <string name="select_keyboard_btn">Pilih sebagai Keyboard Utama</string>
+    <string name="test_keyboard_hint">Ketik di sini untuk menguji keyboard iOS…</string>
+</resources>
