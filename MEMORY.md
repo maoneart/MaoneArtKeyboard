@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.10)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.11)
 
 ---
 
@@ -14,7 +14,11 @@
 5. **Samsung-Style Live Translate Panel**: Panel input kalimat terisolasi di atas keyboard. Pengguna mengetik kalimat lengkap di dalam kotak terjemahan keyboard, lalu menekan tombol `[Kirim ➔]` untuk menerjemahkan sekaligus ke aplikasi tujuan (misal WhatsApp), meniadakan penerjemahan patah perkata ("tidak 1-1").
 6. **Animated Bouncing Emojis**: Laci emoji Apple dilengkapi animasi pegas dinamis (*tactile spring bounce pop*) menggunakan `OvershootInterpolator(3.0f)` saat disentuh (`scale 1.45x`), menghidupkan animasi emoji khas iOS.
 7. **WhatsApp & Multiline Return / Enter Key**: Deteksi tipe input dinamis pada `updateReturnButton(editorInfo)`. Menampilkan simbol Enter iOS (`↵`) pada chat dan form multiline (WhatsApp, Telegram, Notes). Penekanan tombol Enter pada multiline field langsung mengirimkan `\n` via `commitText("\n", 1)` untuk menjamin baris baru terbuat tanpa hilang/diabaikan oleh app.
-8. **Auto-Correction Engine**: Menggunakan algoritma Levenshtein fuzzy distance matching dengan kamus offline bawaan Bahasa Indonesia & English, plus dukungan kamus tambahan di `files/dictionaries/`.
+8. **Smart Typo Buster & Multi-Candidate Strip (v1.0.11)**:
+   - **Kamus Kaya & Slang Chat (1.500+ kata)**: Meliputi kosa kata sehari-hari, kata ganti (`aku`, `kamu`, `dia`, `kita`, `kami`), kata kerja, kata tanya, singkatan chat (`kmu`, `bsa`, `ak`, `mw`, `udh`, `blm`, `lgi`, `jg`, `juha`, `bgt`, `sy`, `tdk`, `ga`, `gpp`, `mksih`, dll.).
+   - **Sinkronisasi Kata Real-Time saat Hapus (Backspace)**: Membaca token kata sebelum kursor via `getCurrentWordBeforeCursor()` sehingga saat pengguna menghapus karakter satu per satu, bilah rekomendasi langsung mengupdate pilihan kata yang sesuai dengan sisa huruf. Saat input kosong atau setelah spasi, otomatis menyajikan kata-kata umum awal (`aku`, `kamu`, `bisa`, `mau`, `lagi`, `sudah`).
+   - **Deteksi Typo Cerdas (Kurang Huruf, Salah Ketik, Kedekatan QWERTY)**: Algoritma Damerau-Levenshtein yang diperkaya deteksi subsequences untuk typo huruf hilang (`kmu` -> `kamu`, `bsa` -> `bisa`), transposisi huruf tertukar (`akmu` -> `kamu`), dan bonus kedekatan tuts keyboard QWERTY (`juha` -> `juga`).
+   - **Scrollable Candidate Strip (Lebih Banyak Rekomendasi)**: Bilah saran kini berupa `HorizontalScrollView` dengan desain chip iOS (teks tebal pada saran pertama, teks reguler pada saran lanjutan, dipisahkan garis vertikal tipis, mendukung 6-8 rekomendasi yang dapat digeser).
 9. **CI/CD Pipeline**: GitHub Actions (`.github/workflows/build_apk.yml`) otomatis build release APK bertanda tangan debug keystore dan mempublikasikan release asset.
 
 ---
@@ -32,4 +36,7 @@
   - Perbaikan Tombol Enter WhatsApp & Multiline (Release v1.0.10):
     1. Tombol Return otomatis menampilkan simbol panah Enter iOS (`↵`) saat membuka WhatsApp atau kolom input multiline.
     2. Eksekusi penekanan Enter langsung menginjeksi karakter newline `\n` ke aplikasi tujuan sehingga baris baru selalu tercipta dengan mulus di WhatsApp.
-    3. Build CI/CD GitHub Actions sukses dan file release APK otomatis tersimpan di `/sdcard/Download/iOSKeyboard.apk` (5.3 MB).
+  - Smart Typo Buster & Rekomendasi Kata Responsif (Release v1.0.11):
+    1. Pilihan kosakata langsung muncul dan berubah dinamis saat huruf dihapus (`kamu` -> hapus jadi `kam` -> hapus jadi `ka` -> hapus jadi `k`).
+    2. Penanganan typo komprehensif: kurang huruf (`kmu` -> `kamu`, `bsa` -> `bisa`), salah ketik tombol berdampingan (`juha` -> `juga`), dan kata singkatan chat.
+    3. Bilah rekomendasi horizontal scrollable dengan hingga 8 saran kata berdesain iOS QuickType chip.
