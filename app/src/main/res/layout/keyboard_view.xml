@@ -35,15 +35,6 @@
             android:src="@drawable/ic_clipboard"
             android:contentDescription="Clipboard History" />
 
-        <!-- Emoji & Sticker Quick Button -->
-        <ImageButton
-            android:id="@+id/btnQuickEmoji"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@drawable/btn_icon_ripple"
-            android:src="@drawable/ic_emoji_smile"
-            android:contentDescription="Emoji &amp; Stiker" />
-
         <!-- Candidate Suggestions Row -->
         <LinearLayout
             android:id="@+id/candidatesRow"
@@ -186,6 +177,22 @@
                 android:clickable="true"
                 android:focusable="false" />
         </LinearLayout>
+
+        <!-- Quick Target Language Bar (Direct Selection on Keyboard) -->
+        <HorizontalScrollView
+            android:id="@+id/scrollTranslateLangs"
+            android:layout_width="match_parent"
+            android:layout_height="28dp"
+            android:scrollbars="none"
+            android:layout_marginBottom="4dp">
+
+            <LinearLayout
+                android:id="@+id/layoutTranslateLangs"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
 
         <!-- Bottom Row: Input Box + Send / Translate Button -->
         <LinearLayout

@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.28)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.29)
 
 ---
 
@@ -77,3 +77,7 @@
     1. **Sistem Belajar Mandiri (User Self-Learning Dictionary)**: Setiap kata yang sering diketik atau dipilih pengguna otomatis dipelajari frekuensinya dan dijadikan rekomendasi nomor 1 saat mengetik awalan katanya.
     2. **74.500+ Kosakata KBBI Lengkap**: Mendukung seluruh kata panjang berimbuhan resmi seperti `kehilangan`, `keberhasilan`, `kesejahteraan`, `kesempatan`, `keputusan`, dll.
     3. **Algoritma Pencarian O(log N) Super Ngebut**: Eksekusi instan di bawah 0.1 milidetik tanpa jeda pada tuts keyboard.
+  - Toolbar Luas, Perbaikan Scroll Emoji Mulus & Pemilih Bahasa Langsung Keyboard (Release v1.0.29):
+    1. **Toolbar QuickType Lega**: Menghapus tombol emoji di sebelah clipboard di toolbar atas sehingga bilah saran kata mendapat ruang penuh yang lapang dan lega.
+    2. **Perbaikan Total Scroll Emoji (Anti Salah Pencet)**: Mengganti touch listener yang mengonsumsi ACTION_DOWN dengan setOnClickListener standar Android sehingga gerakan usap scroll vertikal laci emoji 100% mulus dan tidak memicu pengetikan emoji tanpa sengaja saat menggulir.
+    3. **Bilah Pemilih Bahasa Langsung di Keyboard**: Di panel terjemahan, kini terdapat deretan chip tombol bahasa instan (`🇺🇸 English`, `🇸🇦 Arab`, `🇯🇵 Jepang`, `🇰🇷 Korea`, `🇨🇳 Mandarin`, `🇪🇸 Spanyol`, `🇫🇷 Prancis`, `🇩🇪 Jerman`, dll) yang dapat diganti dengan 1-tap langsung dari keyboard tanpa perlu membuka menu pengaturan! Tersedia juga tombol `🌐 Semua...` untuk memilih puluhan bahasa dunia.

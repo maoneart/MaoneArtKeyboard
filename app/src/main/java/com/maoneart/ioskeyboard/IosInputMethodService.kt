@@ -18,6 +18,7 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -78,6 +79,7 @@ class IosInputMethodService : InputMethodService() {
 
     // Translate Panel Views
     private var translatePanel: LinearLayout? = null
+    private var layoutTranslateLangs: LinearLayout? = null
     private var tvTranslateLangPair: TextView? = null
     private var tvTranslateStatus: TextView? = null
     private var tvTranslateInputBox: TextView? = null
@@ -119,6 +121,7 @@ class IosInputMethodService : InputMethodService() {
 
             // Setup Translate Panel
             translatePanel = view.findViewById(R.id.translatePanel)
+            layoutTranslateLangs = view.findViewById(R.id.layoutTranslateLangs)
             tvTranslateLangPair = view.findViewById(R.id.tvTranslateLangPair)
             tvTranslateStatus = view.findViewById(R.id.tvTranslateStatus)
             tvTranslateInputBox = view.findViewById(R.id.tvTranslateInputBox)
@@ -146,7 +149,6 @@ class IosInputMethodService : InputMethodService() {
 
             val btnQuickTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnQuickClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
-            val btnQuickEmoji = view.findViewById<ImageButton>(R.id.btnQuickEmoji)
             val btnQuickSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
 
             btnQuickTranslate?.setOnClickListener {
@@ -162,16 +164,6 @@ class IosInputMethodService : InputMethodService() {
                     switchMode(Mode.QWERTY)
                 } else {
                     switchMode(Mode.CLIPBOARD)
-                }
-            }
-
-            btnQuickEmoji?.setOnClickListener {
-                audioHaptic.playClickSound(it)
-                audioHaptic.triggerHapticFeedback(it)
-                if (currentMode == Mode.EMOJI) {
-                    switchMode(Mode.QWERTY)
-                } else {
-                    switchMode(Mode.EMOJI)
                 }
             }
 
@@ -206,6 +198,13 @@ class IosInputMethodService : InputMethodService() {
                 prefs.translateSourceLang = prefs.translateTargetLang
                 prefs.translateTargetLang = temp
                 updateTranslatePanelUI()
+            }
+
+            tvTranslateLangPair?.setOnLongClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                showAllLanguagesDialog()
+                true
             }
 
             btnTranslateSend?.setOnClickListener {
@@ -331,12 +330,10 @@ class IosInputMethodService : InputMethodService() {
 
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
-            val btnEmoji = view.findViewById<ImageButton>(R.id.btnQuickEmoji)
             val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
 
             btnTranslate?.setColorFilter(textColor)
             btnClipboard?.setColorFilter(textColor)
-            btnEmoji?.setColorFilter(textColor)
             btnSettings?.setColorFilter(textColor)
         } catch (_: Throwable) {}
     }
@@ -386,6 +383,114 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private val availableTargetLanguages = listOf(
+        Pair("🇺🇸 English", "en"),
+        Pair("🇸🇦 Arab", "ar"),
+        Pair("🇯🇵 Jepang", "ja"),
+        Pair("🇰🇷 Korea", "ko"),
+        Pair("🇨🇳 Mandarin", "zh"),
+        Pair("🇪🇸 Spanyol", "es"),
+        Pair("🇫🇷 Prancis", "fr"),
+        Pair("🇩🇪 Jerman", "de"),
+        Pair("🇷🇺 Rusia", "ru"),
+        Pair("🇹🇷 Turki", "tr"),
+        Pair("🇮🇩 Indonesia", "id"),
+        Pair("🌐 Semua...", "MORE")
+    )
+
+    private fun renderQuickLanguageChips() {
+        val container = layoutTranslateLangs ?: return
+        container.removeAllViews()
+        val isDark = isDarkMode()
+        val currentTarget = prefs.translateTargetLang.lowercase()
+
+        for ((label, code) in availableTargetLanguages) {
+            val isSelected = (code == currentTarget)
+            val chip = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(24)
+                ).apply { setMargins(dp(2), 0, dp(2), 0) }
+                setPadding(dp(8), 0, dp(8), 0)
+                gravity = Gravity.CENTER
+                text = label
+                textSize = 11f
+
+                if (isSelected) {
+                    background = ContextCompat.getDrawable(this@IosInputMethodService, R.drawable.key_bg_blue)
+                    setTextColor(Color.WHITE)
+                    setTypeface(typeface, Typeface.BOLD)
+                } else {
+                    background = ContextCompat.getDrawable(
+                        this@IosInputMethodService,
+                        if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light
+                    )
+                    setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
+                    setTypeface(typeface, Typeface.NORMAL)
+                }
+
+                setOnClickListener {
+                    audioHaptic.playClickSound(it)
+                    audioHaptic.triggerHapticFeedback(it)
+                    if (code == "MORE") {
+                        showAllLanguagesDialog()
+                    } else {
+                        prefs.translateTargetLang = code
+                        updateTranslatePanelUI()
+                    }
+                }
+            }
+            container.addView(chip)
+        }
+    }
+
+    private fun showAllLanguagesDialog() {
+        try {
+            val allLanguages = listOf(
+                Pair("🇺🇸 Inggris (English)", "en"),
+                Pair("🇮🇩 Indonesia", "id"),
+                Pair("🇸🇦 Arab (العربية)", "ar"),
+                Pair("🇯🇵 Jepang (日本語)", "ja"),
+                Pair("🇰🇷 Korea (한국어)", "ko"),
+                Pair("🇨🇳 Mandarin (中文)", "zh"),
+                Pair("🇪🇸 Spanyol (Español)", "es"),
+                Pair("🇫🇷 Prancis (Français)", "fr"),
+                Pair("🇩🇪 Jerman (Deutsch)", "de"),
+                Pair("🇷🇺 Rusia (Русский)", "ru"),
+                Pair("🇹🇷 Turki (Türkçe)", "tr"),
+                Pair("🇳🇱 Belanda (Nederlands)", "nl"),
+                Pair("🇮🇹 Italia (Italiano)", "it"),
+                Pair("🇵🇹 Portugis (Português)", "pt"),
+                Pair("🇻🇳 Vietnam (Tiếng Việt)", "vi"),
+                Pair("🇹🇭 Thailand (ไทย)", "th"),
+                Pair("🇮🇳 Hindi (हिन्दी)", "hi"),
+                Pair("🇵🇭 Filipina (Tagalog)", "tl"),
+                Pair("🇲🇾 Melayu", "ms")
+            )
+            val names = allLanguages.map { it.first }.toTypedArray()
+            val themeRes = if (isDarkMode()) androidx.appcompat.R.style.Theme_AppCompat_Dialog_Alert else androidx.appcompat.R.style.Theme_AppCompat_Light_Dialog_Alert
+            val builder = androidx.appcompat.app.AlertDialog.Builder(ContextThemeWrapper(this, themeRes))
+            builder.setTitle("Pilih Bahasa Tujuan")
+            builder.setItems(names) { _, which ->
+                prefs.translateTargetLang = allLanguages[which].second
+                updateTranslatePanelUI()
+            }
+            builder.setNegativeButton("Batal", null)
+            val dialog = builder.create()
+            val window = dialog.window
+            if (window != null) {
+                val lp = window.attributes
+                lp.token = rootView?.windowToken
+                lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG
+                window.attributes = lp
+                dialog.setCanceledOnTouchOutside(true)
+                dialog.show()
+            }
+        } catch (_: Throwable) {}
+    }
+
     private fun updateTranslatePanelUI() {
         try {
             if (isTranslatePanelOpen) {
@@ -400,6 +505,7 @@ class IosInputMethodService : InputMethodService() {
                     tvTranslateStatus?.text = "Kalimat siap ($src ➔ $tgt)"
                 }
                 updateTranslateInputBoxVisual()
+                renderQuickLanguageChips()
             } else {
                 translatePanel?.visibility = View.GONE
                 translatePanelBuffer.clear()

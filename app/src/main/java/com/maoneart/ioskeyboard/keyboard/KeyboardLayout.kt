@@ -511,7 +511,7 @@ class KeyboardLayout(private val context: Context) {
                     background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
                     isClickable = true
                     isFocusable = false
-                    setupInstantTouch(this) { onAddStickerAction() }
+                    setOnClickListener { onAddStickerAction() }
                 }
 
                 val tvUploadText = TextView(context).apply {
@@ -613,6 +613,8 @@ class KeyboardLayout(private val context: Context) {
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT
                     )
+                    isVerticalScrollBarEnabled = true
+                    isFillViewport = true
                 }
 
                 val layout = LinearLayout(context).apply {
@@ -637,28 +639,17 @@ class KeyboardLayout(private val context: Context) {
                         isClickable = true
                         isFocusable = false
 
-                        setOnTouchListener { v, event ->
-                            when (event.action) {
-                                MotionEvent.ACTION_DOWN -> {
-                                    v.animate()
-                                        .scaleX(1.45f)
-                                        .scaleY(1.45f)
-                                        .setDuration(120)
-                                        .setInterpolator(OvershootInterpolator(3.0f))
-                                        .start()
-                                    onEmojiAction(emo)
-                                    true
+                        // Use setOnClickListener so user can freely scroll without accidental emoji taps!
+                        setOnClickListener { v ->
+                            v.animate()
+                                .scaleX(1.35f)
+                                .scaleY(1.35f)
+                                .setDuration(90)
+                                .withEndAction {
+                                    v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(90).start()
                                 }
-                                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                                    v.animate()
-                                        .scaleX(1.0f)
-                                        .scaleY(1.0f)
-                                        .setDuration(150)
-                                        .start()
-                                    true
-                                }
-                                else -> false
-                            }
+                                .start()
+                            onEmojiAction(emo)
                         }
                     }
                     row.addView(btn)
