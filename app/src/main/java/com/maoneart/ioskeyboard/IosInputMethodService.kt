@@ -4,15 +4,18 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.Typeface
 import android.inputmethodservice.InputMethodService
 import android.text.InputType
 import android.util.Log
 import android.view.ContextThemeWrapper
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -61,9 +64,8 @@ class IosInputMethodService : InputMethodService() {
     // View References
     private var rootView: View? = null
     private var keyboardContainer: FrameLayout? = null
-    private var candidate1: TextView? = null
-    private var candidate2: TextView? = null
-    private var candidate3: TextView? = null
+    private var candidatesContainer: LinearLayout? = null
+    private var candidatesScrollView: HorizontalScrollView? = null
     private var badgeLanguage: TextView? = null
 
     // Samsung-Style Translate Panel Views
@@ -100,9 +102,8 @@ class IosInputMethodService : InputMethodService() {
             rootView = view
 
             keyboardContainer = view.findViewById(R.id.keyboardContainer)
-            candidate1 = view.findViewById(R.id.candidate1)
-            candidate2 = view.findViewById(R.id.candidate2)
-            candidate3 = view.findViewById(R.id.candidate3)
+            candidatesContainer = view.findViewById(R.id.candidatesContainer)
+            candidatesScrollView = view.findViewById(R.id.candidatesScrollView)
             badgeLanguage = view.findViewById(R.id.badgeLanguage)
 
             // Setup Translate Panel
@@ -153,9 +154,6 @@ class IosInputMethodService : InputMethodService() {
                 updateSuggestions()
             }
 
-            candidate1?.setOnClickListener { selectCandidate(candidate1?.text?.toString()) }
-            candidate2?.setOnClickListener { selectCandidate(candidate2?.text?.toString()) }
-            candidate3?.setOnClickListener { selectCandidate(candidate3?.text?.toString()) }
 
             // Samsung-Style Translate Panel Actions
             tvTranslateLangPair?.setOnClickListener {
@@ -220,6 +218,15 @@ class IosInputMethodService : InputMethodService() {
         }
     }
 
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        updateSuggestions()
+    }
+
     private fun isDarkMode(): Boolean {
         return try {
             when (prefs.themeMode) {
@@ -249,10 +256,6 @@ class IosInputMethodService : InputMethodService() {
             tvTranslateInputBox?.setBackgroundResource(if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
             tvTranslateInputBox?.setTextColor(textColor)
 
-            candidate1?.setTextColor(textColor)
-            candidate2?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
-            candidate3?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
-
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
@@ -260,6 +263,8 @@ class IosInputMethodService : InputMethodService() {
             btnTranslate?.setColorFilter(textColor)
             btnClipboard?.setColorFilter(textColor)
             btnSettings?.setColorFilter(textColor)
+
+            updateSuggestions()
         } catch (_: Throwable) {}
     }
 
@@ -460,6 +465,7 @@ class IosInputMethodService : InputMethodService() {
                     translatePanelBuffer.deleteCharAt(translatePanelBuffer.length - 1)
                     tvTranslateInputBox?.text = translatePanelBuffer.toString()
                 }
+                updateSuggestions()
                 return
             }
 
@@ -568,22 +574,119 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    private fun getCurrentWordBeforeCursor(): String {
+        try {
+            if (isTranslatePanelOpen) {
+                val text = translatePanelBuffer.toString()
+                if (text.isEmpty()) return ""
+                var i = text.length - 1
+                while (i >= 0 && !text[i].isWhitespace() && text[i] != '.' && text[i] != ',' && text[i] != '!' && text[i] != '?') {
+                    i--
+                }
+                return text.substring(i + 1)
+            }
+
+            val ic = currentInputConnection
+            if (ic != null) {
+                val chars = ic.getTextBeforeCursor(40, 0)
+                if (chars != null && chars.isNotEmpty()) {
+                    val text = chars.toString()
+                    var i = text.length - 1
+                    while (i >= 0 && !text[i].isWhitespace() && text[i] != '.' && text[i] != ',' && text[i] != '!' && text[i] != '?' && text[i] != '\n') {
+                        i--
+                    }
+                    val word = text.substring(i + 1)
+                    if (word.isNotEmpty()) {
+                        return word
+                    }
+                }
+            }
+            return composingWord.toString()
+        } catch (_: Throwable) {
+            return composingWord.toString()
+        }
+    }
+
     private fun updateSuggestions() {
         try {
-            if (!prefs.isAutoCorrectEnabled || composingWord.isEmpty()) {
-                candidate1?.text = ""
-                candidate2?.text = ""
-                candidate3?.text = ""
+            if (!prefs.isAutoCorrectEnabled) {
+                displaySuggestions(emptyList())
                 return
             }
 
-            val word = composingWord.toString()
+            val word = getCurrentWordBeforeCursor()
             val suggestions = correctionEngine.getSuggestions(word, prefs.activeLanguage)
-
-            candidate1?.text = suggestions.getOrNull(0) ?: ""
-            candidate2?.text = suggestions.getOrNull(1) ?: ""
-            candidate3?.text = suggestions.getOrNull(2) ?: ""
+            displaySuggestions(suggestions)
         } catch (_: Throwable) {}
+    }
+
+    private fun displaySuggestions(suggestions: List<String>) {
+        try {
+            val container = candidatesContainer ?: return
+            container.removeAllViews()
+            if (suggestions.isEmpty()) return
+
+            val isDark = isDarkMode()
+            val primaryTextColor = if (isDark) Color.WHITE else Color.BLACK
+            val secondaryTextColor = if (isDark) Color.LTGRAY else Color.DKGRAY
+            val dividerColor = Color.parseColor(if (isDark) "#33FFFFFF" else "#22000000")
+
+            val density = resources.displayMetrics.density
+            val padH = (12 * density).toInt()
+            val sepWidth = (1 * density).toInt().coerceAtLeast(1)
+            val sepHeight = (22 * density).toInt()
+
+            for (i in suggestions.indices) {
+                val rawWord = suggestions[i]
+                val currentWord = getCurrentWordBeforeCursor()
+                val word = formatCandidateCase(rawWord, currentWord)
+
+                val tv = TextView(this).apply {
+                    text = word
+                    textSize = if (i == 0) 15f else 14f
+                    setTypeface(typeface, if (i == 0) Typeface.BOLD else Typeface.NORMAL)
+                    setTextColor(if (i == 0) primaryTextColor else secondaryTextColor)
+                    gravity = Gravity.CENTER
+                    setPadding(padH, 0, padH, 0)
+                    maxLines = 1
+                    isClickable = true
+                    isFocusable = false
+                    setBackgroundResource(R.drawable.btn_icon_ripple)
+                    setOnClickListener {
+                        selectCandidate(word)
+                    }
+                }
+
+                container.addView(tv, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                ))
+
+                if (i < suggestions.size - 1) {
+                    val sep = View(this).apply {
+                        setBackgroundColor(dividerColor)
+                    }
+                    container.addView(sep, LinearLayout.LayoutParams(sepWidth, sepHeight).apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                    })
+                }
+            }
+
+            candidatesScrollView?.post {
+                candidatesScrollView?.scrollTo(0, 0)
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun formatCandidateCase(candidate: String, original: String): String {
+        if (original.isEmpty()) return candidate
+        if (original.all { it.isUpperCase() } && original.length > 1) {
+            return candidate.uppercase()
+        }
+        if (original[0].isUpperCase()) {
+            return candidate.replaceFirstChar { it.uppercase() }
+        }
+        return candidate
     }
 
     private fun selectCandidate(candidate: String?) {
@@ -592,17 +695,23 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.playClickSound()
             audioHaptic.triggerHapticFeedback()
 
+            val currentWord = getCurrentWordBeforeCursor()
+            val lengthToDelete = currentWord.length
+
             if (isTranslatePanelOpen) {
-                val lengthToDelete = composingWord.length
                 if (translatePanelBuffer.length >= lengthToDelete) {
                     translatePanelBuffer.setLength(translatePanelBuffer.length - lengthToDelete)
                 }
                 translatePanelBuffer.append("$candidate ")
                 tvTranslateInputBox?.text = translatePanelBuffer.toString()
             } else {
-                val lengthToDelete = composingWord.length
-                currentInputConnection?.deleteSurroundingText(lengthToDelete, 0)
-                currentInputConnection?.commitText("$candidate ", 1)
+                val ic = currentInputConnection
+                if (ic != null) {
+                    if (lengthToDelete > 0) {
+                        ic.deleteSurroundingText(lengthToDelete, 0)
+                    }
+                    ic.commitText("$candidate ", 1)
+                }
             }
 
             composingWord.clear()

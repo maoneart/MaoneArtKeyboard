@@ -35,61 +35,25 @@
             android:src="@drawable/ic_clipboard"
             android:contentDescription="Clipboard History" />
 
-        <!-- Candidate Suggestions Row -->
-        <LinearLayout
-            android:id="@+id/candidatesRow"
+        <!-- Candidate Suggestions Scrollable Area -->
+        <HorizontalScrollView
+            android:id="@+id/candidatesScrollView"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:paddingStart="4dp"
-            android:paddingEnd="4dp">
+            android:scrollbars="none"
+            android:fillViewport="true"
+            android:overScrollMode="never">
 
-            <TextView
-                android:id="@+id/candidate1"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:id="@+id/candidatesContainer"
+                android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:textColor="@color/ios_key_text_light"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="22dp"
-                android:background="#448E8E93" />
-
-            <TextView
-                android:id="@+id/candidate2"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:textColor="@color/ios_key_text_light"
-                android:textSize="14sp"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <View
-                android:layout_width="1dp"
-                android:layout_height="22dp"
-                android:background="#448E8E93" />
-
-            <TextView
-                android:id="@+id/candidate3"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:gravity="center"
-                android:textColor="@color/ios_key_text_light"
-                android:textSize="14sp"
-                android:maxLines="1"
-                android:ellipsize="end" />
-        </LinearLayout>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp" />
+        </HorizontalScrollView>
 
         <!-- Language Switch Badge (ID / EN) -->
         <TextView
