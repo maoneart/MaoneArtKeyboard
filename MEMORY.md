@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.23)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.24 / v1.0.23)
 
 ---
 
