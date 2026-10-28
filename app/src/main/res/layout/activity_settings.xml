@@ -370,64 +370,75 @@
                 android:layout_marginStart="56dp"
                 android:background="#E5E5EA" />
 
-            <!-- Sound Volume Selector Row -->
+            <!-- Sound Volume Slider Row -->
             <LinearLayout
-                android:id="@+id/rowSoundVolume"
+                android:id="@+id/layoutSoundVolume"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
-                android:clickable="true"
-                android:focusable="true">
-
-                <FrameLayout
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:background="@drawable/ios_icon_bg_orange">
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_settings_sound" />
-                </FrameLayout>
+                android:paddingTop="10dp"
+                android:paddingBottom="12dp">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/ios_icon_bg_orange">
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_settings_sound" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Volume Suara Ketikan"
+                            android:textSize="15.5sp"
+                            android:textColor="#000000" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Geser slider untuk mengatur kenyaringan"
+                            android:textSize="11.5sp"
+                            android:textColor="#8E8E93" />
+                    </LinearLayout>
 
                     <TextView
+                        android:id="@+id/tvSoundVolume"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Volume Suara Ketikan"
-                        android:textSize="15.5sp"
-                        android:textColor="#000000" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Tingkat kenyaringan klik tock"
-                        android:textSize="11.5sp"
-                        android:textColor="#8E8E93" />
+                        android:text="70%"
+                        android:textSize="14.5sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/ios_blue" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tvSoundVolume"
-                    android:layout_width="wrap_content"
+                <SeekBar
+                    android:id="@+id/seekBarSoundVolume"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="70%"
-                    android:textSize="14.5sp"
-                    android:textColor="#8E8E93"
-                    android:layout_marginEnd="6dp" />
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:src="@drawable/ic_chevron_right" />
+                    android:layout_marginTop="10dp"
+                    android:max="100"
+                    android:progress="70"
+                    android:progressTint="@color/ios_blue"
+                    android:thumbTint="@color/ios_blue" />
             </LinearLayout>
 
             <View
@@ -493,64 +504,75 @@
                 android:layout_marginStart="56dp"
                 android:background="#E5E5EA" />
 
-            <!-- Haptic Strength Selector Row -->
+            <!-- Haptic Strength Slider Row -->
             <LinearLayout
-                android:id="@+id/rowHapticStrength"
+                android:id="@+id/layoutHapticStrength"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
                 android:paddingStart="14dp"
                 android:paddingEnd="14dp"
-                android:clickable="true"
-                android:focusable="true">
-
-                <FrameLayout
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:background="@drawable/ios_icon_bg_purple">
-                    <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
-                        android:layout_gravity="center"
-                        android:src="@drawable/ic_settings_vibrate" />
-                </FrameLayout>
+                android:paddingTop="10dp"
+                android:paddingBottom="12dp">
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="12dp"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <FrameLayout
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/ios_icon_bg_purple">
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/ic_settings_vibrate" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Tingkat Kekuatan Getar"
+                            android:textSize="15.5sp"
+                            android:textColor="#000000" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Geser slider untuk mengatur intensitas"
+                            android:textSize="11.5sp"
+                            android:textColor="#8E8E93" />
+                    </LinearLayout>
 
                     <TextView
+                        android:id="@+id/tvHapticStrength"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Tingkat Kekuatan Getar"
-                        android:textSize="15.5sp"
-                        android:textColor="#000000" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Intensitas getaran sentuhan"
-                        android:textSize="11.5sp"
-                        android:textColor="#8E8E93" />
+                        android:text="45 ms"
+                        android:textSize="14.5sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/ios_blue" />
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tvHapticStrength"
-                    android:layout_width="wrap_content"
+                <SeekBar
+                    android:id="@+id/seekBarHapticStrength"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Sedang (50 ms)"
-                    android:textSize="14.5sp"
-                    android:textColor="#8E8E93"
-                    android:layout_marginEnd="6dp" />
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:src="@drawable/ic_chevron_right" />
+                    android:layout_marginTop="10dp"
+                    android:max="100"
+                    android:progress="45"
+                    android:progressTint="@color/ios_blue"
+                    android:thumbTint="@color/ios_blue" />
             </LinearLayout>
         </LinearLayout>
 

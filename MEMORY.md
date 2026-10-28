@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.24 / v1.0.23)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.25)
 
 ---
 
@@ -56,9 +56,9 @@
     1. Keystore permanen `keystore/release.jks` terintegrasi langsung ke dalam pipeline build release & debug.
     2. Sertifikat berlaku 28 tahun (hingga 2054) dengan SHA-256 fingerprint konstan.
     3. Pengguna bisa langsung update APK kapan pun tanpa perlu uninstall aplikasi terlebih dahulu.
-  - Haptic Dual-Layer, Cursor Translate, Auto-Close & Nulis Otomatis (Release v1.0.22/v1.0.23):
-    1. **Pengaturan Tingkat Getar & Volume di Menu Setting**: Opsi interaktif di menu pengaturan untuk memilih tingkat kekuatan getar (Lembut 30ms, Sedang 50ms, Kuat 75ms, Maksimal 95ms) dengan preview getar langsung, serta volume suara ketikan (30%, 60%, 80%, 100%) dengan preview suara tock langsung.
-    2. **Getar Semua Tombol Terasa Nyata**: Setiap tombol huruf, angka, simbol kini mengaktifkan hardware haptic view tap dan physical vibrator motor berdurasi 45ms-85ms dengan amplitude 255.
+  - Haptic Dual-Layer, Cursor Translate, Auto-Close & Nulis Otomatis (Release v1.0.22/v1.0.23/v1.0.25):
+    1. **Tampilan Slider (SeekBar) Suara & Getar di Menu Setting**: Mengganti dialog pop-up dengan slider SeekBar horizontal langsung di kartu pengaturan. Pengguna bisa menggeser volume suara dari 0% (paling rendah/senyap) hingga 100%, serta kekuatan getar dari 5 ms (paling lembut) hingga 100 ms, dengan real-time live preview saat digeser.
+    2. **Perbaikan Getaran Tuts Huruf Total (Direct OneShot Hardware Pulse)**: Menghapus `EFFECT_CLICK` yang di-mute oleh kernel vendor ROM Android. Menggunakan `VibrationEffect.createOneShot(durationMs, amplitude)` + `AudioAttributes(USAGE_ASSISTANCE_SONIFICATION)` sehingga satu ketukan huruf mana pun di keyboard dijamin bergetar mantap dan responsif.
     3. **Kursor Interaktif Mode Terjemahan**: Kursor biru khas iOS (`│`) dapat digeser langsung dengan sentuhan jari untuk edit di tengah kalimat.
     4. **Auto-Close Mode Terjemahan**: Panel otomatis tertutup setelah kirim atau saat pindah chat.
     5. **Nulis Otomatis Berantai (Next-Word Prediction)**: 3.000+ kosakata dengan N-Gram prediction memungkinkan user mengetik kalimat lengkap hanya dengan tap bilah saran beruntun.

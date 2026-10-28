@@ -14,6 +14,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -40,7 +41,9 @@ class SettingsActivity : AppCompatActivity() {
 
     private lateinit var tvCurrentTheme: TextView
     private lateinit var tvSoundVolume: TextView
+    private lateinit var seekBarSoundVolume: SeekBar
     private lateinit var tvHapticStrength: TextView
+    private lateinit var seekBarHapticStrength: SeekBar
     private lateinit var tvActiveLanguage: TextView
     private lateinit var tvTranslatePair: TextView
     private lateinit var etTestInput: EditText
@@ -78,12 +81,12 @@ class SettingsActivity : AppCompatActivity() {
         val switchKeyPopup = findViewById<SwitchMaterial>(R.id.switchKeyPopup)
 
         val switchSound = findViewById<SwitchMaterial>(R.id.switchSound)
-        val rowSoundVolume = findViewById<LinearLayout>(R.id.rowSoundVolume)
         tvSoundVolume = findViewById(R.id.tvSoundVolume)
+        seekBarSoundVolume = findViewById(R.id.seekBarSoundVolume)
 
         val switchHaptic = findViewById<SwitchMaterial>(R.id.switchHaptic)
-        val rowHapticStrength = findViewById<LinearLayout>(R.id.rowHapticStrength)
         tvHapticStrength = findViewById(R.id.tvHapticStrength)
+        seekBarHapticStrength = findViewById(R.id.seekBarHapticStrength)
 
         val rowLanguage = findViewById<LinearLayout>(R.id.rowLanguage)
         tvActiveLanguage = findViewById(R.id.tvActiveLanguage)
@@ -121,17 +124,49 @@ class SettingsActivity : AppCompatActivity() {
             prefs.isSoundEnabled = isChecked
         }
 
-        rowSoundVolume.setOnClickListener {
-            showSoundVolumeDialog()
-        }
+        seekBarSoundVolume.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    prefs.soundVolume = progress / 100f
+                    tvSoundVolume.text = "$progress%"
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                try {
+                    val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                    am?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, prefs.soundVolume)
+                } catch (_: Throwable) {}
+            }
+        })
 
         switchHaptic.setOnCheckedChangeListener { _, isChecked ->
             prefs.isHapticEnabled = isChecked
         }
 
-        rowHapticStrength.setOnClickListener {
-            showHapticStrengthDialog()
-        }
+        seekBarHapticStrength.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val ms = progress.coerceAtLeast(5)
+                    prefs.hapticStrength = ms
+                    tvHapticStrength.text = "$ms ms"
+                }
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                try {
+                    val ms = prefs.hapticStrength.toLong()
+                    @Suppress("DEPRECATION")
+                    val vib = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val amp = ((ms.toFloat() / 100f) * 255).toInt().coerceIn(90, 255)
+                        vib?.vibrate(VibrationEffect.createOneShot(ms, amp))
+                    } else {
+                        vib?.vibrate(ms)
+                    }
+                } catch (_: Throwable) {}
+            }
+        })
 
         rowLanguage.setOnClickListener {
             showLanguageDialog()
@@ -249,84 +284,15 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun updateSoundVolumeLabel() {
-        val pct = (prefs.soundVolume * 100).toInt()
+        val pct = (prefs.soundVolume * 100).toInt().coerceIn(0, 100)
         tvSoundVolume.text = "$pct%"
+        seekBarSoundVolume.progress = pct
     }
 
     private fun updateHapticStrengthLabel() {
-        val ms = prefs.hapticStrength
-        tvHapticStrength.text = when {
-            ms <= 35 -> "Lembut ($ms ms)"
-            ms <= 55 -> "Sedang ($ms ms)"
-            ms <= 75 -> "Kuat ($ms ms)"
-            else -> "Maksimal ($ms ms)"
-        }
-    }
-
-    private fun showSoundVolumeDialog() {
-        val options = arrayOf("Pelan (30%)", "Sedang (60%)", "Standar iOS (80%)", "Maksimal (100%)")
-        val values = floatArrayOf(0.3f, 0.6f, 0.8f, 1.0f)
-        val currentVol = prefs.soundVolume
-        val currentIndex = when {
-            currentVol <= 0.4f -> 0
-            currentVol <= 0.7f -> 1
-            currentVol <= 0.9f -> 2
-            else -> 3
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Pilih Volume Suara Ketikan")
-            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
-                val selectedVol = values[which]
-                prefs.soundVolume = selectedVol
-                updateSoundVolumeLabel()
-                // Sound test preview
-                try {
-                    val am = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                    am?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, selectedVol)
-                } catch (_: Throwable) {}
-                dialog.dismiss()
-            }
-            .setNegativeButton("Batal", null)
-            .show()
-    }
-
-    private fun showHapticStrengthDialog() {
-        val options = arrayOf(
-            "Lembut (30 ms) — Sentuhan Halus",
-            "Sedang (50 ms) — Standar Mantap",
-            "Kuat (75 ms) — Tegas di Semua HP",
-            "Maksimal (95 ms) — Ekstra Bertenaga"
-        )
-        val values = intArrayOf(30, 50, 75, 95)
-        val currentMs = prefs.hapticStrength
-        val currentIndex = when {
-            currentMs <= 35 -> 0
-            currentMs <= 55 -> 1
-            currentMs <= 75 -> 2
-            else -> 3
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle("Pilih Kekuatan Getaran")
-            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
-                val selectedMs = values[which]
-                prefs.hapticStrength = selectedMs
-                updateHapticStrengthLabel()
-                // Haptic vibration test preview
-                try {
-                    @Suppress("DEPRECATION")
-                    val vib = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        vib?.vibrate(VibrationEffect.createOneShot(selectedMs.toLong(), 255))
-                    } else {
-                        vib?.vibrate(selectedMs.toLong())
-                    }
-                } catch (_: Throwable) {}
-                dialog.dismiss()
-            }
-            .setNegativeButton("Batal", null)
-            .show()
+        val ms = prefs.hapticStrength.coerceIn(5, 100)
+        tvHapticStrength.text = "$ms ms"
+        seekBarHapticStrength.progress = ms
     }
 
     private fun updateLanguageLabel() {
