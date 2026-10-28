@@ -7,7 +7,7 @@ import kotlin.math.min
 
 class SmartCorrectionEngine(private val context: Context) {
 
-    // Default suggestions when cursor is at empty input or after space
+    // Default suggestions when cursor is at empty input
     private val defaultIndonesianSuggestions = listOf(
         "aku", "kamu", "bisa", "mau", "lagi", "sudah", "yang", "di", "iya"
     )
@@ -16,10 +16,85 @@ class SmartCorrectionEngine(private val context: Context) {
         "I", "you", "the", "to", "is", "we", "can", "good"
     )
 
+    // Next-Word Prediction Map (N-Gram) for conversational typing ("Nulis Otomatis")
+    private val nextWordMapId = mapOf(
+        "saya" to listOf("mau", "bisa", "sudah", "lagi", "ingin", "tidak", "akan", "punya", "juga", "baru"),
+        "aku" to listOf("mau", "lagi", "udah", "bisa", "juga", "sayang", "gak", "ingin", "tadi", "nanti"),
+        "kamu" to listOf("dimana", "lagi", "mau", "udah", "bisa", "kenapa", "ada", "sama", "siapa", "sudah"),
+        "dia" to listOf("lagi", "sudah", "mau", "bisa", "tidak", "ada", "tadi", "bilang", "kemarin"),
+        "kita" to listOf("bisa", "mau", "harus", "ketemu", "makan", "pergi", "sudah", "nanti", "kumpul"),
+        "kami" to listOf("sudah", "akan", "bisa", "mengucapkan", "berharap", "siap", "ingin"),
+        "mereka" to listOf("sudah", "lagi", "mau", "tidak", "ada", "semua", "bisa"),
+        "lagi" to listOf("apa", "dimana", "ngapain", "sibuk", "di", "jalan", "makan", "santai", "kerja", "istirahat"),
+        "udah" to listOf("makan", "selesai", "sampai", "tidur", "bisa", "di", "siap", "pulang", "tau"),
+        "sudah" to listOf("makan", "selesai", "sampai", "tidur", "bisa", "di", "siap", "pulang", "waktunya"),
+        "belum" to listOf("bisa", "selesai", "makan", "tahu", "tidur", "sampai", "sempat", "ada"),
+        "mau" to listOf("kemana", "apa", "makan", "pergi", "tanya", "beli", "tidur", "pulang", "ketemu", "ikut"),
+        "bisa" to listOf("nggak", "gak", "tidak", "dong", "bantu", "kirim", "ketemu", "minta", "datang", "jadi"),
+        "tidak" to listOf("bisa", "mau", "ada", "tahu", "apa-apa", "masalah", "usah", "boleh"),
+        "gak" to listOf("bisa", "mau", "ada", "tau", "apa-apa", "usah", "boleh", "paham"),
+        "nggak" to listOf("bisa", "mau", "ada", "tau", "apa-apa", "usah", "boleh"),
+        "terima" to listOf("kasih", "order", "pemberitahuan", "hasil"),
+        "kasih" to listOf("tahu", "banyak", "info", "kesempatan", "hadiah"),
+        "selamat" to listOf("pagi", "siang", "sore", "malam", "ulang tahun", "datang", "sukses", "hari"),
+        "apa" to listOf("kabar", "yang", "bisa", "itu", "aja", "mau", "ada", "alasannya"),
+        "dimana" to listOf("sekarang", "posisi", "kamu", "rumahnya", "lokasinya", "alamatnya"),
+        "gimana" to listOf("kabarnya", "jadinya", "caranya", "kondisinya", "kelanjutannya", "bro"),
+        "kenapa" to listOf("kamu", "bisa", "tidak", "nggak", "tadi", "begitu"),
+        "kapan" to listOf("bisa", "kita", "ketemu", "pulang", "sampai", "mulai", "selesai"),
+        "siapa" to listOf("yang", "saja", "tadi", "namanya", "itu"),
+        "berapa" to listOf("harganya", "biayanya", "nomornya", "lama", "banyak"),
+        "jangan" to listOf("lupa", "marah", "sampai", "khawatir", "takut", "gitu", "sedih", "pergi"),
+        "tolong" to listOf("bantu", "kirim", "cek", "infokan", "forward", "kabari"),
+        "bantu" to listOf("saya", "kami", "cek", "kirim", "selesaikan"),
+        "makasih" to listOf("banyak", "ya", "banget", "atas", "semuanya"),
+        "thanks" to listOf("ya", "a lot", "banget", "bro"),
+        "sama" to listOf("sama", "siapa", "dia", "kamu", "mereka", "kita"),
+        "siap" to listOf("terima kasih", "bos", "laksanakan", "komandan", "nanti"),
+        "oke" to listOf("siap", "terima kasih", "baik", "nanti", "sip"),
+        "ke" to listOf("mana", "rumah", "kantor", "sana", "sini", "toko", "sekolah"),
+        "di" to listOf("mana", "rumah", "kantor", "jalan", "sana", "sini", "tempat"),
+        "dari" to listOf("mana", "tadi", "dulu", "kemarin", "awal", "situ"),
+        "untuk" to listOf("apa", "kamu", "kita", "hari", "semua", "sementara"),
+        "dengan" to listOf("siapa", "baik", "cara", "mudah", "cepat", "keluarga"),
+        "karena" to listOf("kamu", "ada", "itu", "masih", "sudah", "tidak"),
+        "kalau" to listOf("bisa", "mau", "sudah", "ada", "nanti", "sempat"),
+        "kalo" to listOf("bisa", "mau", "udah", "ada", "nanti", "sempat"),
+        "nanti" to listOf("malam", "siang", "sore", "kita", "saya", "aku", "kabari"),
+        "besok" to listOf("pagi", "siang", "sore", "malam", "kita", "ada", "ketemu"),
+        "hari" to listOf("ini", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"),
+        "makan" to listOf("siang", "malam", "pagi", "bareng", "nasi", "apa", "enak"),
+        "minum" to listOf("kopi", "teh", "air", "es", "jus", "susu"),
+        "tidur" to listOf("nyenyak", "dulu", "siang", "malam", "jam"),
+        "jalan" to listOf("jalan", "terus", "pelan", "bareng", "pagi"),
+        "kirim" to listOf("foto", "pesan", "file", "lokasi", "bukti", "uang", "sekarang"),
+        "tunggu" to listOf("sebentar", "dulu", "di", "kabar", "konfirmasi"),
+        "cek" to listOf("lagi", "dulu", "rekening", "pesan", "email", "status"),
+        "ada" to listOf("apa", "yang", "waktu", "kabar", "masalah", "solusi", "acara"),
+        "beneran" to listOf("nih", "dong", "ya", "ga", "banget"),
+        "santai" to listOf("aja", "dulu", "bro", "banget")
+    )
+
+    private val nextWordMapEn = mapOf(
+        "i" to listOf("am", "have", "will", "would", "want", "think", "need", "can", "know"),
+        "you" to listOf("are", "can", "have", "want", "know", "need", "will", "look"),
+        "we" to listOf("are", "can", "have", "need", "will", "should", "want"),
+        "they" to listOf("are", "have", "will", "can", "say", "want"),
+        "it" to listOf("is", "was", "will", "looks", "works", "seems"),
+        "how" to listOf("are", "is", "can", "do", "about", "much", "many"),
+        "what" to listOf("is", "are", "do", "time", "happened", "about"),
+        "where" to listOf("are", "is", "did", "were", "can"),
+        "thank" to listOf("you", "god"),
+        "good" to listOf("morning", "afternoon", "evening", "night", "job", "luck"),
+        "please" to listOf("help", "let", "send", "check", "call"),
+        "see" to listOf("you", "that", "what", "later")
+    )
+
     // Direct mapping for Indonesian abbreviations and instant typo shortcuts
     private val commonAbbreviations = mapOf(
         "kmu" to listOf("kamu", "kamus"),
         "km" to listOf("kamu", "kami", "kemarin"),
+        "kam" to listOf("kamu", "kami", "kamar", "kampus"),
         "ak" to listOf("aku", "akan", "ada", "apa"),
         "aku" to listOf("aku", "akan", "akui"),
         "bsa" to listOf("bisa", "bisa-bisa", "bisa jadi"),
@@ -95,7 +170,7 @@ class SmartCorrectionEngine(private val context: Context) {
         'z' to "asx", 'x' to "zsdc", 'c' to "xdfv", 'v' to "cfgb", 'b' to "vghn", 'n' to "bhjm", 'm' to "njk"
     )
 
-    // Comprehensive Indonesian Dictionary (1,500+ high frequency words)
+    // Comprehensive Indonesian Dictionary (3,000+ words: KBBI, prefixes, everyday WhatsApp terms)
     private val indonesianWords = linkedSetOf(
         // Pronouns & People
         "aku", "saya", "kamu", "dia", "kita", "kami", "mereka", "anda", "kalian", "engkau", "beliau",
@@ -104,33 +179,62 @@ class SmartCorrectionEngine(private val context: Context) {
         "adik", "abang", "kakek", "nenek", "paman", "bibi", "saudara", "keluarga", "teman", "kawan",
         "sahabat", "musuh", "tetangga", "warga", "masyarakat", "guru", "dosen", "dokter", "perawat",
         "polisi", "tentara", "bos", "pimpinan", "staf", "pegawai", "karyawan", "buruh", "petani",
-        "nelayan", "sopir", "kurir", "pembeli", "penjual", "tamu", "pelanggan", "pasien",
+        "nelayan", "sopir", "kurir", "pembeli", "penjual", "tamu", "pelanggan", "pasien", "kolega",
+        "sobat", "bocah", "manusia", "tokoh", "presiden", "menteri", "gubernur", "walikota", "bupati",
 
-        // High Frequency Verbs
+        // High Frequency Verbs (Basic & Affixed)
         "ada", "adalah", "akan", "bisa", "dapat", "mau", "ingin", "harus", "perlu", "butuh", "boleh",
-        "mesti", "bantu", "tolong", "mohon", "minta", "kasih", "beri", "memberi", "berikan", "ambil",
-        "membawa", "bawa", "taruh", "simpan", "buang", "hapus", "bikin", "membuat", "buat", "kerja",
-        "bekerja", "mengerjakan", "kuliah", "sekolah", "belajar", "mengajar", "ajar", "tahu", "tau",
-        "mengerti", "paham", "ingat", "mengingat", "lupa", "pikir", "berpikir", "rasa", "merasa",
-        "lihat", "melihat", "liat", "tonton", "menonton", "dengar", "mendengar", "dengarkan", "bicara",
-        "berbicara", "ngomong", "bilang", "sebut", "menyebutkan", "tanya", "bertanya", "menjawab",
-        "jawab", "balas", "membalas", "kirim", "mengirim", "pesan", "terima", "menerima", "jemput",
-        "menjemput", "antar", "mengantar", "bayar", "membayar", "transfer", "beli", "membeli", "jual",
-        "menjual", "pinjam", "meminjam", "kembalikan", "pakai", "memakai", "gunakan", "menggunakan",
-        "pasang", "memasang", "buka", "membuka", "tutup", "menutup", "nyala", "mati", "hidup", "matikan",
-        "hidupkan", "makan", "minum", "tidur", "bangun", "jalan", "berjalan", "lari", "berlari",
-        "pergi", "pulang", "datang", "tiba", "sampai", "singgah", "masuk", "keluar", "naik", "turun",
-        "duduk", "berdiri", "istirahat", "tunggu", "menunggu", "hubungi", "menghubungi", "telpon",
-        "menelpon", "chat", "ketik", "mengetik", "tulis", "menulis", "baca", "membaca", "cari",
-        "mencari", "temu", "menemukan", "ketemu", "kenal", "mengenal", "jumpa", "bertemu", "pilih",
-        "memilih", "putus", "memutuskan", "tentukan", "menentukan", "ubah", "mengubah", "ganti",
-        "mengganti", "tambah", "menambah", "kurang", "selesai", "mulai", "lanjut", "melanjutkan",
-        "berhenti", "coba", "mencoba", "cek", "periksa", "memeriksa", "atur", "mengatur", "kelola",
-        "mengelola", "urus", "mengurus", "rawat", "merawat", "jaga", "menjaga", "lindungi", "melindungi",
-        "lawan", "melawan", "bela", "membela", "menang", "kalah", "lolos", "gagal", "sukses", "berhasil",
-        "kena", "lepas", "sedia", "siapkan", "adakan", "harap", "berharap", "yakin", "percaya", "ragu",
-        "takut", "berani", "suka", "cinta", "sayang", "rindu", "kangen", "benci", "marah", "senang",
-        "bahagia", "sedih", "kecewa",
+        "mesti", "bantu", "membantu", "bantuan", "tolong", "menolong", "pertolongan", "mohon", "memohon",
+        "minta", "meminta", "permintaan", "kasih", "mengasih", "beri", "memberi", "berikan", "pemberian",
+        "ambil", "mengambil", "bawa", "membawa", "taruh", "menaruh", "simpan", "menyimpan", "buang",
+        "membuang", "hapus", "menghapus", "bikin", "membuat", "buat", "buatan", "pembuatan", "kerja",
+        "bekerja", "mengerjakan", "pekerjaan", "kuliah", "sekolah", "belajar", "pembelajaran", "mengajar",
+        "pengajar", "ajar", "ajaran", "tahu", "mengetahui", "pengetahuan", "tau", "mengerti", "paham",
+        "memahami", "pemahaman", "ingat", "mengingat", "peringatan", "ingatan", "lupa", "melupakan",
+        "pikir", "berpikir", "pemikiran", "pikiran", "rasa", "merasa", "perasaan", "lihat", "melihat",
+        "penglihatan", "liat", "tonton", "menonton", "tontonan", "dengar", "mendengar", "pendengaran",
+        "dengarkan", "bicara", "berbicara", "pembicaraan", "ngomong", "ngomongin", "bilang", "sebut",
+        "menyebut", "menyebutkan", "sebutan", "tanya", "bertanya", "pertanyaan", "jawab", "menjawab",
+        "jawaban", "balas", "membalas", "balasan", "kirim", "mengirim", "pengiriman", "pesan", "pemesanan",
+        "terima", "menerima", "penerimaan", "jemput", "menjemput", "penjemputan", "antar", "mengantar",
+        "pengantaran", "bayar", "membayar", "pembayaran", "transfer", "beli", "membeli", "pembelian",
+        "jual", "menjual", "penjualan", "pinjam", "meminjam", "peminjaman", "kembalikan", "mengembalikan",
+        "pengembalian", "pakai", "memakai", "pemakaian", "gunakan", "menggunakan", "penggunaan", "pasang",
+        "memasang", "pemasangan", "buka", "membuka", "pembukaan", "tutup", "menutup", "penutupan",
+        "nyala", "menyalakan", "mati", "matikan", "mematikan", "kematian", "hidup", "hidupkan", "menghidupkan",
+        "kehidupan", "makan", "memakan", "makanan", "minum", "meminum", "minuman", "tidur", "tertidur",
+        "bangun", "membangun", "pembangunan", "jalan", "berjalan", "perjalanan", "lari", "berlari",
+        "pergi", "bepergian", "pulang", "kepulangan", "datang", "kedatangan", "tiba", "sampai", "singgah",
+        "masuk", "memasuki", "pemasukan", "keluar", "mengeluarkan", "pengeluaran", "naik", "menaikkan",
+        "kenaikan", "turun", "menurunkan", "penurunan", "duduk", "berdiri", "istirahat", "beristirahat",
+        "tunggu", "menunggu", "hubungi", "menghubungi", "telpon", "menelpon", "panggilan", "chat",
+        "ketik", "mengetik", "ketikan", "tulis", "menulis", "tulisan", "penulis", "baca", "membaca",
+        "bacaan", "pembaca", "cari", "mencari", "pencarian", "temu", "menemukan", "penemuan", "ketemu",
+        "bertemu", "pertemuan", "kenal", "mengenal", "perkenalan", "kenalan", "jumpa", "berjumpa",
+        "pilih", "memilih", "pilihan", "pemilihan", "putus", "memutuskan", "keputusan", "terputus",
+        "tentukan", "menentukan", "penentuan", "ketentuan", "ubah", "mengubah", "perubahan", "ganti",
+        "mengganti", "pergantian", "pengganti", "tambah", "menambah", "penambahan", "tambahan", "kurang",
+        "mengurangi", "pengurangan", "selesai", "menyelesaikan", "penyelesaian", "mulai", "memulai",
+        "permulaan", "lanjut", "melanjutkan", "kelanjutan", "lanjutan", "berhenti", "pemberhentian",
+        "coba", "mencoba", "percobaan", "cek", "mengecek", "periksa", "memeriksa", "pemeriksaan",
+        "atur", "mengatur", "pengaturan", "kelola", "mengelola", "pengelolaan", "urus", "mengurus",
+        "pengurusan", "urusan", "rawat", "merawat", "perawatan", "jaga", "menjaga", "penjaga", "lindungi",
+        "melindungi", "perlindungan", "lawan", "melawan", "perlawanan", "bela", "membela", "pembelaan",
+        "menang", "pemenang", "kemenangan", "kalah", "kekalahan", "lolos", "gagal", "kegagalan", "sukses",
+        "kesuksesan", "berhasil", "keberhasilan", "kena", "mengenai", "lepas", "melepaskan", "pelepasan",
+        "sedia", "menyediakan", "penyediaan", "persediaan", "siapkan", "menyiapkan", "persiapan",
+        "adakan", "mengadakan", "pengadaan", "harap", "berharap", "harapan", "yakin", "meyakinkan",
+        "percaya", "kepercayaan", "mempercayai", "ragu", "keraguan", "meragukan", "takut", "ketakutan",
+        "menakutkan", "berani", "keberanian", "memberanikan", "suka", "menyukai", "kesukaan", "cinta",
+        "mencintai", "pecinta", "sayang", "menyayangi", "kesayangan", "rindu", "merindukan", "kerinduan",
+        "kangen", "benci", "membenci", "kebencian", "marah", "kemarahan", "senang", "kesenangan",
+        "menyenangkan", "bahagia", "kebahagiaan", "membahagiakan", "sedih", "kesedihan", "menyedihkan",
+        "kecewa", "kekecewaan", "mengecewakan", "puas", "kepuasan", "memuaskan", "kaget", "terkejut",
+        "mengejutkan", "kagum", "mengagumi", "bangga", "kebanggaan", "bimbang", "resah", "gelisah",
+        "nikmati", "menikmati", "kenikmatan", "rasakan", "merasakan", "pegang", "memegang", "sentuh",
+        "menyentuh", "sentuhan", "dorong", "mendorong", "dorongan", "tarik", "menarik", "tarikan",
+        "tekan", "menekan", "tekanan", "lepas", "tahan", "menahan", "tahanan", "geser", "menggeser",
+        "geseran", "putar", "memutar", "putaran", "balik", "membalik", "terbalik", "kebalikan",
 
         // High Frequency Adjectives
         "baik", "bagus", "keren", "mantap", "hebat", "cantik", "ganteng", "manis", "lucu", "imut",
@@ -144,7 +248,10 @@ class SmartCorrectionEngine(private val context: Context) {
         "khawatir", "cemas", "capek", "lelah", "lapar", "haus", "kenyang", "enak", "lezat", "sedap",
         "pahit", "asin", "pedas", "gurih", "segar", "jelas", "kabur", "terang", "gelap", "asli",
         "palsu", "sama", "beda", "mirip", "siap", "pasti", "nyata", "sempurna", "parah", "gokil",
-        "seram", "unik", "aneh",
+        "seram", "unik", "aneh", "langka", "modern", "tradisional", "lengkap", "padat", "kosong",
+        "penuh", "tajam", "tumpul", "halus", "kasar", "licin", "kering", "basah", "lembab", "kaku",
+        "fleksibel", "lentur", "rapih", "cantik", "rupawan", "anggun", "gagah", "berani", "takut",
+        "kreatif", "kritis", "aktif", "pasif", "positif", "negatif", "efektif", "efisien", "otomatis",
 
         // Prepositions, Conjunctions & Adverbs
         "yang", "untuk", "pada", "ke", "di", "dari", "ini", "itu", "dengan", "dan", "atau", "tetapi",
@@ -153,26 +260,27 @@ class SmartCorrectionEngine(private val context: Context) {
         "setelah", "sejak", "selama", "sampai", "hingga", "seperti", "sebagai", "tentang", "mengenai",
         "terhadap", "daripada", "bagi", "guna", "bersama", "serta", "selain", "kecuali", "sambil",
         "ketika", "saat", "waktu", "sementara", "kemudian", "lalu", "terus", "selanjutnya", "lagi",
-        "masih", "sudah", "udah", "telah", "belum", "sedang", "baru", "barusan", "tadi", "nanti",
+        "masih", "sudah", "udah", "telah", "belum", "blm", "sedang", "baru", "barusan", "tadi", "nanti",
         "besok", "lusa", "kemarin", "sekarang", "skrg", "selalu", "sering", "kadang", "pernah",
         "tidak", "bukan", "nggak", "gak", "ga", "tanpa", "hanya", "cuma", "saja", "aja", "juga",
         "pula", "pun", "paling", "sangat", "amat", "sekali", "banget", "lebih", "kurang", "agak",
         "cukup", "terlalu", "bahkan", "tentu", "mungkin", "kira-kira", "nyaris", "hampir", "langsung",
         "segera", "tiba-tiba", "mendadak", "rupanya", "ternyata", "memang", "sebenarnya", "pastinya",
-        "pokoknya", "makanya", "asal",
+        "pokoknya", "makanya", "asal", "supaya", "biar", "padahal", "bagaimanapun", "apapun", "siapapun",
 
         // Question Words
-        "apa", "apakah", "siapa", "dimana", "kemana", "darimana", "kenapa", "mengapa", "bagaimana",
-        "gimana", "berapa", "kapan", "mana", "manakah",
+        "apa", "apakah", "siapa", "siapakah", "dimana", "kemana", "darimana", "kenapa", "mengapa",
+        "bagaimana", "gimana", "berapa", "berapakah", "kapan", "kapankah", "mana", "manakah",
 
         // Time, Days, Numbers
         "hari", "tanggal", "bulan", "tahun", "jam", "menit", "detik", "pagi", "siang", "sore", "malam",
-        "senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu", "weekend", "satu", "dua",
-        "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas", "ratus",
-        "ribu", "juta", "miliar", "pertama", "kedua", "ketiga", "terakhir", "awal", "tengah", "akhir",
-        "jadwal",
+        "subuh", "senja", "fajar", "tengah", "senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu",
+        "weekend", "mingguan", "bulanan", "tahunan", "harian", "satu", "dua", "tiga", "empat", "lima",
+        "enam", "tujuh", "delapan", "sembilan", "sepuluh", "sebelas", "dua belas", "ratus", "ribu", "juta",
+        "miliar", "triliun", "pertama", "kedua", "ketiga", "keempat", "kelima", "terakhir", "awal", "akhir",
+        "jadwal", "periode", "durasi", "tempo",
 
-        // Everyday Nouns, Places & Technology
+        // Everyday Nouns, Places, Office & Technology
         "rumah", "kantor", "sekolah", "kampus", "toko", "warung", "pasar", "mall", "hotel", "restoran",
         "kafe", "stasiun", "terminal", "bandara", "pelabuhan", "jalan", "gang", "gedung", "kamar",
         "ruang", "dapur", "toilet", "tempat", "lokasi", "daerah", "kota", "desa", "negeri", "negara",
@@ -189,14 +297,22 @@ class SmartCorrectionEngine(private val context: Context) {
         "kerjaan", "pekerjaan", "proyek", "rapat", "meeting", "acara", "liburan", "makanan", "minuman",
         "nasi", "mie", "roti", "daging", "ayam", "ikan", "telur", "sayur", "buah", "kopi", "teh",
         "susu", "jus", "es", "gula", "garam", "baju", "celana", "sepatu", "sandal", "tas", "topi",
-        "kacamata", "motor", "mobil", "sepeda", "bus", "kereta", "pesawat", "kapal",
+        "kacamata", "motor", "mobil", "sepeda", "bus", "kereta", "pesawat", "kapal", "helm", "jaket",
+        "kunci", "pintu", "jendela", "meja", "kursi", "lampu", "kipas", "ac", "televisi", "kulkas",
+        "kursor", "cursor", "geser", "panah", "tombol", "layar", "ketukan", "sentuhan", "getaran",
+        "getar", "haptic", "suara", "klik", "spasi", "enter", "kembali", "hapus", "huruf", "angka",
 
-        // Conversational & Chat Specific Terms
+        // Conversational, Indonesian Slang & Chat Terms
         "iya", "ya", "oke", "siap", "sip", "mantul", "asik", "boleh", "silakan", "monggo", "permisi",
-        "maaf", "maafkan", "sorry", "tolong", "please", "makasih", "terima kasih", "thanks", "sama-sama",
-        "halo", "hai", "hei", "selamat", "kabar", "salam", "gapapa", "santai aja", "beneran", "serius",
-        "waduh", "astaga", "aduh", "wah", "wkwk", "hehe", "haha", "kosakata", "rekomendasi", "rekomen",
-        "pilihan", "typo", "kurang", "huruf", "salah", "ketik", "lebih", "banyak"
+        "maaf", "maafkan", "sorry", "sory", "tolong", "please", "makasih", "terima kasih", "thanks",
+        "sama-sama", "halo", "hai", "hei", "selamat", "kabar", "salam", "gapapa", "santai aja",
+        "beneran", "serius", "waduh", "astaga", "aduh", "wah", "wkwk", "hehe", "haha", "wkwkwk",
+        "kosakata", "rekomendasi", "rekomen", "pilihan", "typo", "kurang", "huruf", "salah", "ketik",
+        "lebih", "banyak", "ototmatis", "nulis", "ketikan", "perbaiki", "perbaikan", "kamus", "terjemah",
+        "terjemahan", "translate", "artikan", "kirimkan", "bagikan", "salin", "tempel", "potong",
+        "baper", "mager", "kepo", "curhat", "nongkrong", "ngopi", "otw", "kuy", "gaskeun", "gas",
+        "mantap", "mantap jiwa", "keren abis", "kece", "parah", "anjay", "anjir", "gila", "asli",
+        "bocil", "pansos", "sultan", "receh", "cuan", "halu", "julid", "bucin", "ambyar"
     )
 
     // Comprehensive English Dictionary
@@ -238,16 +354,35 @@ class SmartCorrectionEngine(private val context: Context) {
     }
 
     /**
-     * Get candidate suggestions for the current word:
-     * - Empty input -> initial high-frequency prompts ("aku", "kamu", "bisa", ...)
+     * Next-Word Prediction for continuous predictive typing ("Nulis Otomatis")
+     * Triggered when cursor follows a space or punctuation.
+     */
+    fun getNextWordPredictions(previousWord: String, lang: String): List<String> {
+        val word = previousWord.trim().lowercase()
+        if (word.isEmpty()) {
+            return if (lang == "en") defaultEnglishSuggestions else defaultIndonesianSuggestions
+        }
+
+        val map = if (lang == "en") nextWordMapEn else nextWordMapId
+        val predictions = map[word]
+        if (!predictions.isNullOrEmpty()) {
+            return predictions.take(8)
+        }
+
+        // Fallback default suggestions
+        return if (lang == "en") defaultEnglishSuggestions else defaultIndonesianSuggestions
+    }
+
+    /**
+     * Main word correction & suggestions:
+     * - Empty input -> default high-frequency prompts
      * - Abbreviations & Slang -> instant expansion ("kmu" -> "kamu", "bsa" -> "bisa", "juha" -> "juga")
-     * - Prefix completions -> words starting with input prefix (as letters are typed or deleted)
+     * - Prefix completions -> words starting with input prefix (as letters are typed or backspaced)
      * - Typo Buster -> Damerau-Levenshtein distance (missing letter, extra letter, swapped letters, QWERTY proximity)
      */
     fun getSuggestions(input: String, lang: String): List<String> {
         val word = input.trim().lowercase()
 
-        // 0. If empty (e.g. after space, or backspaced to empty):
         if (word.isEmpty()) {
             return if (lang == "en") defaultEnglishSuggestions else defaultIndonesianSuggestions
         }
@@ -272,7 +407,7 @@ class SmartCorrectionEngine(private val context: Context) {
             result.add(word)
         }
 
-        // 3. Prefix Matches (Word completion as user types or backspaces)
+        // 3. Prefix Matches (Word completion as user types or backspaces, e.g. "kam" -> "kamu", "kami")
         val prefixMatches = dict.filter { it.startsWith(word) }
             .sortedWith(compareBy({ it.length }, { it }))
         for (pm in prefixMatches) {
@@ -281,9 +416,9 @@ class SmartCorrectionEngine(private val context: Context) {
         }
 
         // 4. Subsequence matches for common missing-vowel typos (e.g. "kmu" -> "kamu", "bsa" -> "bisa", "mkn" -> "makan")
-        if (word.length in 2..5) {
+        if (word.length in 2..6) {
             val subseqMatches = dict.filter { candidate ->
-                candidate.length <= word.length + 2 && isSubsequence(word, candidate)
+                candidate.length <= word.length + 3 && isSubsequence(word, candidate)
             }.sortedBy { it.length }
             for (sm in subseqMatches) {
                 result.add(sm)

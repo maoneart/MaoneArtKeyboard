@@ -1,6 +1,7 @@
 package com.maoneart.ioskeyboard.audio
 
 import android.content.Context
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.os.Build
 import android.os.VibrationEffect
@@ -12,16 +13,18 @@ import com.maoneart.ioskeyboard.preferences.KeyboardPreferences
 
 class AudioHapticManager(private val context: Context, private val prefs: KeyboardPreferences) {
 
+    var activeRootView: View? = null
+
     private val audioManager = try {
         context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     } catch (_: Throwable) {
         null
     }
 
-    private val vibrator = try {
+    private val vibrator: Vibrator? = try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-            vibratorManager?.defaultVibrator
+            val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vm?.defaultVibrator ?: (context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator)
         } else {
             @Suppress("DEPRECATION")
             context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
@@ -39,35 +42,62 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
                 audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD)
             } catch (_: Throwable) {
                 try {
-                    view?.playSoundEffect(android.view.SoundEffectConstants.CLICK)
+                    val target = view ?: activeRootView
+                    target?.playSoundEffect(android.view.SoundEffectConstants.CLICK)
                 } catch (_: Throwable) {}
             }
         }
     }
 
+    /**
+     * Dual-Layer Tactile Haptic Engine:
+     * 1. Direct Hardware View Haptic (forces instant micro-click via WindowManager)
+     * 2. Physical Vibrator Motor (calibrated duration & max amplitude to overcome motor inertia)
+     */
     fun triggerHapticFeedback(view: View? = null) {
         if (!prefs.isHapticEnabled) return
 
+        // 1. Hardware View Haptic Tap
         try {
-            if (view != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                return
-            }
+            val targetView = view ?: activeRootView
+            targetView?.performHapticFeedback(
+                HapticFeedbackConstants.KEYBOARD_TAP,
+                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+            )
+        } catch (_: Throwable) {}
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val effect = VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
-                vibrator?.vibrate(effect)
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val effect = VibrationEffect.createOneShot(prefs.hapticStrength.toLong().coerceAtLeast(10L), VibrationEffect.DEFAULT_AMPLITUDE)
-                vibrator?.vibrate(effect)
+        // 2. Physical Vibrator Motor (40ms-60ms duration to overcome hardware ERM spin-up inertia)
+        try {
+            val vib = vibrator ?: return
+            if (!vib.hasVibrator()) return
+
+            val durationMs = prefs.hapticStrength.toLong().coerceIn(35L, 85L)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val audioAttributes = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .build()
+
+                val effect = try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+                    } else {
+                        VibrationEffect.createOneShot(durationMs, 255)
+                    }
+                } catch (_: Throwable) {
+                    VibrationEffect.createOneShot(durationMs, 255)
+                }
+
+                try {
+                    vib.vibrate(effect, audioAttributes)
+                } catch (_: Throwable) {
+                    vib.vibrate(effect)
+                }
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(prefs.hapticStrength.toLong().coerceAtLeast(10L))
+                vib.vibrate(durationMs)
             }
-        } catch (_: Throwable) {
-            try {
-                view?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-            } catch (_: Throwable) {}
-        }
+        } catch (_: Throwable) {}
     }
 }

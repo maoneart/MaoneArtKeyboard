@@ -11,8 +11,8 @@ android {
         applicationId "com.maoneart.ioskeyboard"
         minSdk 24
         targetSdk 34
-        versionCode 20
-        versionName "1.0.20"
+        versionCode 22
+        versionName "1.0.22"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

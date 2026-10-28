@@ -7,11 +7,16 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.inputmethodservice.InputMethodService
 import android.text.InputType
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
@@ -54,9 +59,10 @@ class IosInputMethodService : InputMethodService() {
     private var lastShiftPressTime: Long = 0
     private var lastSpacePressTime: Long = 0
 
-    // Samsung-Style Live Translate Input Panel State
+    // Live Translate Panel State with Movable Interactive Cursor
     private var isTranslatePanelOpen = false
     private val translatePanelBuffer = StringBuilder()
+    private var translateCursorPosition = 0
     private val composingWord = StringBuilder()
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
 
@@ -68,7 +74,7 @@ class IosInputMethodService : InputMethodService() {
     private var candidate3: TextView? = null
     private var badgeLanguage: TextView? = null
 
-    // Samsung-Style Translate Panel Views
+    // Translate Panel Views
     private var translatePanel: LinearLayout? = null
     private var tvTranslateLangPair: TextView? = null
     private var tvTranslateStatus: TextView? = null
@@ -100,6 +106,7 @@ class IosInputMethodService : InputMethodService() {
             val inflater = LayoutInflater.from(themedContext)
             val view = inflater.inflate(R.layout.keyboard_view, null)
             rootView = view
+            audioHaptic.activeRootView = view
 
             keyboardContainer = view.findViewById(R.id.keyboardContainer)
             candidate1 = view.findViewById(R.id.candidate1)
@@ -114,6 +121,25 @@ class IosInputMethodService : InputMethodService() {
             tvTranslateInputBox = view.findViewById(R.id.tvTranslateInputBox)
             btnTranslateSend = view.findViewById(R.id.btnTranslateSend)
             btnCloseTranslate = view.findViewById(R.id.btnCloseTranslate)
+
+            // Interactive Cursor Touch Listener ("buat di geser-geser")
+            tvTranslateInputBox?.setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
+                    val layout = tvTranslateInputBox?.layout
+                    if (layout != null && translatePanelBuffer.isNotEmpty()) {
+                        val x = event.x - (tvTranslateInputBox?.totalPaddingLeft ?: 0) + (tvTranslateInputBox?.scrollX ?: 0)
+                        val y = event.y - (tvTranslateInputBox?.totalPaddingTop ?: 0) + (tvTranslateInputBox?.scrollY ?: 0)
+                        val line = layout.getLineForVertical(y.toInt().coerceIn(0, (layout.lineCount - 1).coerceAtLeast(0)))
+                        val offset = layout.getOffsetForHorizontal(line, x)
+                        translateCursorPosition = offset.coerceIn(0, translatePanelBuffer.length)
+                        updateTranslateInputBoxVisual()
+                        audioHaptic.triggerHapticFeedback()
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
 
             val btnQuickTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnQuickClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
@@ -159,8 +185,6 @@ class IosInputMethodService : InputMethodService() {
             candidate2?.setOnClickListener { selectCandidate(candidate2?.text?.toString()) }
             candidate3?.setOnClickListener { selectCandidate(candidate3?.text?.toString()) }
 
-
-            // Samsung-Style Translate Panel Actions
             tvTranslateLangPair?.setOnClickListener {
                 audioHaptic.playClickSound(it)
                 audioHaptic.triggerHapticFeedback(it)
@@ -211,7 +235,14 @@ class IosInputMethodService : InputMethodService() {
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         try {
+            audioHaptic.activeRootView = rootView
             composingWord.clear()
+
+            // Auto-Close translate panel when opening a new chat/input session
+            if (!restarting && isTranslatePanelOpen) {
+                closeTranslatePanel()
+            }
+
             updateSuggestions()
             updateLanguageBadge()
             updateTranslatePanelUI()
@@ -221,6 +252,25 @@ class IosInputMethodService : InputMethodService() {
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error onStartInputView", t)
         }
+    }
+
+    override fun onFinishInputView(finishingInput: Boolean) {
+        super.onFinishInputView(finishingInput)
+        try {
+            // Auto-close translate panel when user exits keyboard or switches chat
+            if (isTranslatePanelOpen) {
+                closeTranslatePanel()
+            }
+        } catch (_: Throwable) {}
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        try {
+            if (isTranslatePanelOpen) {
+                closeTranslatePanel()
+            }
+        } catch (_: Throwable) {}
     }
 
     override fun onUpdateSelection(
@@ -284,13 +334,40 @@ class IosInputMethodService : InputMethodService() {
 
     private fun toggleTranslatePanel() {
         isTranslatePanelOpen = !isTranslatePanelOpen
+        if (isTranslatePanelOpen) {
+            translateCursorPosition = translatePanelBuffer.length
+        }
         updateTranslatePanelUI()
     }
 
     private fun closeTranslatePanel() {
         isTranslatePanelOpen = false
         translatePanelBuffer.clear()
+        translateCursorPosition = 0
         updateTranslatePanelUI()
+    }
+
+    // Render movable iOS blue cursor ('│') in Translate Input Box
+    private fun updateTranslateInputBoxVisual() {
+        try {
+            val box = tvTranslateInputBox ?: return
+            if (!isTranslatePanelOpen) return
+
+            if (translatePanelBuffer.isEmpty()) {
+                val ssb = SpannableStringBuilder("│")
+                ssb.setSpan(ForegroundColorSpan(Color.parseColor("#007AFF")), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                ssb.setSpan(StyleSpan(Typeface.BOLD), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                box.text = ssb
+                return
+            }
+
+            val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+            val ssb = SpannableStringBuilder(translatePanelBuffer)
+            ssb.insert(pos, "│")
+            ssb.setSpan(ForegroundColorSpan(Color.parseColor("#007AFF")), pos, pos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            ssb.setSpan(StyleSpan(Typeface.BOLD), pos, pos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            box.text = ssb
+        } catch (_: Throwable) {}
     }
 
     private fun updateTranslatePanelUI() {
@@ -302,15 +379,15 @@ class IosInputMethodService : InputMethodService() {
                 tvTranslateLangPair?.text = "$src ⇄ $tgt"
 
                 if (translatePanelBuffer.isEmpty()) {
-                    tvTranslateInputBox?.text = ""
                     tvTranslateStatus?.text = "Ketik kalimat di kotak, lalu tap Kirim"
                 } else {
-                    tvTranslateInputBox?.text = translatePanelBuffer.toString()
                     tvTranslateStatus?.text = "Kalimat siap ($src ➔ $tgt)"
                 }
+                updateTranslateInputBoxVisual()
             } else {
                 translatePanel?.visibility = View.GONE
                 translatePanelBuffer.clear()
+                translateCursorPosition = 0
                 tvTranslateInputBox?.text = ""
             }
         } catch (_: Throwable) {}
@@ -335,9 +412,8 @@ class IosInputMethodService : InputMethodService() {
                 // Commit translated sentence directly into the host app (WhatsApp, etc.)
                 currentInputConnection?.commitText("$translated ", 1)
 
-                translatePanelBuffer.clear()
-                tvTranslateInputBox?.text = ""
-                tvTranslateStatus?.text = "✓ Terkirim ke obrolan!"
+                // Auto-Close translate panel immediately after sending!
+                closeTranslatePanel()
             } catch (_: Throwable) {
                 tvTranslateStatus?.text = "Gagal menerjemahkan (periksa koneksi)"
             }
@@ -412,7 +488,6 @@ class IosInputMethodService : InputMethodService() {
                         isShifted = !isShifted
                     }
                     lastShiftPressTime = now
-                    // Instant Shift update without re-inflating views
                     layoutEngine.updateShiftState(isShifted || isCapsLock)
                     layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode())
                 }
@@ -447,9 +522,12 @@ class IosInputMethodService : InputMethodService() {
     private fun handleCharacterInput(charStr: String) {
         try {
             if (isTranslatePanelOpen) {
-                translatePanelBuffer.append(charStr)
-                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                translatePanelBuffer.insert(pos, charStr)
+                translateCursorPosition = pos + charStr.length
+                updateTranslateInputBoxVisual()
                 tvTranslateStatus?.text = "Kalimat siap (${prefs.translateSourceLang.uppercase()} ➔ ${prefs.translateTargetLang.uppercase()})"
+                updateSuggestions()
             } else {
                 currentInputConnection?.commitText(charStr, 1)
                 composingWord.append(charStr)
@@ -458,7 +536,6 @@ class IosInputMethodService : InputMethodService() {
 
             if (isShifted && !isCapsLock) {
                 isShifted = false
-                // Instant update without rebuilding view tree
                 layoutEngine.updateShiftState(false)
                 layoutEngine.updateShiftButtonVisual(false, false, isDarkMode())
             }
@@ -468,9 +545,11 @@ class IosInputMethodService : InputMethodService() {
     private fun handleBackspace() {
         try {
             if (isTranslatePanelOpen) {
-                if (translatePanelBuffer.isNotEmpty()) {
-                    translatePanelBuffer.deleteCharAt(translatePanelBuffer.length - 1)
-                    tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                if (translatePanelBuffer.isNotEmpty() && translateCursorPosition > 0) {
+                    val pos = translateCursorPosition.coerceIn(1, translatePanelBuffer.length)
+                    translatePanelBuffer.deleteCharAt(pos - 1)
+                    translateCursorPosition = pos - 1
+                    updateTranslateInputBoxVisual()
                 }
                 updateSuggestions()
                 return
@@ -487,8 +566,11 @@ class IosInputMethodService : InputMethodService() {
     private fun handleSpace() {
         try {
             if (isTranslatePanelOpen) {
-                translatePanelBuffer.append(" ")
-                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                translatePanelBuffer.insert(pos, " ")
+                translateCursorPosition = pos + 1
+                updateTranslateInputBoxVisual()
+                updateSuggestions()
                 return
             }
 
@@ -497,6 +579,7 @@ class IosInputMethodService : InputMethodService() {
                 currentInputConnection?.deleteSurroundingText(1, 0)
                 currentInputConnection?.commitText(". ", 1)
                 lastSpacePressTime = 0
+                updateSuggestions()
                 return
             }
 
@@ -507,7 +590,7 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
-    // Dynamic Enter / Return Key handling (WhatsApp new line & send support)
+    // Dynamic Enter / Return Key handling (Search, WhatsApp new line, Send support)
     private fun handleReturn() {
         try {
             if (isTranslatePanelOpen && translatePanelBuffer.isNotBlank()) {
@@ -520,7 +603,7 @@ class IosInputMethodService : InputMethodService() {
             val imeAction = info?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
             val isMultiLine = info != null && ((info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0)
 
-            // If it's a multiline field (e.g. WhatsApp, Notes, Chat): ALWAYS insert a newline directly!
+            // Multiline field (WhatsApp, Telegram, Notes): Always insert a newline!
             if (isMultiLine) {
                 ic.commitText("\n", 1)
                 composingWord.clear()
@@ -531,20 +614,12 @@ class IosInputMethodService : InputMethodService() {
             if (imeAction != EditorInfo.IME_ACTION_NONE && imeAction != EditorInfo.IME_ACTION_UNSPECIFIED) {
                 val handled = ic.performEditorAction(imeAction)
                 if (!handled) {
-                    if (isMultiLine) {
-                        ic.commitText("\n", 1)
-                    } else {
-                        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-                        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
-                    }
-                }
-            } else {
-                if (isMultiLine) {
-                    ic.commitText("\n", 1)
-                } else {
                     ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
                     ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
                 }
+            } else {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
             }
 
             composingWord.clear()
@@ -568,8 +643,11 @@ class IosInputMethodService : InputMethodService() {
     private fun commitDirectText(text: String) {
         try {
             if (isTranslatePanelOpen) {
-                translatePanelBuffer.append(text)
-                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                translatePanelBuffer.insert(pos, text)
+                translateCursorPosition = pos + text.length
+                updateTranslateInputBoxVisual()
+                updateSuggestions()
             } else {
                 currentInputConnection?.commitText(text, 1)
                 composingWord.clear()
@@ -578,39 +656,61 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
-    private fun getCurrentWordBeforeCursor(): String {
+    /**
+     * Context extraction for Predictive Typing & Typo Correction:
+     * Returns Pair(currentWordBeingTyped, lastFinishedWordBeforeSpace)
+     */
+    private fun getTypingContext(): Pair<String, String> {
         try {
-            if (isTranslatePanelOpen) {
-                val text = translatePanelBuffer.toString()
-                if (text.isEmpty()) return ""
-                var i = text.length - 1
-                while (i >= 0 && !text[i].isWhitespace() && text[i] != '.' && text[i] != ',' && text[i] != '!' && text[i] != '?') {
-                    i--
-                }
-                return text.substring(i + 1)
+            val textBefore: String = if (isTranslatePanelOpen) {
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                translatePanelBuffer.substring(0, pos)
+            } else {
+                val ic = currentInputConnection
+                val chars = ic?.getTextBeforeCursor(60, 0)
+                chars?.toString() ?: composingWord.toString()
             }
 
-            val ic = currentInputConnection
-            if (ic != null) {
-                val chars = ic.getTextBeforeCursor(40, 0)
-                if (chars != null && chars.isNotEmpty()) {
-                    val text = chars.toString()
-                    var i = text.length - 1
-                    while (i >= 0 && !text[i].isWhitespace() && text[i] != '.' && text[i] != ',' && text[i] != '!' && text[i] != '?' && text[i] != '\n') {
-                        i--
-                    }
-                    val word = text.substring(i + 1)
-                    if (word.isNotEmpty()) {
-                        return word
-                    }
+            if (textBefore.isEmpty()) return Pair("", "")
+
+            // If cursor directly follows a space or punctuation:
+            if (textBefore.last().isWhitespace() || textBefore.last() in ".,!?") {
+                val trimmed = textBefore.trimEnd { it.isWhitespace() || it in ".,!?" }
+                if (trimmed.isEmpty()) return Pair("", "")
+                var i = trimmed.length - 1
+                while (i >= 0 && !trimmed[i].isWhitespace() && trimmed[i] !in ".,!?\n") {
+                    i--
                 }
+                val lastWord = trimmed.substring(i + 1)
+                return Pair("", lastWord)
             }
-            return composingWord.toString()
+
+            // Otherwise, cursor is at the end of a word being typed or backspaced:
+            var i = textBefore.length - 1
+            while (i >= 0 && !textBefore[i].isWhitespace() && textBefore[i] !in ".,!?\n") {
+                i--
+            }
+            val currentWord = textBefore.substring(i + 1)
+
+            // Also find previous word before this current word
+            val priorText = textBefore.substring(0, (i + 1).coerceAtLeast(0)).trimEnd { it.isWhitespace() || it in ".,!?" }
+            var j = priorText.length - 1
+            while (j >= 0 && !priorText[j].isWhitespace() && priorText[j] !in ".,!?\n") {
+                j--
+            }
+            val previousWord = if (priorText.isNotEmpty()) priorText.substring(j + 1) else ""
+
+            return Pair(currentWord, previousWord)
         } catch (_: Throwable) {
-            return composingWord.toString()
+            return Pair(composingWord.toString(), "")
         }
     }
 
+    /**
+     * Updates QuickType Candidate Bar:
+     * - In-word typing -> Typo correction, Slang expansion, Prefix completions
+     * - Space boundary -> Next-Word Prediction for continuous automatic sentence writing ("Nulis Otomatis")
+     */
     private fun updateSuggestions() {
         try {
             if (!prefs.isAutoCorrectEnabled) {
@@ -620,8 +720,17 @@ class IosInputMethodService : InputMethodService() {
                 return
             }
 
-            val currentWord = getCurrentWordBeforeCursor()
-            val suggestions = correctionEngine.getSuggestions(currentWord, prefs.activeLanguage)
+            val (currentWord, previousWord) = getTypingContext()
+
+            val suggestions = if (currentWord.isNotEmpty()) {
+                // User is actively typing or backspacing a word
+                correctionEngine.getSuggestions(currentWord, prefs.activeLanguage)
+            } else if (previousWord.isNotEmpty()) {
+                // User pressed space: continuous predictive typing ("Nulis Otomatis")
+                correctionEngine.getNextWordPredictions(previousWord, prefs.activeLanguage)
+            } else {
+                correctionEngine.getSuggestions("", prefs.activeLanguage)
+            }
 
             if (suggestions.isEmpty()) {
                 candidate1?.text = ""
@@ -630,18 +739,20 @@ class IosInputMethodService : InputMethodService() {
                 return
             }
 
+            val refWord = if (currentWord.isNotEmpty()) currentWord else previousWord
+
             if (suggestions.size == 1) {
                 candidate1?.text = ""
-                candidate2?.text = formatCandidateCase(suggestions[0], currentWord)
+                candidate2?.text = formatCandidateCase(suggestions[0], refWord)
                 candidate3?.text = ""
             } else if (suggestions.size == 2) {
-                candidate1?.text = formatCandidateCase(suggestions[1], currentWord)
-                candidate2?.text = formatCandidateCase(suggestions[0], currentWord)
+                candidate1?.text = formatCandidateCase(suggestions[1], refWord)
+                candidate2?.text = formatCandidateCase(suggestions[0], refWord)
                 candidate3?.text = ""
             } else {
-                candidate1?.text = formatCandidateCase(suggestions[1], currentWord)
-                candidate2?.text = formatCandidateCase(suggestions[0], currentWord)
-                candidate3?.text = formatCandidateCase(suggestions[2], currentWord)
+                candidate1?.text = formatCandidateCase(suggestions[1], refWord)
+                candidate2?.text = formatCandidateCase(suggestions[0], refWord)
+                candidate3?.text = formatCandidateCase(suggestions[2], refWord)
             }
         } catch (_: Throwable) {}
     }
@@ -663,15 +774,18 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.playClickSound()
             audioHaptic.triggerHapticFeedback()
 
-            val currentWord = getCurrentWordBeforeCursor()
+            val (currentWord, _) = getTypingContext()
             val lengthToDelete = currentWord.length
 
             if (isTranslatePanelOpen) {
-                if (translatePanelBuffer.length >= lengthToDelete) {
-                    translatePanelBuffer.setLength(translatePanelBuffer.length - lengthToDelete)
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                if (lengthToDelete > 0 && pos >= lengthToDelete) {
+                    translatePanelBuffer.delete(pos - lengthToDelete, pos)
+                    translateCursorPosition = pos - lengthToDelete
                 }
-                translatePanelBuffer.append("$candidate ")
-                tvTranslateInputBox?.text = translatePanelBuffer.toString()
+                translatePanelBuffer.insert(translateCursorPosition, "$candidate ")
+                translateCursorPosition += candidate.length + 1
+                updateTranslateInputBoxVisual()
             } else {
                 val ic = currentInputConnection
                 if (ic != null) {
@@ -683,6 +797,7 @@ class IosInputMethodService : InputMethodService() {
             }
 
             composingWord.clear()
+            // Immediately chain to the next word prediction! ("Nulis Otomatis")
             updateSuggestions()
         } catch (_: Throwable) {}
     }

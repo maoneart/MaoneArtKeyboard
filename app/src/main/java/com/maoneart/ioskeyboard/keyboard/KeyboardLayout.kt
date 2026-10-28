@@ -40,7 +40,7 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // Dynamic Enter / Return / Send / Search Button for WhatsApp & All Apps
+    // Dynamic Context-Adaptive Enter / Return / Search Button (iOS Smart Action)
     fun updateReturnButton(editorInfo: EditorInfo?) {
         val btn = returnButtonRef ?: return
         if (editorInfo == null) {
@@ -49,26 +49,35 @@ class KeyboardLayout(private val context: Context) {
             return
         }
 
+        val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
+        val variation = editorInfo.inputType and InputType.TYPE_MASK_VARIATION
         val isMultiLine = (editorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
 
-        // WhatsApp & all multiline fields: ALWAYS show Return / Enter key (↵)
+        // 1. Web Search or Filter: Show Search Icon (🔍)
+        if (imeAction == EditorInfo.IME_ACTION_SEARCH ||
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_SEARCH ||
+            variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
+            btn.text = "🔍"
+            btn.textSize = 18f
+            return
+        }
+
+        // 2. Browser URL or Web Address: Show "Buka"
+        if (imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI) {
+            btn.text = "Buka"
+            btn.textSize = 14f
+            return
+        }
+
+        // 3. WhatsApp, Telegram, Notes & all multiline fields: Show iOS Return Arrow (↵)
         if (isMultiLine) {
             btn.text = "↵"
             btn.textSize = 20f
             return
         }
 
-        val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
-
+        // 4. Form and Single-line Actions
         when (imeAction) {
-            EditorInfo.IME_ACTION_GO -> {
-                btn.text = "Buka"
-                btn.textSize = 14f
-            }
-            EditorInfo.IME_ACTION_SEARCH -> {
-                btn.text = "Cari"
-                btn.textSize = 14f
-            }
             EditorInfo.IME_ACTION_SEND -> {
                 btn.text = "Kirim"
                 btn.textSize = 14f
@@ -694,16 +703,24 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
+            isHapticFeedbackEnabled = true
             setupInstantTouch(this) { onKeyAction(text.toString()) }
         }
     }
 
-    // 0ms Latency Instant Touch Down Listener
+    // 0ms Latency Instant Touch Down Listener with Hardware Haptic Trigger
     private fun setupInstantTouch(view: View, onTrigger: () -> Unit) {
+        view.isHapticFeedbackEnabled = true
         view.setOnTouchListener { v, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
+                    try {
+                        v.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
                     onTrigger()
                     true
                 }
@@ -718,6 +735,7 @@ class KeyboardLayout(private val context: Context) {
 
     // High-Speed Auto Repeat Backspace ("Hapus Ngebut")
     private fun setupRapidBackspaceTouch(view: View, onBackspace: () -> Unit) {
+        view.isHapticFeedbackEnabled = true
         val handler = Handler(Looper.getMainLooper())
         var repeatRunnable: Runnable? = null
         var deleteCount = 0
@@ -727,6 +745,12 @@ class KeyboardLayout(private val context: Context) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
                     deleteCount = 0
+                    try {
+                        v.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
                     // 1. Delete character immediately
                     onBackspace()
 
@@ -734,6 +758,12 @@ class KeyboardLayout(private val context: Context) {
                     repeatRunnable = object : Runnable {
                         override fun run() {
                             deleteCount++
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
                             onBackspace()
                             // Accelerate: after 8 deletions switch from 60ms to 35ms (super ngebut!)
                             val nextDelay = if (deleteCount > 8) 35L else 60L

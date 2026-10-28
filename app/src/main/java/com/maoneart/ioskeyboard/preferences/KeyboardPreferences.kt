@@ -23,7 +23,7 @@ class KeyboardPreferences(context: Context) {
         set(value) = prefs.edit().putBoolean("haptic_enabled", value).apply()
 
     var hapticStrength: Int
-        get() = prefs.getInt("haptic_strength", 25) // ms
+        get() = prefs.getInt("haptic_strength", 45) // ms calibrated for Android tactile feedback
         set(value) = prefs.edit().putInt("haptic_strength", value).apply()
 
     var isKeyPopupEnabled: Boolean

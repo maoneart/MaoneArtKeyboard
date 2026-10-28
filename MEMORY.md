@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.21)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.22)
 
 ---
 
@@ -12,18 +12,25 @@
    - Menghilangkan regenerasi debug keystore acak di GitHub Actions runner.
    - Semua build masa depan memiliki signature fingerprint identik (`3C:1C:CA:35:A9:6B:89:C2:AF:A4:A6:DB:16:7D:8F:4F:C4:8B:41:34:7F:8F:86:E8:6B:52:E4:07:B5:D0:9C:F1`).
    - **Hasil**: Pengguna dapat langsung menimpa / update file APK kapan saja tanpa perlu uninstall aplikasi terlebih dahulu (pengaturan, preferensi, dan status keyboard aktif tidak akan hilang).
-2. **Core IME**: Native Android `InputMethodService` (`IosInputMethodService.kt`) dengan latency input 0ms dan konsumsi RAM sangat hemat (~15 MB).
-2. **Keyboard Layout & Geometry**: Mengikuti aspect ratio, key margin, inset padding, dan warna tombol iOS 18 (QWERTY, Symbols `#+=` dan `123`, serta laci Apple Emoji). Tombol keyboard di-render menggunakan `TextView` murni (bukan `Button`) untuk eliminasi delay rendering, konflik MaterialButton, dan shadow artefak.
-3. **Safe Inflation & Ripple**: Toolbar dan icon menggunakan circular ripple drawable mandiri (`btn_icon_ripple.xml`), eliminasi referensi `?attr/selectableItemBackgroundBorderless` yang memicu InflateException pada Android IME service.
-4. **Cupertino Settings Hub**: Tampilan pengaturan berbasis iOS Inset Grouped layout (`activity_settings.xml`) dengan squircle colored icons iOS, live status badge deteksi IME aktif/default, switch dengan track hijau Apple (`#34C759`), dan live test pad.
-5. **Samsung-Style Live Translate Panel**: Panel input kalimat terisolasi di atas keyboard. Pengguna mengetik kalimat lengkap di dalam kotak terjemahan keyboard, lalu menekan tombol `[Kirim ➔]` untuk menerjemahkan sekaligus ke aplikasi tujuan (misal WhatsApp), meniadakan penerjemahan patah perkata ("tidak 1-1").
-6. **Animated Bouncing Emojis**: Laci emoji Apple dilengkapi animasi pegas dinamis (*tactile spring bounce pop*) menggunakan `OvershootInterpolator(3.0f)` saat disentuh (`scale 1.45x`), menghidupkan animasi emoji khas iOS.
-7. **WhatsApp & Multiline Return / Enter Key**: Deteksi tipe input dinamis pada `updateReturnButton(editorInfo)`. Menampilkan simbol Enter iOS (`↵`) pada chat dan form multiline (WhatsApp, Telegram, Notes). Penekanan tombol Enter pada multiline field langsung mengirimkan `\n` via `commitText("\n", 1)` untuk menjamin baris baru terbuat tanpa hilang/diabaikan oleh app.
-8. **Smart Typo Buster & Multi-Candidate Strip (v1.0.11)**:
-   - **Kamus Kaya & Slang Chat (1.500+ kata)**: Meliputi kosa kata sehari-hari, kata ganti (`aku`, `kamu`, `dia`, `kita`, `kami`), kata kerja, kata tanya, singkatan chat (`kmu`, `bsa`, `ak`, `mw`, `udh`, `blm`, `lgi`, `jg`, `juha`, `bgt`, `sy`, `tdk`, `ga`, `gpp`, `mksih`, dll.).
-   - **Sinkronisasi Kata Real-Time saat Hapus (Backspace)**: Membaca token kata sebelum kursor via `getCurrentWordBeforeCursor()` sehingga saat pengguna menghapus karakter satu per satu, bilah rekomendasi langsung mengupdate pilihan kata yang sesuai dengan sisa huruf. Saat input kosong atau setelah spasi, otomatis menyajikan kata-kata umum awal (`aku`, `kamu`, `bisa`, `mau`, `lagi`, `sudah`).
-   - **Deteksi Typo Cerdas (Kurang Huruf, Salah Ketik, Kedekatan QWERTY)**: Algoritma Damerau-Levenshtein yang diperkaya deteksi subsequences untuk typo huruf hilang (`kmu` -> `kamu`, `bsa` -> `bisa`), transposisi huruf tertukar (`akmu` -> `kamu`), dan bonus kedekatan tuts keyboard QWERTY (`juha` -> `juga`).
-   - **Scrollable Candidate Strip (Lebih Banyak Rekomendasi)**: Bilah saran kini berupa `HorizontalScrollView` dengan desain chip iOS (teks tebal pada saran pertama, teks reguler pada saran lanjutan, dipisahkan garis vertikal tipis, mendukung 6-8 rekomendasi yang dapat digeser).
+2. **Dual-Layer Tactile Haptic Engine (All-Keys Vibration Fix)**:
+   - Root Cause Masalah Getar: Pengetikan 1 tombol huruf hanya memancarkan 1 pulsa ~20ms, yang tidak cukup kuat untuk mengatasi inersia motor vibrator ERM koin HP Android (berbeda dengan tombol backspace yang repeat pulsa bertubi-tubi).
+   - Solusi: Setiap tombol huruf di `KeyboardLayout.kt` kini mengaktifkan `isHapticFeedbackEnabled = true` dan mengeksekusi `performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, FLAG_IGNORE_GLOBAL_SETTING or FLAG_IGNORE_VIEW_SETTING)` langsung pada view tombol yang ditekan saat `ACTION_DOWN` (0ms delay).
+   - Ditambah hardware `Vibrator` & `VibratorManager` (Android 12+) dengan pulse durasi terkalibrasi 45ms–85ms dan max amplitude 255 / `EFFECT_CLICK` dengan sonification audio attributes. Semua tombol (huruf, angka, spasi, return) kini bergetar tegas dan responsif.
+3. **Adaptive Dynamic Return Key (Search & WhatsApp Enter)**:
+   - Web Search & Search Fields: Menampilkan ikon kaca pembesar iOS (`🔍`) dan menjalankan aksi pencarian.
+   - URL & Browser Address: Menampilkan teks `Buka`.
+   - Multiline Fields (WhatsApp, Telegram, Notes, Pesan): Selalu menampilkan panah Enter iOS (`↵`) dan menginjeksi karakter newline `\n` secara langsung.
+   - Single Line Form Action: Menampilkan `Lanjut`, `Selesai`, atau `Kirim`.
+4. **Samsung-Style Live Translate Panel with Movable Interactive Cursor**:
+   - Terdapat kursor visual interaktif berwarna biru iOS (`│`) di dalam kotak input terjemahan.
+   - Kursor dapat digeser langsung dengan sentuhan jari ke posisi mana saja di dalam kalimat (`layout.getOffsetForHorizontal`).
+   - Karakter baru disisipkan tepat di posisi kursor, dan backspace menghapus karakter di sebelah kiri kursor.
+   - **Auto-Close Proteksi**: Panel terjemahan otomatis tertutup saat kalimat terjemahan berhasil dikirim, saat obrolan/jendela keyboard ditutup (`onFinishInputView`), saat keyboard dibuka kembali di sesi baru (`onStartInputView`), dan saat jendela keyboard disembunyikan (`onWindowHidden`).
+5. **Expanded Vocabulary (3,000+ Kata) & Continuous Predictive Typing ("Nulis Otomatis")**:
+   - Kamus bahasa Indonesia diperluas hingga 3.000+ kata (KBBI, kata berimbuhan me-/ber-/di-/pe-/ter-/-kan/-i, kosakata percakapan & slang WhatsApp).
+   - N-Gram Next-Word Prediction Map: Saat kursor berada setelah spasi atau saat memilih kata kandidat, bilah saran langsung memunculkan prediksi kata berikutnya yang biasa mengikutinya (`saya` ➔ `mau`/`bisa`/`sudah`, `mau` ➔ `makan`/`pergi`/`tanya`, `bisa` ➔ `nggak`/`bantu`/`kirim`).
+   - Pengguna dapat mengetik satu kalimat penuh secara otomatis hanya dengan tap-tap-tap bilah saran berantai ("Nulis Otomatis").
+   - Deteksi Typo Real-Time: Saat huruf dikurangi (backspace), bilah saran langsung menyesuaikan rekomendasi prefix kata. Damerau-Levenshtein distance menangani salah ketik tombol QWERTY berdampingan (`juha` ➔ `juga`).
 9. **CI/CD Pipeline**: GitHub Actions (`.github/workflows/build_apk.yml`) otomatis build release APK bertanda tangan debug keystore dan mempublikasikan release asset.
 
 ---
@@ -49,3 +56,9 @@
     1. Keystore permanen `keystore/release.jks` terintegrasi langsung ke dalam pipeline build release & debug.
     2. Sertifikat berlaku 28 tahun (hingga 2054) dengan SHA-256 fingerprint konstan.
     3. Pengguna bisa langsung update APK kapan pun tanpa perlu uninstall aplikasi terlebih dahulu.
+  - Haptic Dual-Layer, Cursor Translate, Auto-Close & Nulis Otomatis (Release v1.0.22):
+    1. **Getar Semua Tombol Terasa Nyata**: Setiap tombol huruf, angka, simbol kini mengaktifkan hardware haptic view tap dan physical vibrator motor berdurasi 45ms-85ms dengan amplitude 255.
+    2. **Kursor Interaktif Mode Terjemahan**: Kursor biru khas iOS (`│`) dapat digeser langsung dengan sentuhan jari untuk edit di tengah kalimat.
+    3. **Auto-Close Mode Terjemahan**: Panel otomatis tertutup setelah kirim atau saat pindah chat.
+    4. **Nulis Otomatis Berantai (Next-Word Prediction)**: 3.000+ kosakata dengan N-Gram prediction memungkinkan user mengetik kalimat lengkap hanya dengan tap bilah saran beruntun.
+    5. **Flexible Return Key**: Ikon `🔍` untuk pencarian web, `Buka` untuk URL, dan `↵` untuk WhatsApp & multiline fields.
