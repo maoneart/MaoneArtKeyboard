@@ -425,10 +425,12 @@ class KeyboardLayout(private val context: Context) {
         return root
     }
 
-    // --- 3. APPLE EMOJI BOARD LAYOUT (with Animated Bounce on Touch) ---
+    // --- 3. APPLE EMOJI & WHATSAPP STICKER BOARD LAYOUT ---
     fun createEmojiView(
         isDark: Boolean,
         onEmojiAction: (String) -> Unit,
+        onStickerAction: (java.io.File) -> Unit,
+        onAddStickerAction: () -> Unit,
         onBackAction: () -> Unit
     ): View {
         val root = LinearLayout(context).apply {
@@ -439,82 +441,305 @@ class KeyboardLayout(private val context: Context) {
             )
         }
 
-        val scrollContainer = ScrollView(context).apply {
+        // Top Category Bar (Smileys, Hands, Hearts, Animals, Food, Activities, Symbols, Stickers, + Add)
+        val tabCategories = listOf(
+            Pair("Smileys", "😀"),
+            Pair("Hands", "👋"),
+            Pair("Hearts", "❤️"),
+            Pair("Animals", "🐶"),
+            Pair("Food", "🍔"),
+            Pair("Activities", "⚽"),
+            Pair("Symbols", "💯"),
+            Pair("STICKERS", "🖼️ Stiker"),
+            Pair("ADD_STICKER", "➕")
+        )
+
+        var activeCat = "Smileys"
+        val tabViews = mutableMapOf<String, TextView>()
+
+        val tabsScroll = android.widget.HorizontalScrollView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(38)
+            )
+            isHorizontalScrollBarEnabled = false
+            setBackgroundColor(if (isDark) ContextCompat.getColor(context, R.color.ios_toolbar_dark) else ContextCompat.getColor(context, R.color.ios_toolbar_light))
+        }
+
+        val tabsLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(6), 0, dp(6), 0)
+        }
+
+        val contentContainer = FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1.0f
             )
         }
-        val emojiContent = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(8), dp(4), dp(8), dp(4))
-        }
 
-        for (cat in EmojiBoardManager.categories) {
-            val list = EmojiBoardManager.emojis[cat] ?: continue
-            val header = TextView(context).apply {
-                text = cat.uppercase()
-                setTextColor(if (isDark) Color.LTGRAY else Color.GRAY)
-                textSize = 11.5f
-                setPadding(dp(4), dp(8), dp(4), dp(4))
-            }
-            emojiContent.addView(header)
+        fun renderContent(selectedCategory: String) {
+            contentContainer.removeAllViews()
 
-            var row = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
-            }
-            var count = 0
-            for (emo in list) {
-                val btn = TextView(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
-                    text = emo
-                    textSize = 25f
+            if (selectedCategory == "STICKERS") {
+                // Render WhatsApp Stickers Grid
+                val stickerManager = com.maoneart.ioskeyboard.sticker.StickerManager(context)
+                val stickers = stickerManager.getStickers()
+
+                val scroll = ScrollView(context).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+
+                val layout = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(10), dp(8), dp(10), dp(8))
+                }
+
+                // Add Sticker Action Button Card
+                val btnUploadCard = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(44)
+                    ).apply { setMargins(0, 0, 0, dp(10)) }
+                    background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
                     isClickable = true
                     isFocusable = false
+                    setupInstantTouch(this) { onAddStickerAction() }
+                }
 
-                    // Apple Animated Emoji Spring Bounce on Touch ("Animasi Emoji Gerak")
-                    setOnTouchListener { v, event ->
-                        when (event.action) {
-                            MotionEvent.ACTION_DOWN -> {
-                                v.animate()
-                                    .scaleX(1.45f)
-                                    .scaleY(1.45f)
-                                    .setDuration(120)
-                                    .setInterpolator(OvershootInterpolator(3.0f))
-                                    .start()
-                                onEmojiAction(emo)
+                val tvUploadText = TextView(context).apply {
+                    text = "➕ Upload Gambar (PNG/JPG) Jadi Stiker WebP"
+                    setTextColor(ContextCompat.getColor(context, R.color.ios_blue))
+                    textSize = 13.5f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                }
+                btnUploadCard.addView(tvUploadText)
+                layout.addView(btnUploadCard)
+
+                if (stickers.isEmpty()) {
+                    val tvEmpty = TextView(context).apply {
+                        text = "Belum ada stiker tersimpan.\nKetuk tombol di atas untuk memilih foto PNG/JPG dari galeri dan otomatis dijadikan stiker WhatsApp!"
+                        setTextColor(Color.GRAY)
+                        textSize = 13f
+                        gravity = Gravity.CENTER
+                        setPadding(dp(16), dp(30), dp(16), dp(30))
+                    }
+                    layout.addView(tvEmpty)
+                } else {
+                    var row = LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(75))
+                            .apply { setMargins(0, dp(3), 0, dp(3)) }
+                    }
+                    var count = 0
+
+                    for (stickerFile in stickers) {
+                        val itemFrame = FrameLayout(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+                                .apply { setMargins(dp(3), 0, dp(3), 0) }
+                            background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+                            setPadding(dp(4), dp(4), dp(4), dp(4))
+                            isClickable = true
+                            isFocusable = false
+
+                            setOnClickListener {
+                                onStickerAction(stickerFile)
+                            }
+
+                            setOnLongClickListener {
+                                android.app.AlertDialog.Builder(context)
+                                    .setTitle("Hapus Stiker")
+                                    .setMessage("Hapus stiker ini dari keyboard?")
+                                    .setPositiveButton("Hapus") { _, _ ->
+                                        stickerManager.deleteSticker(stickerFile)
+                                        renderContent("STICKERS")
+                                    }
+                                    .setNegativeButton("Batal", null)
+                                    .show()
                                 true
                             }
-                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                                v.animate()
-                                    .scaleX(1.0f)
-                                    .scaleY(1.0f)
-                                    .setDuration(150)
-                                    .start()
-                                true
+                        }
+
+                        val ivSticker = android.widget.ImageView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                            try {
+                                val bmp = android.graphics.BitmapFactory.decodeFile(stickerFile.absolutePath)
+                                setImageBitmap(bmp)
+                            } catch (_: Throwable) {}
+                        }
+                        itemFrame.addView(ivSticker)
+                        row.addView(itemFrame)
+                        count++
+
+                        if (count == 4) {
+                            layout.addView(row)
+                            row = LinearLayout(context).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(75))
+                                    .apply { setMargins(0, dp(3), 0, dp(3)) }
                             }
-                            else -> false
+                            count = 0
                         }
                     }
-                }
-                row.addView(btn)
-                count++
-                if (count == 8) {
-                    emojiContent.addView(row)
-                    row = LinearLayout(context).apply {
-                        orientation = LinearLayout.HORIZONTAL
-                        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
+
+                    if (count > 0) {
+                        // Fill remaining spaces in row
+                        while (count < 4) {
+                            val spacer = View(context).apply {
+                                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+                                    .apply { setMargins(dp(3), 0, dp(3), 0) }
+                            }
+                            row.addView(spacer)
+                            count++
+                        }
+                        layout.addView(row)
                     }
-                    count = 0
+                }
+
+                scroll.addView(layout)
+                contentContainer.addView(scroll)
+            } else {
+                // Render Emojis for selected category
+                val scroll = ScrollView(context).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                }
+
+                val layout = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(8), dp(4), dp(8), dp(4))
+                }
+
+                val emojiList = EmojiBoardManager.emojis[selectedCategory] ?: emptyList()
+
+                var row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
+                }
+                var count = 0
+
+                for (emo in emojiList) {
+                    val btn = TextView(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+                        text = emo
+                        textSize = 25f
+                        gravity = Gravity.CENTER
+                        isClickable = true
+                        isFocusable = false
+
+                        setOnTouchListener { v, event ->
+                            when (event.action) {
+                                MotionEvent.ACTION_DOWN -> {
+                                    v.animate()
+                                        .scaleX(1.45f)
+                                        .scaleY(1.45f)
+                                        .setDuration(120)
+                                        .setInterpolator(OvershootInterpolator(3.0f))
+                                        .start()
+                                    onEmojiAction(emo)
+                                    true
+                                }
+                                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                    v.animate()
+                                        .scaleX(1.0f)
+                                        .scaleY(1.0f)
+                                        .setDuration(150)
+                                        .start()
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
+                    }
+                    row.addView(btn)
+                    count++
+
+                    if (count == 8) {
+                        layout.addView(row)
+                        row = LinearLayout(context).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
+                        }
+                        count = 0
+                    }
+                }
+
+                if (count > 0) {
+                    while (count < 8) {
+                        val spacer = View(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+                        }
+                        row.addView(spacer)
+                        count++
+                    }
+                    layout.addView(row)
+                }
+
+                scroll.addView(layout)
+                contentContainer.addView(scroll)
+            }
+        }
+
+        fun updateTabStyles() {
+            for ((key, btn) in tabViews) {
+                if (key == activeCat) {
+                    btn.setBackgroundResource(R.drawable.key_bg_blue)
+                    btn.setTextColor(Color.WHITE)
+                    btn.setTypeface(btn.typeface, android.graphics.Typeface.BOLD)
+                } else {
+                    btn.setBackgroundColor(Color.TRANSPARENT)
+                    btn.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
+                    btn.setTypeface(btn.typeface, android.graphics.Typeface.NORMAL)
                 }
             }
-            if (count > 0) emojiContent.addView(row)
         }
-        scrollContainer.addView(emojiContent)
-        root.addView(scrollContainer)
+
+        // Build Tab Buttons
+        for ((catKey, catLabel) in tabCategories) {
+            val tabBtn = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(28)
+                ).apply { setMargins(dp(3), 0, dp(3), 0) }
+                setPadding(dp(10), 0, dp(10), 0)
+                gravity = Gravity.CENTER
+                text = catLabel
+                textSize = 13.5f
+                isClickable = true
+                isFocusable = false
+
+                setOnClickListener {
+                    if (catKey == "ADD_STICKER") {
+                        onAddStickerAction()
+                    } else {
+                        activeCat = catKey
+                        updateTabStyles()
+                        renderContent(activeCat)
+                    }
+                }
+            }
+            tabViews[catKey] = tabBtn
+            tabsLayout.addView(tabBtn)
+        }
+
+        tabsScroll.addView(tabsLayout)
+        root.addView(tabsScroll)
+
+        // Initial content render
+        updateTabStyles()
+        renderContent(activeCat)
+
+        root.addView(contentContainer)
 
         // Bottom Bar (ABC + Backspace)
         val bottomBar = LinearLayout(context).apply {

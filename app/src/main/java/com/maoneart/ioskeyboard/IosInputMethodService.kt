@@ -51,6 +51,7 @@ class IosInputMethodService : InputMethodService() {
     private lateinit var correctionEngine: SmartCorrectionEngine
     private lateinit var translateManager: LiveTranslateManager
     private lateinit var clipboardManager: ClipboardHistoryManager
+    private lateinit var stickerManager: com.maoneart.ioskeyboard.sticker.StickerManager
     private lateinit var layoutEngine: KeyboardLayout
 
     private var currentMode = Mode.QWERTY
@@ -94,6 +95,7 @@ class IosInputMethodService : InputMethodService() {
             correctionEngine = SmartCorrectionEngine(this)
             translateManager = LiveTranslateManager()
             clipboardManager = ClipboardHistoryManager(this)
+            stickerManager = com.maoneart.ioskeyboard.sticker.StickerManager(this)
             layoutEngine = KeyboardLayout(this)
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in onCreate", t)
@@ -143,6 +145,7 @@ class IosInputMethodService : InputMethodService() {
 
             val btnQuickTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnQuickClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
+            val btnQuickEmoji = view.findViewById<ImageButton>(R.id.btnQuickEmoji)
             val btnQuickSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
 
             btnQuickTranslate?.setOnClickListener {
@@ -158,6 +161,16 @@ class IosInputMethodService : InputMethodService() {
                     switchMode(Mode.QWERTY)
                 } else {
                     switchMode(Mode.CLIPBOARD)
+                }
+            }
+
+            btnQuickEmoji?.setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                if (currentMode == Mode.EMOJI) {
+                    switchMode(Mode.QWERTY)
+                } else {
+                    switchMode(Mode.EMOJI)
                 }
             }
 
@@ -317,10 +330,12 @@ class IosInputMethodService : InputMethodService() {
 
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
+            val btnEmoji = view.findViewById<ImageButton>(R.id.btnQuickEmoji)
             val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
 
             btnTranslate?.setColorFilter(textColor)
             btnClipboard?.setColorFilter(textColor)
+            btnEmoji?.setColorFilter(textColor)
             btnSettings?.setColorFilter(textColor)
         } catch (_: Throwable) {}
     }
@@ -452,6 +467,12 @@ class IosInputMethodService : InputMethodService() {
                 Mode.EMOJI -> layoutEngine.createEmojiView(
                     isDark = isDark,
                     onEmojiAction = { handleEmojiAction(it) },
+                    onStickerAction = { stickerFile ->
+                        sendStickerToApp(stickerFile)
+                    },
+                    onAddStickerAction = {
+                        openStickerUploadScreen()
+                    },
                     onBackAction = { switchMode(Mode.QWERTY) }
                 )
                 Mode.CLIPBOARD -> layoutEngine.createClipboardView(
@@ -637,6 +658,38 @@ class IosInputMethodService : InputMethodService() {
             } else {
                 commitDirectText(emoji)
             }
+        } catch (_: Throwable) {}
+    }
+
+    private fun sendStickerToApp(stickerFile: java.io.File) {
+        try {
+            audioHaptic.playClickSound()
+            audioHaptic.triggerHapticFeedback()
+
+            val success = stickerManager.sendSticker(
+                currentInputConnection,
+                currentInputEditorInfo,
+                stickerFile
+            )
+
+            if (!success) {
+                android.widget.Toast.makeText(
+                    this,
+                    "Aplikasi ini tidak mendukung stiker langsung",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun openStickerUploadScreen() {
+        try {
+            audioHaptic.playClickSound()
+            audioHaptic.triggerHapticFeedback()
+            val intent = Intent(this, com.maoneart.ioskeyboard.sticker.StickerUploadActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            startActivity(intent)
         } catch (_: Throwable) {}
     }
 

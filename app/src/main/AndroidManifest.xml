@@ -43,5 +43,21 @@
             android:label="@string/title_languages"
             android:theme="@style/Theme.IosKeyboard.Settings" />
 
+        <activity
+            android:name=".sticker.StickerUploadActivity"
+            android:exported="false"
+            android:label="Tambah Stiker WhatsApp"
+            android:theme="@style/Theme.IosKeyboard.Settings" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
     </application>
 </manifest>

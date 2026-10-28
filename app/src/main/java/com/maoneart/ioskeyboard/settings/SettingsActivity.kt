@@ -192,6 +192,10 @@ class SettingsActivity : AppCompatActivity() {
             showTranslatePairDialog()
         }
 
+        findViewById<LinearLayout>(R.id.rowAddSticker)?.setOnClickListener {
+            startActivity(Intent(this, com.maoneart.ioskeyboard.sticker.StickerUploadActivity::class.java))
+        }
+
         btnClearTest.setOnClickListener {
             etTestInput.setText("")
         }
