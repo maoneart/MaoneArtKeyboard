@@ -2,12 +2,17 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.11)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.13)
 
 ---
 
 ## 📌 Architecture & Technical Decisions
-1. **Core IME**: Native Android `InputMethodService` (`IosInputMethodService.kt`) dengan latency input 0ms dan konsumsi RAM sangat hemat (~15 MB).
+1. **1-Key Permanent Signing Architecture (`keystore/release.jks`)**:
+   - Sertifikat RSA 2048-bit mandiri (`SHA384withRSA`) disimpan permanen di repositori (`keystore/release.jks`) dengan masa berlaku hingga tahun 2054 (28 tahun).
+   - Menghilangkan regenerasi debug keystore acak di GitHub Actions runner.
+   - Semua build masa depan memiliki signature fingerprint identik (`3C:1C:CA:35:A9:6B:89:C2:AF:A4:A6:DB:16:7D:8F:4F:C4:8B:41:34:7F:8F:86:E8:6B:52:E4:07:B5:D0:9C:F1`).
+   - **Hasil**: Pengguna dapat langsung menimpa / update file APK kapan saja tanpa perlu uninstall aplikasi terlebih dahulu (pengaturan, preferensi, dan status keyboard aktif tidak akan hilang).
+2. **Core IME**: Native Android `InputMethodService` (`IosInputMethodService.kt`) dengan latency input 0ms dan konsumsi RAM sangat hemat (~15 MB).
 2. **Keyboard Layout & Geometry**: Mengikuti aspect ratio, key margin, inset padding, dan warna tombol iOS 18 (QWERTY, Symbols `#+=` dan `123`, serta laci Apple Emoji). Tombol keyboard di-render menggunakan `TextView` murni (bukan `Button`) untuk eliminasi delay rendering, konflik MaterialButton, dan shadow artefak.
 3. **Safe Inflation & Ripple**: Toolbar dan icon menggunakan circular ripple drawable mandiri (`btn_icon_ripple.xml`), eliminasi referensi `?attr/selectableItemBackgroundBorderless` yang memicu InflateException pada Android IME service.
 4. **Cupertino Settings Hub**: Tampilan pengaturan berbasis iOS Inset Grouped layout (`activity_settings.xml`) dengan squircle colored icons iOS, live status badge deteksi IME aktif/default, switch dengan track hijau Apple (`#34C759`), dan live test pad.
@@ -36,7 +41,11 @@
   - Perbaikan Tombol Enter WhatsApp & Multiline (Release v1.0.10):
     1. Tombol Return otomatis menampilkan simbol panah Enter iOS (`↵`) saat membuka WhatsApp atau kolom input multiline.
     2. Eksekusi penekanan Enter langsung menginjeksi karakter newline `\n` ke aplikasi tujuan sehingga baris baru selalu tercipta dengan mulus di WhatsApp.
-  - Smart Typo Buster & Rekomendasi Kata Responsif (Release v1.0.11):
+  - Smart Typo Buster & Rekomendasi Kata Responsif (Release v1.0.12):
     1. Pilihan kosakata langsung muncul dan berubah dinamis saat huruf dihapus (`kamu` -> hapus jadi `kam` -> hapus jadi `ka` -> hapus jadi `k`).
     2. Penanganan typo komprehensif: kurang huruf (`kmu` -> `kamu`, `bsa` -> `bisa`), salah ketik tombol berdampingan (`juha` -> `juga`), dan kata singkatan chat.
     3. Bilah rekomendasi horizontal scrollable dengan hingga 8 saran kata berdesain iOS QuickType chip.
+  - Sistem 1 Key / Permanent Keystore Release (Release v1.0.13):
+    1. Keystore permanen `keystore/release.jks` terintegrasi langsung ke dalam pipeline build release & debug.
+    2. Sertifikat berlaku 28 tahun (hingga 2054) dengan SHA-256 fingerprint konstan.
+    3. Pengguna bisa langsung update APK kapan pun tanpa perlu uninstall aplikasi terlebih dahulu.

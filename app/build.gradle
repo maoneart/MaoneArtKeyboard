@@ -11,18 +11,29 @@ android {
         applicationId "com.maoneart.ioskeyboard"
         minSdk 24
         targetSdk 34
-        versionCode 11
-        versionName "1.0.11"
+        versionCode 13
+        versionName "1.0.13"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("${rootDir}/keystore/release.jks")
+            storePassword "maoneart_key_2026"
+            keyAlias "maoneart"
+            keyPassword "maoneart_key_2026"
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // Signing with debug key if release keystore not present so CI/CD always succeeds out of the box
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
         }
     }
 
