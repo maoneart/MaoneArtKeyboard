@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.22)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.23)
 
 ---
 
@@ -56,9 +56,10 @@
     1. Keystore permanen `keystore/release.jks` terintegrasi langsung ke dalam pipeline build release & debug.
     2. Sertifikat berlaku 28 tahun (hingga 2054) dengan SHA-256 fingerprint konstan.
     3. Pengguna bisa langsung update APK kapan pun tanpa perlu uninstall aplikasi terlebih dahulu.
-  - Haptic Dual-Layer, Cursor Translate, Auto-Close & Nulis Otomatis (Release v1.0.22):
-    1. **Getar Semua Tombol Terasa Nyata**: Setiap tombol huruf, angka, simbol kini mengaktifkan hardware haptic view tap dan physical vibrator motor berdurasi 45ms-85ms dengan amplitude 255.
-    2. **Kursor Interaktif Mode Terjemahan**: Kursor biru khas iOS (`│`) dapat digeser langsung dengan sentuhan jari untuk edit di tengah kalimat.
-    3. **Auto-Close Mode Terjemahan**: Panel otomatis tertutup setelah kirim atau saat pindah chat.
-    4. **Nulis Otomatis Berantai (Next-Word Prediction)**: 3.000+ kosakata dengan N-Gram prediction memungkinkan user mengetik kalimat lengkap hanya dengan tap bilah saran beruntun.
-    5. **Flexible Return Key**: Ikon `🔍` untuk pencarian web, `Buka` untuk URL, dan `↵` untuk WhatsApp & multiline fields.
+  - Haptic Dual-Layer, Cursor Translate, Auto-Close & Nulis Otomatis (Release v1.0.22/v1.0.23):
+    1. **Pengaturan Tingkat Getar & Volume di Menu Setting**: Opsi interaktif di menu pengaturan untuk memilih tingkat kekuatan getar (Lembut 30ms, Sedang 50ms, Kuat 75ms, Maksimal 95ms) dengan preview getar langsung, serta volume suara ketikan (30%, 60%, 80%, 100%) dengan preview suara tock langsung.
+    2. **Getar Semua Tombol Terasa Nyata**: Setiap tombol huruf, angka, simbol kini mengaktifkan hardware haptic view tap dan physical vibrator motor berdurasi 45ms-85ms dengan amplitude 255.
+    3. **Kursor Interaktif Mode Terjemahan**: Kursor biru khas iOS (`│`) dapat digeser langsung dengan sentuhan jari untuk edit di tengah kalimat.
+    4. **Auto-Close Mode Terjemahan**: Panel otomatis tertutup setelah kirim atau saat pindah chat.
+    5. **Nulis Otomatis Berantai (Next-Word Prediction)**: 3.000+ kosakata dengan N-Gram prediction memungkinkan user mengetik kalimat lengkap hanya dengan tap bilah saran beruntun.
+    6. **Flexible Return Key**: Ikon `🔍` untuk pencarian web, `Buka` untuk URL, dan `↵` untuk WhatsApp & multiline fields.

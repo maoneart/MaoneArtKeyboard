@@ -55,7 +55,6 @@ class KeyboardLayout(private val context: Context) {
 
         // 1. Web Search or Filter: Show Search Icon (🔍)
         if (imeAction == EditorInfo.IME_ACTION_SEARCH ||
-            variation == InputType.TYPE_TEXT_VARIATION_WEB_SEARCH ||
             variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
             btn.text = "🔍"
             btn.textSize = 18f
