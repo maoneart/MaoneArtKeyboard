@@ -520,15 +520,12 @@ class IosInputMethodService : InputMethodService() {
             val imeAction = info?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
             val isMultiLine = info != null && ((info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0)
 
-            // If it's a multiline field (e.g. WhatsApp, Notes, Chat): Insert a newline directly!
+            // If it's a multiline field (e.g. WhatsApp, Notes, Chat): ALWAYS insert a newline directly!
             if (isMultiLine) {
-                if (imeAction == EditorInfo.IME_ACTION_NONE || imeAction == EditorInfo.IME_ACTION_UNSPECIFIED ||
-                    (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0)) {
-                    ic.commitText("\n", 1)
-                    composingWord.clear()
-                    updateSuggestions()
-                    return
-                }
+                ic.commitText("\n", 1)
+                composingWord.clear()
+                updateSuggestions()
+                return
             }
 
             if (imeAction != EditorInfo.IME_ACTION_NONE && imeAction != EditorInfo.IME_ACTION_UNSPECIFIED) {

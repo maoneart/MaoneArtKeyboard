@@ -49,15 +49,16 @@ class KeyboardLayout(private val context: Context) {
             return
         }
 
-        val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
         val isMultiLine = (editorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
 
-        if (isMultiLine && (editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0 ||
-                imeAction == EditorInfo.IME_ACTION_NONE || imeAction == EditorInfo.IME_ACTION_UNSPECIFIED)) {
+        // WhatsApp & all multiline fields: ALWAYS show Return / Enter key (↵)
+        if (isMultiLine) {
             btn.text = "↵"
             btn.textSize = 20f
             return
         }
+
+        val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
 
         when (imeAction) {
             EditorInfo.IME_ACTION_GO -> {
