@@ -219,7 +219,7 @@ class KeyboardLayout(private val context: Context) {
         r4Layout.addView(btnEmoji)
 
         // Space Button (with active language indicator)
-        val langLabel = if (activeLanguage == "en") "English" else "Indonesia"
+        val langLabel = if (activeLanguage == "en") "space" else "spasi"
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.4f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
@@ -385,7 +385,7 @@ class KeyboardLayout(private val context: Context) {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.4f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
-            text = "space"
+            text = "spasi"
             setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
             textSize = 14f
             gravity = Gravity.CENTER

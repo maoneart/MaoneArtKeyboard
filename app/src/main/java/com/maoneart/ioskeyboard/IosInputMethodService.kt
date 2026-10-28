@@ -15,7 +15,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
-import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -64,8 +63,9 @@ class IosInputMethodService : InputMethodService() {
     // View References
     private var rootView: View? = null
     private var keyboardContainer: FrameLayout? = null
-    private var candidatesContainer: LinearLayout? = null
-    private var candidatesScrollView: HorizontalScrollView? = null
+    private var candidate1: TextView? = null
+    private var candidate2: TextView? = null
+    private var candidate3: TextView? = null
     private var badgeLanguage: TextView? = null
 
     // Samsung-Style Translate Panel Views
@@ -102,8 +102,9 @@ class IosInputMethodService : InputMethodService() {
             rootView = view
 
             keyboardContainer = view.findViewById(R.id.keyboardContainer)
-            candidatesContainer = view.findViewById(R.id.candidatesContainer)
-            candidatesScrollView = view.findViewById(R.id.candidatesScrollView)
+            candidate1 = view.findViewById(R.id.candidate1)
+            candidate2 = view.findViewById(R.id.candidate2)
+            candidate3 = view.findViewById(R.id.candidate3)
             badgeLanguage = view.findViewById(R.id.badgeLanguage)
 
             // Setup Translate Panel
@@ -153,6 +154,10 @@ class IosInputMethodService : InputMethodService() {
                 renderCurrentLayout()
                 updateSuggestions()
             }
+
+            candidate1?.setOnClickListener { selectCandidate(candidate1?.text?.toString()) }
+            candidate2?.setOnClickListener { selectCandidate(candidate2?.text?.toString()) }
+            candidate3?.setOnClickListener { selectCandidate(candidate3?.text?.toString()) }
 
 
             // Samsung-Style Translate Panel Actions
@@ -256,6 +261,10 @@ class IosInputMethodService : InputMethodService() {
             tvTranslateInputBox?.setBackgroundResource(if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
             tvTranslateInputBox?.setTextColor(textColor)
 
+            candidate1?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
+            candidate2?.setTextColor(textColor)
+            candidate3?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
+
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
@@ -263,8 +272,6 @@ class IosInputMethodService : InputMethodService() {
             btnTranslate?.setColorFilter(textColor)
             btnClipboard?.setColorFilter(textColor)
             btnSettings?.setColorFilter(textColor)
-
-            updateSuggestions()
         } catch (_: Throwable) {}
     }
 
@@ -610,70 +617,34 @@ class IosInputMethodService : InputMethodService() {
     private fun updateSuggestions() {
         try {
             if (!prefs.isAutoCorrectEnabled) {
-                displaySuggestions(emptyList())
+                candidate1?.text = ""
+                candidate2?.text = ""
+                candidate3?.text = ""
                 return
             }
 
-            val word = getCurrentWordBeforeCursor()
-            val suggestions = correctionEngine.getSuggestions(word, prefs.activeLanguage)
-            displaySuggestions(suggestions)
-        } catch (_: Throwable) {}
-    }
+            val currentWord = getCurrentWordBeforeCursor()
+            val suggestions = correctionEngine.getSuggestions(currentWord, prefs.activeLanguage)
 
-    private fun displaySuggestions(suggestions: List<String>) {
-        try {
-            val container = candidatesContainer ?: return
-            container.removeAllViews()
-            if (suggestions.isEmpty()) return
-
-            val isDark = isDarkMode()
-            val primaryTextColor = if (isDark) Color.WHITE else Color.BLACK
-            val secondaryTextColor = if (isDark) Color.LTGRAY else Color.DKGRAY
-            val dividerColor = Color.parseColor(if (isDark) "#33FFFFFF" else "#22000000")
-
-            val density = resources.displayMetrics.density
-            val padH = (12 * density).toInt()
-            val sepWidth = (1 * density).toInt().coerceAtLeast(1)
-            val sepHeight = (22 * density).toInt()
-
-            for (i in suggestions.indices) {
-                val rawWord = suggestions[i]
-                val currentWord = getCurrentWordBeforeCursor()
-                val word = formatCandidateCase(rawWord, currentWord)
-
-                val tv = TextView(this).apply {
-                    text = word
-                    textSize = if (i == 0) 15f else 14f
-                    setTypeface(typeface, if (i == 0) Typeface.BOLD else Typeface.NORMAL)
-                    setTextColor(if (i == 0) primaryTextColor else secondaryTextColor)
-                    gravity = Gravity.CENTER
-                    setPadding(padH, 0, padH, 0)
-                    maxLines = 1
-                    isClickable = true
-                    isFocusable = false
-                    setBackgroundResource(R.drawable.btn_icon_ripple)
-                    setOnClickListener {
-                        selectCandidate(word)
-                    }
-                }
-
-                container.addView(tv, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.MATCH_PARENT
-                ))
-
-                if (i < suggestions.size - 1) {
-                    val sep = View(this).apply {
-                        setBackgroundColor(dividerColor)
-                    }
-                    container.addView(sep, LinearLayout.LayoutParams(sepWidth, sepHeight).apply {
-                        gravity = Gravity.CENTER_VERTICAL
-                    })
-                }
+            if (suggestions.isEmpty()) {
+                candidate1?.text = ""
+                candidate2?.text = ""
+                candidate3?.text = ""
+                return
             }
 
-            candidatesScrollView?.post {
-                candidatesScrollView?.scrollTo(0, 0)
+            if (suggestions.size == 1) {
+                candidate1?.text = ""
+                candidate2?.text = formatCandidateCase(suggestions[0], currentWord)
+                candidate3?.text = ""
+            } else if (suggestions.size == 2) {
+                candidate1?.text = formatCandidateCase(suggestions[1], currentWord)
+                candidate2?.text = formatCandidateCase(suggestions[0], currentWord)
+                candidate3?.text = ""
+            } else {
+                candidate1?.text = formatCandidateCase(suggestions[1], currentWord)
+                candidate2?.text = formatCandidateCase(suggestions[0], currentWord)
+                candidate3?.text = formatCandidateCase(suggestions[2], currentWord)
             }
         } catch (_: Throwable) {}
     }
