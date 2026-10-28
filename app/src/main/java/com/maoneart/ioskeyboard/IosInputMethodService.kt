@@ -586,6 +586,11 @@ class IosInputMethodService : InputMethodService() {
 
     private fun handleSpace() {
         try {
+            val (activeWord, _) = getTypingContext()
+            if (activeWord.length >= 2) {
+                correctionEngine.recordWordUsage(activeWord, 1)
+            }
+
             if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
                 translatePanelBuffer.insert(pos, " ")
@@ -614,6 +619,11 @@ class IosInputMethodService : InputMethodService() {
     // Dynamic Enter / Return Key handling (Search, WhatsApp new line, Send support)
     private fun handleReturn() {
         try {
+            val (activeWord, _) = getTypingContext()
+            if (activeWord.length >= 2) {
+                correctionEngine.recordWordUsage(activeWord, 1)
+            }
+
             if (isTranslatePanelOpen && translatePanelBuffer.isNotBlank()) {
                 sendTranslatedSentence()
                 return
@@ -830,6 +840,9 @@ class IosInputMethodService : InputMethodService() {
             val (currentWord, _) = getTypingContext()
             val lengthToDelete = currentWord.length
 
+            // Dynamic Self-Learning: Catat kata yang dipilih pengguna dengan prioritas frekuensi tinggi!
+            correctionEngine.recordWordUsage(candidate, 2)
+
             if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
                 if (lengthToDelete > 0 && pos >= lengthToDelete) {
@@ -853,5 +866,13 @@ class IosInputMethodService : InputMethodService() {
             // Immediately chain to the next word prediction! ("Nulis Otomatis")
             updateSuggestions()
         } catch (_: Throwable) {}
+    }
+
+    override fun onDestroy() {
+        try {
+            correctionEngine.flushUserDictionary()
+            serviceScope.cancel()
+        } catch (_: Throwable) {}
+        super.onDestroy()
     }
 }

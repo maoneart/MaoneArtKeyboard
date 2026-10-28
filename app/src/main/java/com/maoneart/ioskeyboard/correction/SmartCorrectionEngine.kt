@@ -1,7 +1,17 @@
 package com.maoneart.ioskeyboard.correction
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.BufferedReader
 import java.io.File
+import java.io.InputStreamReader
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -312,7 +322,38 @@ class SmartCorrectionEngine(private val context: Context) {
         "terjemahan", "translate", "artikan", "kirimkan", "bagikan", "salin", "tempel", "potong",
         "baper", "mager", "kepo", "curhat", "nongkrong", "ngopi", "otw", "kuy", "gaskeun", "gas",
         "mantap", "mantap jiwa", "keren abis", "kece", "parah", "anjay", "anjir", "gila", "asli",
-        "bocil", "pansos", "sultan", "receh", "cuan", "halu", "julid", "bucin", "ambyar"
+        "bocil", "pansos", "sultan", "receh", "cuan", "halu", "julid", "bucin", "ambyar",
+
+        // Extensive KBBI Affixed & Long Words (ke-...-an, pe-...-an, me-...-kan, ber-..., ter-...)
+        "kehilangan", "keberhasilan", "kesejahteraan", "kesempatan", "keputusan", "kemenangan", "kekalahan",
+        "kekecewaan", "keberadaan", "kemampuan", "kebutuhan", "kegiatan", "keadaan", "kehadiran", "keselamatan",
+        "kesehatan", "kesulitan", "kemudahan", "keinginan", "kenyataan", "kepercayaan", "keindahan", "kejadian",
+        "kebersihan", "keamanan", "kesalahan", "kebenaran", "keberanian", "kekuatan", "kelemahan", "kebanggaan",
+        "kebahagiaan", "kesedihan", "kegembiraan", "kegagalan", "kerinduan", "kemarahan", "kebencian", "kedamaian",
+        "kebijakan", "kecepatan", "kejelasan", "keterangan", "keperluan", "kewajiban", "kemungkinan", "kesepakatan",
+        "kepentingan", "kerjasama", "kekurangan", "kelebihan", "kesadaran", "keadilan", "kenyamanan", "keistimewaan",
+        "keterlambatan", "kebersamaan", "kepadatan", "kehangatan", "kesejukan", "ketenangan", "kesempurnaan",
+        "kelayakan", "keterbukaan", "ketertiban", "kegelisahan", "kepandaian", "kemiskinan", "kekayaan", "kemakmuran",
+        "pembelajaran", "pemeriksaan", "penyelesaian", "pengembangan", "pembangunan", "peningkatan", "pengurangan",
+        "pembayaran", "pengiriman", "penerimaan", "pendaftaran", "pengaturan", "pengelolaan", "pendidikan",
+        "pekerjaan", "pelayanan", "pengawasan", "pertemuan", "perjalanan", "perjanjian", "perbedaan", "perubahan",
+        "perkembangan", "permainan", "perhatian", "pertanyaan", "peringatan", "perkiraan", "pertimbangan",
+        "persiapan", "peralatan", "perusahaan", "perjuangan", "pembicaraan", "penglihatan", "pendengaran",
+        "pencarian", "pembelian", "penjualan", "penyimpanan", "penggunaan", "pemakaian", "pertahanan",
+        "menjelaskan", "menunjukkan", "mengatakan", "menyatakan", "meningkatkan", "mengembangkan", "menggunakan",
+        "membutuhkan", "mendapatkan", "menemukan", "memberikan", "menyelesaikan", "mempersiapkan", "mengirimkan",
+        "menyampaikan", "menginformasikan", "menanyakan", "memastikan", "menghubungi", "mengunjungi", "melakukan",
+        "menciptakan", "menginginkan", "menghilangkan", "memperbaiki", "menjalankan", "menghentikan", "menggantikan",
+        "membatalkan", "mengaktifkan", "menghidupkan", "mematikan", "menyediakan", "menghasilkan", "menyelamatkan",
+        "mencantumkan", "mengecek", "mengkonfirmasi", "mengikhlaskan", "mempertahankan", "memperjuangkan",
+        "berjalan", "berbicara", "berharap", "berjuang", "berkembang", "berkunjung", "berpikir", "berusaha",
+        "bertemu", "berkumpul", "beristirahat", "berpindah", "bersemangat", "bertanggungjawab", "berlangsung",
+        "berpartisipasi", "berkomunikasi", "beradaptasi", "berkualitas", "berpengalaman", "bermanfaat", "berbahaya",
+        "beruntung", "berhasil", "berubah", "bergabung", "bersama",
+        "terjadi", "termasuk", "terlihat", "terdengar", "terkenal", "terbuka", "tertutup", "terbaca", "tertulis",
+        "tergantung", "terkait", "terhubung", "terpilih", "terbaik", "tercepat", "terpenting", "terbesar",
+        "terkecil", "terbaru", "terlama", "termurah", "termahal", "terbatas", "tertinggi", "terendah", "tersedia",
+        "tercatat", "terlambat", "terselesaikan", "tercapai"
     )
 
     // Comprehensive English Dictionary
@@ -333,8 +374,21 @@ class SmartCorrectionEngine(private val context: Context) {
 
     private val customWords = mutableSetOf<String>()
 
+    // 74,500+ Official KBBI Dictionary loaded in background for instant O(log N) prefix retrieval
+    private val kbbiWords = ArrayList<String>(75000)
+    private val kbbiSet = HashSet<String>(75000)
+
+    // User Dynamic Self-Learning Dictionary (tracks words user frequently types, prioritizes top frequencies)
+    private val userDictionary = ConcurrentHashMap<String, Int>()
+    private var isUserDictDirty = false
+    private var saveUserDictJob: Job? = null
+
+    private val engineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
     init {
         loadCustomDictionary()
+        loadUserDictionary()
+        loadKbbiDictionary()
     }
 
     private fun loadCustomDictionary() {
@@ -351,6 +405,115 @@ class SmartCorrectionEngine(private val context: Context) {
                 }
             }
         } catch (_: Exception) {}
+    }
+
+    private fun loadUserDictionary() {
+        try {
+            val file = File(context.filesDir, "user_dictionary.txt")
+            if (file.exists()) {
+                file.forEachLine { line ->
+                    val parts = line.split("|")
+                    if (parts.size >= 2) {
+                        val word = parts[0].trim().lowercase()
+                        val freq = parts[1].trim().toIntOrNull() ?: 1
+                        if (word.isNotEmpty()) {
+                            userDictionary[word] = freq
+                        }
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun loadKbbiDictionary() {
+        engineScope.launch {
+            try {
+                context.assets.open("dictionaries/id.dict").use { input ->
+                    BufferedReader(InputStreamReader(input, Charsets.UTF_8)).use { reader ->
+                        var line: String?
+                        val tempWords = ArrayList<String>(75000)
+                        while (reader.readLine().also { line = it } != null) {
+                            val w = line?.trim()?.lowercase() ?: continue
+                            if (w.isNotEmpty()) {
+                                tempWords.add(w)
+                            }
+                        }
+                        tempWords.sort()
+                        synchronized(kbbiWords) {
+                            kbbiWords.clear()
+                            kbbiWords.addAll(tempWords)
+                            kbbiSet.clear()
+                            kbbiSet.addAll(tempWords)
+                        }
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
+    }
+
+    /**
+     * Record words typed or selected by the user to boost their prediction ranking.
+     * Frequently typed words become highest priority recommendations automatically.
+     */
+    fun recordWordUsage(rawWord: String, weight: Int = 1) {
+        val cleaned = rawWord.trim().lowercase().filter { it.isLetter() || it == '-' }
+        if (cleaned.length < 2) return
+
+        val current = userDictionary[cleaned] ?: 0
+        userDictionary[cleaned] = current + weight
+        isUserDictDirty = true
+
+        saveUserDictJob?.cancel()
+        saveUserDictJob = engineScope.launch {
+            delay(1500)
+            persistUserDictionary()
+        }
+    }
+
+    private fun persistUserDictionary() {
+        if (!isUserDictDirty) return
+        try {
+            val file = File(context.filesDir, "user_dictionary.txt")
+            val tempFile = File(context.filesDir, "user_dictionary.tmp")
+            tempFile.bufferedWriter(Charsets.UTF_8).use { writer ->
+                for ((w, freq) in userDictionary) {
+                    writer.write("$w|$freq\n")
+                }
+            }
+            if (tempFile.exists()) {
+                tempFile.renameTo(file)
+            }
+            isUserDictDirty = false
+        } catch (_: Throwable) {}
+    }
+
+    fun flushUserDictionary() {
+        if (isUserDictDirty) {
+            persistUserDictionary()
+        }
+    }
+
+    private fun findKbbiPrefixMatches(prefix: String, maxCount: Int = 8): List<String> {
+        val list = synchronized(kbbiWords) { if (kbbiWords.isEmpty()) emptyList() else ArrayList(kbbiWords) }
+        if (list.isEmpty()) return emptyList()
+
+        var idx = Collections.binarySearch(list, prefix)
+        if (idx < 0) {
+            idx = -(idx + 1)
+        }
+        val matches = ArrayList<String>()
+        var count = 0
+        while (idx < list.size && count < maxCount * 3) {
+            val candidate = list[idx]
+            if (candidate.startsWith(prefix)) {
+                matches.add(candidate)
+                count++
+                idx++
+            } else {
+                break
+            }
+        }
+        return matches.sortedBy { it.length }.take(maxCount)
     }
 
     /**
@@ -384,6 +547,13 @@ class SmartCorrectionEngine(private val context: Context) {
         val word = input.trim().lowercase()
 
         if (word.isEmpty()) {
+            val frequentUserWords = userDictionary.entries
+                .sortedByDescending { it.value }
+                .take(6)
+                .map { it.key }
+            if (frequentUserWords.isNotEmpty()) {
+                return frequentUserWords
+            }
             return if (lang == "en") defaultEnglishSuggestions else defaultIndonesianSuggestions
         }
 
@@ -402,12 +572,23 @@ class SmartCorrectionEngine(private val context: Context) {
             }
         }
 
-        // 2. Exact match in dictionary
-        if (dict.contains(word)) {
+        // 2. SELF-LEARNING USER DICTIONARY (Prioritas tertinggi: kata yang sering diketik pengguna!)
+        val learnedMatches = userDictionary.entries
+            .filter { it.key.startsWith(word) }
+            .sortedByDescending { it.value }
+            .take(6)
+            .map { it.key }
+        for (lm in learnedMatches) {
+            result.add(lm)
+            if (result.size >= 8) return result.toList()
+        }
+
+        // 3. Exact match in dictionary
+        if (dict.contains(word) || (lang != "en" && kbbiSet.contains(word))) {
             result.add(word)
         }
 
-        // 3. Prefix Matches (Word completion as user types or backspaces, e.g. "kam" -> "kamu", "kami")
+        // 4. Prefix Matches from High-Frequency Built-in words
         val prefixMatches = dict.filter { it.startsWith(word) }
             .sortedWith(compareBy({ it.length }, { it }))
         for (pm in prefixMatches) {
@@ -415,7 +596,16 @@ class SmartCorrectionEngine(private val context: Context) {
             if (result.size >= 8) return result.toList()
         }
 
-        // 4. Subsequence matches for common missing-vowel typos (e.g. "kmu" -> "kamu", "bsa" -> "bisa", "mkn" -> "makan")
+        // 5. Prefix Matches from Comprehensive 74,500+ KBBI Dictionary (Instant Binary Search)
+        if (lang != "en") {
+            val kbbiMatches = findKbbiPrefixMatches(word, maxCount = 8)
+            for (km in kbbiMatches) {
+                result.add(km)
+                if (result.size >= 8) return result.toList()
+            }
+        }
+
+        // 6. Subsequence matches for common missing-vowel typos (e.g. "kmu" -> "kamu", "bsa" -> "bisa", "mkn" -> "makan")
         if (word.length in 2..6) {
             val subseqMatches = dict.filter { candidate ->
                 candidate.length <= word.length + 3 && isSubsequence(word, candidate)
@@ -426,40 +616,47 @@ class SmartCorrectionEngine(private val context: Context) {
             }
         }
 
-        // 5. Typo Buster: Damerau-Levenshtein distance + QWERTY keyboard proximity
-        val maxDist = if (word.length <= 3) 1 else 2
-        val typoCandidates = mutableListOf<Pair<String, Int>>()
+        // 7. Typo Buster: Damerau-Levenshtein distance + QWERTY keyboard proximity
+        if (result.size < 5) {
+            val typoPool = dict + userDictionary.keys
+            val maxDist = if (word.length <= 3) 1 else 2
+            val typoCandidates = mutableListOf<Pair<String, Int>>()
 
-        for (candidate in dict) {
-            if (abs(candidate.length - word.length) > 2) continue
-            // Optimization: if word is 3+ chars and candidate starts with unrelated key, skip
-            if (word.length >= 3 && candidate[0] != word[0] && !isQwertyNeighbor(word[0], candidate[0])) continue
+            for (candidate in typoPool) {
+                if (abs(candidate.length - word.length) > 2) continue
+                // Optimization: if word is 3+ chars and candidate starts with unrelated key, skip
+                if (word.length >= 3 && candidate[0] != word[0] && !isQwertyNeighbor(word[0], candidate[0])) continue
 
-            val dist = damerauLevenshtein(word, candidate)
-            if (dist <= maxDist) {
-                var score = dist * 10
-                // Bonus if first letter matches
-                if (candidate.isNotEmpty() && word.isNotEmpty() && candidate[0] == word[0]) {
-                    score -= 3
-                }
-                // Bonus for QWERTY neighbor substitutions (e.g. 'g' <-> 'h', 'u' <-> 'y')
-                if (candidate.length == word.length) {
-                    var neighborMatches = 0
-                    for (i in word.indices) {
-                        if (word[i] != candidate[i] && isQwertyNeighbor(word[i], candidate[i])) {
-                            neighborMatches++
-                        }
+                val dist = damerauLevenshtein(word, candidate)
+                if (dist <= maxDist) {
+                    var score = dist * 10
+                    // Bonus if first letter matches
+                    if (candidate.isNotEmpty() && word.isNotEmpty() && candidate[0] == word[0]) {
+                        score -= 3
                     }
-                    score -= neighborMatches * 3
+                    // Bonus for QWERTY neighbor substitutions (e.g. 'g' <-> 'h', 'u' <-> 'y')
+                    if (candidate.length == word.length) {
+                        var neighborMatches = 0
+                        for (i in word.indices) {
+                            if (word[i] != candidate[i] && isQwertyNeighbor(word[i], candidate[i])) {
+                                neighborMatches++
+                            }
+                        }
+                        score -= neighborMatches * 3
+                    }
+                    val userFreq = userDictionary[candidate] ?: 0
+                    if (userFreq > 0) {
+                        score -= min(15, userFreq * 2)
+                    }
+                    typoCandidates.add(Pair(candidate, score))
                 }
-                typoCandidates.add(Pair(candidate, score))
             }
-        }
 
-        typoCandidates.sortBy { it.second }
-        for ((cand, _) in typoCandidates) {
-            result.add(cand)
-            if (result.size >= 8) break
+            typoCandidates.sortBy { it.second }
+            for ((cand, _) in typoCandidates) {
+                result.add(cand)
+                if (result.size >= 8) break
+            }
         }
 
         // Fallback: If still empty, preserve user input
