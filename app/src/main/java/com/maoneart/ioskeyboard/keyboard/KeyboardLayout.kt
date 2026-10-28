@@ -4,10 +4,12 @@ import android.content.Context
 import android.graphics.Color
 import android.os.Handler
 import android.os.Looper
+import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.OvershootInterpolator
+import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
@@ -21,6 +23,7 @@ class KeyboardLayout(private val context: Context) {
 
     private val letterKeyViews = mutableListOf<Pair<TextView, String>>()
     private var shiftButtonRef: ImageButton? = null
+    private var returnButtonRef: TextView? = null
 
     // Update letter cases in 0.1ms without rebuilding views
     fun updateShiftState(isShifted: Boolean) {
@@ -34,6 +37,53 @@ class KeyboardLayout(private val context: Context) {
             val activeColor = ContextCompat.getColor(context, R.color.ios_blue)
             val normalColor = if (isDark) Color.WHITE else Color.BLACK
             btn.setColorFilter(if (isShifted || isCapsLock) activeColor else normalColor)
+        }
+    }
+
+    // Dynamic Enter / Return / Send / Search Button for WhatsApp & All Apps
+    fun updateReturnButton(editorInfo: EditorInfo?) {
+        val btn = returnButtonRef ?: return
+        if (editorInfo == null) {
+            btn.text = "↵"
+            btn.textSize = 20f
+            return
+        }
+
+        val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
+        val isMultiLine = (editorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+
+        if (isMultiLine && (editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0 ||
+                imeAction == EditorInfo.IME_ACTION_NONE || imeAction == EditorInfo.IME_ACTION_UNSPECIFIED)) {
+            btn.text = "↵"
+            btn.textSize = 20f
+            return
+        }
+
+        when (imeAction) {
+            EditorInfo.IME_ACTION_GO -> {
+                btn.text = "Buka"
+                btn.textSize = 14f
+            }
+            EditorInfo.IME_ACTION_SEARCH -> {
+                btn.text = "Cari"
+                btn.textSize = 14f
+            }
+            EditorInfo.IME_ACTION_SEND -> {
+                btn.text = "Kirim"
+                btn.textSize = 14f
+            }
+            EditorInfo.IME_ACTION_NEXT -> {
+                btn.text = "Lanjut"
+                btn.textSize = 13.5f
+            }
+            EditorInfo.IME_ACTION_DONE -> {
+                btn.text = "Selesai"
+                btn.textSize = 13.5f
+            }
+            else -> {
+                btn.text = "↵"
+                btn.textSize = 20f
+            }
         }
     }
 
@@ -116,7 +166,7 @@ class KeyboardLayout(private val context: Context) {
         r3Layout.addView(btnBackspace)
         root.addView(r3Layout)
 
-        // Row 4 (123 + Emoji Smiley + Space + Return)
+        // Row 4 (123 + Emoji Smiley + Space + Return/Enter)
         val r4Layout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -184,21 +234,21 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btnSpace)
 
-        // Return Action Button (iOS Blue)
+        // Return / Enter Action Button (↵)
         val btnReturn = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.0f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
-            text = "return"
+            text = "↵"
             setTextColor(Color.WHITE)
-            textSize = 14.5f
+            textSize = 20f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
         }
+        returnButtonRef = btnReturn
         r4Layout.addView(btnReturn)
-        root.addView(r4Layout)
 
         return root
     }
@@ -345,20 +395,21 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnSpace)
 
+        // Return / Enter Action Button (↵)
         val btnReturn = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.0f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
-            text = "return"
+            text = "↵"
             setTextColor(Color.WHITE)
-            textSize = 14.5f
+            textSize = 20f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
         }
+        returnButtonRef = btnReturn
         r4.addView(btnReturn)
-        root.addView(r4)
 
         return root
     }

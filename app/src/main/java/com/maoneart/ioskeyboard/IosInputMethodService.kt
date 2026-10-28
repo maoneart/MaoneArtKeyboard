@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.inputmethodservice.InputMethodService
+import android.text.InputType
 import android.util.Log
 import android.view.ContextThemeWrapper
 import android.view.KeyEvent
@@ -160,7 +161,6 @@ class IosInputMethodService : InputMethodService() {
             tvTranslateLangPair?.setOnClickListener {
                 audioHaptic.playClickSound(it)
                 audioHaptic.triggerHapticFeedback(it)
-                // Swap translation direction
                 val temp = prefs.translateSourceLang
                 prefs.translateSourceLang = prefs.translateTargetLang
                 prefs.translateTargetLang = temp
@@ -214,6 +214,7 @@ class IosInputMethodService : InputMethodService() {
             updateTranslatePanelUI()
             rootView?.let { applyThemeStyling(it) }
             renderCurrentLayout()
+            layoutEngine.updateReturnButton(info)
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error onStartInputView", t)
         }
@@ -377,6 +378,7 @@ class IosInputMethodService : InputMethodService() {
             }
 
             container.addView(contentView)
+            layoutEngine.updateReturnButton(currentInputEditorInfo)
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in renderCurrentLayout", t)
         }
@@ -492,6 +494,7 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    // Dynamic Enter / Return Key handling (WhatsApp new line & send support)
     private fun handleReturn() {
         try {
             if (isTranslatePanelOpen && translatePanelBuffer.isNotBlank()) {
@@ -500,14 +503,38 @@ class IosInputMethodService : InputMethodService() {
             }
 
             val ic = currentInputConnection ?: return
-            val currentEditorInfo = currentInputEditorInfo
-            val imeAction = currentEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
+            val info = currentInputEditorInfo
+            val imeAction = info?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
+            val isMultiLine = info != null && ((info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0)
+
+            // If it's a multiline field (e.g. WhatsApp, Notes, Chat): Insert a newline directly!
+            if (isMultiLine) {
+                if (imeAction == EditorInfo.IME_ACTION_NONE || imeAction == EditorInfo.IME_ACTION_UNSPECIFIED ||
+                    (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0)) {
+                    ic.commitText("\n", 1)
+                    composingWord.clear()
+                    updateSuggestions()
+                    return
+                }
+            }
 
             if (imeAction != EditorInfo.IME_ACTION_NONE && imeAction != EditorInfo.IME_ACTION_UNSPECIFIED) {
-                ic.performEditorAction(imeAction)
+                val handled = ic.performEditorAction(imeAction)
+                if (!handled) {
+                    if (isMultiLine) {
+                        ic.commitText("\n", 1)
+                    } else {
+                        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+                        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+                    }
+                }
             } else {
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+                if (isMultiLine) {
+                    ic.commitText("\n", 1)
+                } else {
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+                }
             }
 
             composingWord.clear()
