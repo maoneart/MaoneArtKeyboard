@@ -285,7 +285,7 @@ class IosInputMethodService : InputMethodService() {
             updateTranslatePanelUI()
             rootView?.let { applyThemeStyling(it) }
             renderCurrentLayout()
-            layoutEngine.updateReturnButton(info, isDarkMode())
+            layoutEngine.updateReturnButton(info, themeMode = prefs.themeMode, isDark = isDarkMode())
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error onStartInputView", t)
         }
@@ -322,6 +322,7 @@ class IosInputMethodService : InputMethodService() {
     private fun isDarkMode(): Boolean {
         return try {
             when (prefs.themeMode) {
+                "woody" -> true
                 "dark" -> true
                 "light" -> false
                 else -> {
@@ -337,28 +338,51 @@ class IosInputMethodService : InputMethodService() {
     private fun applyThemeStyling(view: View) {
         try {
             val isDark = isDarkMode()
+            val isWoody = (prefs.themeMode == "woody")
             val keyboardRoot = view.findViewById<LinearLayout>(R.id.keyboardRoot)
             val topToolbar = view.findViewById<LinearLayout>(R.id.topToolbar)
-            val textColor = if (isDark) Color.WHITE else Color.BLACK
+            val textColor = when {
+                isWoody -> Color.parseColor("#FFF3E0")
+                isDark -> Color.WHITE
+                else -> Color.BLACK
+            }
+            val secondaryText = when {
+                isWoody -> Color.parseColor("#C4A587")
+                isDark -> Color.LTGRAY
+                else -> Color.DKGRAY
+            }
+            val iconTint = when {
+                isWoody -> Color.parseColor("#E8D5B5")
+                isDark -> Color.WHITE
+                else -> Color.BLACK
+            }
 
-            keyboardRoot?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_bg_dark else R.color.ios_bg_light))
-            topToolbar?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
+            if (isWoody) {
+                keyboardRoot?.setBackgroundResource(R.drawable.theme_woody_bg)
+                topToolbar?.setBackgroundColor(Color.parseColor("#22140D"))
+                translatePanel?.setBackgroundColor(Color.parseColor("#22140D"))
+                tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_woody)
+                tvTranslateInputBox?.setTextColor(textColor)
+            } else {
+                keyboardRoot?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_bg_dark else R.color.ios_bg_light))
+                topToolbar?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
+                translatePanel?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
+                tvTranslateInputBox?.setBackgroundResource(if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+                tvTranslateInputBox?.setTextColor(textColor)
+            }
 
-            translatePanel?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
-            tvTranslateInputBox?.setBackgroundResource(if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
-            tvTranslateInputBox?.setTextColor(textColor)
-
-            candidate1?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
+            candidate1?.setTextColor(secondaryText)
             candidate2?.setTextColor(textColor)
-            candidate3?.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
+            candidate3?.setTextColor(secondaryText)
 
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
 
-            btnTranslate?.setColorFilter(textColor)
-            btnClipboard?.setColorFilter(textColor)
-            btnSettings?.setColorFilter(textColor)
+            btnTranslate?.setColorFilter(iconTint)
+            btnClipboard?.setColorFilter(iconTint)
+            btnSettings?.setColorFilter(iconTint)
+            badgeLanguage?.setTextColor(iconTint)
         } catch (_: Throwable) {}
     }
 
@@ -582,6 +606,7 @@ class IosInputMethodService : InputMethodService() {
                 Mode.QWERTY -> layoutEngine.createQwertyView(
                     isShifted = isShifted || isCapsLock,
                     isDark = isDark,
+                    themeMode = prefs.themeMode,
                     activeLanguage = prefs.activeLanguage,
                     isSwipeEnabled = prefs.isSwipeTypingEnabled,
                     onKeyAction = { handleKeyAction(it) },
@@ -592,12 +617,14 @@ class IosInputMethodService : InputMethodService() {
                 Mode.SYMBOLS_123 -> layoutEngine.createSymbolsView(
                     isMoreSymbols = false,
                     isDark = isDark,
+                    themeMode = prefs.themeMode,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
                 )
                 Mode.SYMBOLS_MORE -> layoutEngine.createSymbolsView(
                     isMoreSymbols = true,
                     isDark = isDark,
+                    themeMode = prefs.themeMode,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
                 )
@@ -624,7 +651,7 @@ class IosInputMethodService : InputMethodService() {
             }
 
             container.addView(contentView)
-            layoutEngine.updateReturnButton(currentInputEditorInfo, isDarkMode())
+            layoutEngine.updateReturnButton(currentInputEditorInfo, themeMode = prefs.themeMode, isDark = isDarkMode())
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in renderCurrentLayout", t)
         }
@@ -706,7 +733,7 @@ class IosInputMethodService : InputMethodService() {
                     }
                     lastShiftPressTime = now
                     layoutEngine.updateShiftState(isShifted || isCapsLock)
-                    layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode())
+                    layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode(), prefs.themeMode)
                 }
                 "ACTION_BACKSPACE" -> {
                     handleBackspace()
@@ -757,7 +784,7 @@ class IosInputMethodService : InputMethodService() {
             if (isShifted && !isCapsLock) {
                 isShifted = false
                 layoutEngine.updateShiftState(false)
-                layoutEngine.updateShiftButtonVisual(false, false, isDarkMode())
+                layoutEngine.updateShiftButtonVisual(false, false, isDarkMode(), prefs.themeMode)
             }
         } catch (_: Throwable) {}
     }

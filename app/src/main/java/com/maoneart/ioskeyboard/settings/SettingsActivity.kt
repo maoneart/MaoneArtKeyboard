@@ -307,6 +307,7 @@ class SettingsActivity : AppCompatActivity() {
         tvCurrentTheme.text = when (prefs.themeMode) {
             "dark" -> "iOS Dark"
             "light" -> "iOS Light"
+            "woody" -> "Woody (Sony Xperia) 🪵"
             else -> "Otomatis"
         }
     }
@@ -337,10 +338,16 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showThemeDialog() {
-        val options = arrayOf("Otomatis (Ikuti Sistem)", "iOS Light (Terang)", "iOS Dark (Gelap)")
+        val options = arrayOf(
+            "Otomatis (Ikuti Sistem)",
+            "iOS Light (Terang)",
+            "iOS Dark (Gelap)",
+            "Woody (Sony Xperia Edition) 🪵"
+        )
         val currentSelection = when (prefs.themeMode) {
             "light" -> 1
             "dark" -> 2
+            "woody" -> 3
             else -> 0
         }
 
@@ -350,6 +357,7 @@ class SettingsActivity : AppCompatActivity() {
                 prefs.themeMode = when (which) {
                     1 -> "light"
                     2 -> "dark"
+                    3 -> "woody"
                     else -> "auto"
                 }
                 updateThemeLabel()

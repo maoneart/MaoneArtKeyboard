@@ -97,3 +97,14 @@
     1. **Trackpad Virtual 2D Penuh (Atas, Bawah, Kiri, Kanan)**: Tahan tombol spasi untuk menggeser kursor tidak hanya ke kiri/kanan, tapi juga langsung melompat antar baris ke atas (`KEYCODE_DPAD_UP`) dan ke bawah (`KEYCODE_DPAD_DOWN`) saat ada paragraf/enter tanpa harus mundur satu per satu.
     2. **Disallow Intercept Touch**: Memastikan sentuhan jari bebas meluncur ke seluruh area keyboard tanpa terputus atau ter-intercept oleh parent layout.
     3. **Kalibrasi Sensitivitas Nyaman**: `stepDistanceX = 12dp` dan `stepDistanceY = 14dp` untuk presisi navigasi teks yang mulus disertai respon tactile haptic pulse.
+  - Ikon Search Dead Center, Logo Kekinian & Tema Woody Sony Xperia (Release v1.0.33):
+    1. **Tombol Search 100% Dead Center**: Mengubah struktur tombol aksi menjadi `ReturnButtonLayout` (FrameLayout + ImageView centered) sehingga ikon kaca pembesar putih datar berada tepat di tengah tanpa meleset ke kiri.
+    2. **Ikon Toolbar Kekinian (Modern SF Symbols & iOS 18)**:
+       - `ic_clipboard.xml`: Desain papan klip minimalis outline modern dengan magnetic clip dan garis catatan elegan.
+       - `ic_translate.xml`: Desain Apple Translate (iOS 18) dua gelembung percakapan terhubung dengan tipografi 'A' ramping.
+    3. **Tema Woody (Sony Xperia Edition) 🪵**:
+       - Latar belakang keyboard serat kayu mahoni hangat (`theme_woody_bg.xml`).
+       - Ubin tuts kayu jati/oak halus dengan bevel dan drop shadow (`key_bg_woody.xml`).
+       - Tuts fungsi kayu gelap walnut (`key_bg_woody_special.xml`) dan tuts aksi kayu amber bronze keemasan (`key_bg_woody_action.xml`).
+       - Warna teks huruf ivory warm cream (`#FFF3E0`) dan animasi jejak swipe QuickPath berwarna api emas (`#FFA726`).
+       - Pilihan tema langsung di Pengaturan Cupertino: "Woody (Sony Xperia Edition) 🪵".

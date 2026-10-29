@@ -22,6 +22,10 @@ class SwipeTrailView(context: Context) : View(context) {
     private val points = mutableListOf<TimedPoint>()
     private val path = Path()
 
+    fun setTrailColor(color: Int) {
+        trailPaint.color = color
+    }
+
     fun addPoint(x: Float, y: Float) {
         val now = System.currentTimeMillis()
         points.add(TimedPoint(x, y, now))

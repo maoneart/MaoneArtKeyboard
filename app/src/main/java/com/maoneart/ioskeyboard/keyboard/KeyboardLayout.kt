@@ -21,9 +21,46 @@ import com.maoneart.ioskeyboard.emoji.EmojiBoardManager
 
 class KeyboardLayout(private val context: Context) {
 
+    class ReturnButtonLayout(context: Context) : FrameLayout(context) {
+        val textView = TextView(context).apply {
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+            gravity = Gravity.CENTER
+            textSize = 15f
+        }
+        val imageView = android.widget.ImageView(context).apply {
+            layoutParams = LayoutParams(
+                (22 * resources.displayMetrics.density).toInt(),
+                (22 * resources.displayMetrics.density).toInt(),
+                Gravity.CENTER
+            )
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            visibility = View.GONE
+        }
+        init {
+            addView(textView)
+            addView(imageView)
+        }
+
+        fun showIcon(drawableRes: Int, bgRes: Int) {
+            textView.visibility = View.GONE
+            imageView.visibility = View.VISIBLE
+            imageView.setImageResource(drawableRes)
+            setBackgroundResource(bgRes)
+        }
+
+        fun showText(textStr: String, sizeSp: Float, textColor: Int, bgRes: Int) {
+            imageView.visibility = View.GONE
+            textView.visibility = View.VISIBLE
+            textView.text = textStr
+            textView.textSize = sizeSp
+            textView.setTextColor(textColor)
+            setBackgroundResource(bgRes)
+        }
+    }
+
     private val letterKeyViews = mutableListOf<Pair<TextView, String>>()
     private var shiftButtonRef: ImageButton? = null
-    private var returnButtonRef: TextView? = null
+    private var returnButtonRef: ReturnButtonLayout? = null
 
     // Update letter cases in 0.1ms without rebuilding views
     fun updateShiftState(isShifted: Boolean) {
@@ -32,74 +69,70 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    fun updateShiftButtonVisual(isShifted: Boolean, isCapsLock: Boolean, isDark: Boolean) {
+    fun updateShiftButtonVisual(isShifted: Boolean, isCapsLock: Boolean, isDark: Boolean, themeMode: String = "auto") {
         shiftButtonRef?.let { btn ->
-            val activeColor = ContextCompat.getColor(context, R.color.ios_blue)
-            val normalColor = if (isDark) Color.WHITE else Color.BLACK
+            val isWoody = (themeMode == "woody")
+            val activeColor = if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue)
+            val normalColor = if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
             btn.setColorFilter(if (isShifted || isCapsLock) activeColor else normalColor)
         }
     }
 
     // Dynamic Context-Adaptive Enter / Return / Search Button (iOS Smart Action)
-    fun updateReturnButton(editorInfo: EditorInfo?, isDark: Boolean = false) {
+    fun updateReturnButton(editorInfo: EditorInfo?, themeMode: String = "auto", isDark: Boolean = false) {
         val btn = returnButtonRef ?: return
-        val specialKeyBg = if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light
-        val textColor = if (isDark) Color.WHITE else Color.BLACK
+        val isWoody = (themeMode == "woody")
+        val specialKeyBg = when {
+            isWoody -> R.drawable.key_bg_woody_special
+            isDark -> R.drawable.key_bg_special_dark
+            else -> R.drawable.key_bg_special_light
+        }
+        val actionKeyBg = when {
+            isWoody -> R.drawable.key_bg_woody_action
+            else -> R.drawable.key_bg_blue
+        }
+        val textColor = when {
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
 
         if (editorInfo == null) {
-            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
-            btn.background = ContextCompat.getDrawable(context, specialKeyBg)
-            btn.setTextColor(textColor)
-            btn.text = "return"
-            btn.textSize = 15f
+            btn.showText("return", 15f, textColor, specialKeyBg)
             return
         }
 
         val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
         val variation = editorInfo.inputType and InputType.TYPE_MASK_VARIATION
-        val isMultiLine = (editorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
 
-        // 1. Web Search or Filter: Show Flat White Search Icon with Blue BG
+        // 1. Web Search or Filter: Show Flat White Search Icon with Action BG (100% Dead Center)
         if (imeAction == EditorInfo.IME_ACTION_SEARCH ||
             variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
-            btn.text = ""
-            btn.background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
-            btn.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_search_white, 0, 0, 0)
+            btn.showIcon(R.drawable.ic_search_white, actionKeyBg)
             return
         }
 
-        btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
-
-        // 2. Browser URL or Web Address: Show "Buka" (Blue BG)
+        // 2. Browser URL or Web Address: Show "Buka" (Action BG)
         if (imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI) {
-            btn.text = "Buka"
-            btn.textSize = 14f
-            btn.setTextColor(Color.WHITE)
-            btn.background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
+            btn.showText("Buka", 14f, Color.WHITE, actionKeyBg)
             return
         }
 
-        // 3. Form Send Action: Show "Kirim" (Blue BG)
+        // 3. Form Send Action: Show "Kirim" (Action BG)
         if (imeAction == EditorInfo.IME_ACTION_SEND) {
-            btn.text = "Kirim"
-            btn.textSize = 14f
-            btn.setTextColor(Color.WHITE)
-            btn.background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
+            btn.showText("Kirim", 14f, Color.WHITE, actionKeyBg)
             return
         }
 
         // 4. WhatsApp, Telegram, Notes & all multiline / standard newline:
-        // Authentic Apple iOS "return" key with functional gray background
-        btn.text = "return"
-        btn.textSize = 15f
-        btn.background = ContextCompat.getDrawable(context, specialKeyBg)
-        btn.setTextColor(textColor)
+        btn.showText("return", 15f, textColor, specialKeyBg)
     }
 
     // --- 1. QWERTY LAYOUT ---
     fun createQwertyView(
         isShifted: Boolean,
         isDark: Boolean,
+        themeMode: String = "auto",
         activeLanguage: String,
         isSwipeEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
@@ -122,9 +155,27 @@ class KeyboardLayout(private val context: Context) {
         val row2 = listOf("a", "s", "d", "f", "g", "h", "j", "k", "l")
         val row3 = listOf("z", "x", "c", "v", "b", "n", "m")
 
-        val keyBg = if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light
-        val specialKeyBg = if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light
-        val textColor = if (isDark) Color.WHITE else Color.BLACK
+        val isWoody = (themeMode == "woody")
+        val keyBg = when {
+            isWoody -> R.drawable.key_bg_woody
+            isDark -> R.drawable.key_bg_ios_dark
+            else -> R.drawable.key_bg_ios_light
+        }
+        val specialKeyBg = when {
+            isWoody -> R.drawable.key_bg_woody_special
+            isDark -> R.drawable.key_bg_special_dark
+            else -> R.drawable.key_bg_special_light
+        }
+        val textColor = when {
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+        val secondaryTextColor = when {
+            isWoody -> Color.parseColor("#C4A587")
+            isDark -> Color.parseColor("#98989D")
+            else -> Color.parseColor("#8E8E93")
+        }
 
         // Row 1
         root.addView(createRow(row1, isShifted, keyBg, textColor, onKeyAction))
@@ -150,7 +201,8 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_shift)
-            setColorFilter(if (isShifted) ContextCompat.getColor(context, R.color.ios_blue) else textColor)
+            val shiftActiveColor = if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue)
+            setColorFilter(if (isShifted) shiftActiveColor else textColor)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_SHIFT") }
@@ -225,12 +277,12 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = langLabel
-            setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+            setTextColor(secondaryTextColor)
             textSize = 14f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupSpacebarTrackpadTouch(this, langLabel, isDark, { onKeyAction(" ") }, onCursorMove)
+            setupSpacebarTrackpadTouch(this, langLabel, isDark, themeMode, { onKeyAction(" ") }, onCursorMove)
         }
         r4Layout.addView(btnSpace)
 
@@ -248,15 +300,11 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btnMic)
 
-        // Return / Enter Action Button (return)
-        val btnReturn = TextView(context).apply {
+        // Return / Enter Action Button (return / Dead Center Search Icon)
+        val btnReturn = ReturnButtonLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, specialKeyBg)
-            text = "return"
-            setTextColor(textColor)
-            textSize = 15f
-            gravity = Gravity.CENTER
+            showText("return", 15f, textColor, specialKeyBg)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
@@ -272,6 +320,9 @@ class KeyboardLayout(private val context: Context) {
             onSwipeCompleted = onSwipeComplete,
             onSwipeCharDetected = onSwipeHaptic
         )
+        if (isWoody) {
+            container.setTrailColor(Color.parseColor("#FFA726"))
+        }
         container.setKeyboardContentView(root)
         return container
     }
@@ -292,6 +343,7 @@ class KeyboardLayout(private val context: Context) {
     fun createSymbolsView(
         isMoreSymbols: Boolean,
         isDark: Boolean,
+        themeMode: String = "auto",
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int) -> Unit = { _, _ -> }
     ): View {
@@ -319,9 +371,27 @@ class KeyboardLayout(private val context: Context) {
         else
             listOf(".", ",", "?", "!", "'")
 
-        val keyBg = if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light
-        val specialKeyBg = if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light
-        val textColor = if (isDark) Color.WHITE else Color.BLACK
+        val isWoody = (themeMode == "woody")
+        val keyBg = when {
+            isWoody -> R.drawable.key_bg_woody
+            isDark -> R.drawable.key_bg_ios_dark
+            else -> R.drawable.key_bg_ios_light
+        }
+        val specialKeyBg = when {
+            isWoody -> R.drawable.key_bg_woody_special
+            isDark -> R.drawable.key_bg_special_dark
+            else -> R.drawable.key_bg_special_light
+        }
+        val textColor = when {
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+        val secondaryTextColor = when {
+            isWoody -> Color.parseColor("#C4A587")
+            isDark -> Color.parseColor("#98989D")
+            else -> Color.parseColor("#8E8E93")
+        }
 
         root.addView(createRow(row1, false, keyBg, textColor, onKeyAction))
         root.addView(createRow(row2, false, keyBg, textColor, onKeyAction))
@@ -409,12 +479,12 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = "spasi"
-            setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+            setTextColor(secondaryTextColor)
             textSize = 14f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupSpacebarTrackpadTouch(this, "spasi", isDark, { onKeyAction(" ") }, onCursorMove)
+            setupSpacebarTrackpadTouch(this, "spasi", isDark, themeMode, { onKeyAction(" ") }, onCursorMove)
         }
         r4.addView(btnSpace)
 
@@ -432,15 +502,11 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnMic)
 
-        // Return / Enter Action Button (return)
-        val btnReturn = TextView(context).apply {
+        // Return / Enter Action Button (return / Dead Center Search Icon)
+        val btnReturn = ReturnButtonLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, specialKeyBg)
-            text = "return"
-            setTextColor(textColor)
-            textSize = 15f
-            gravity = Gravity.CENTER
+            showText("return", 15f, textColor, specialKeyBg)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
@@ -955,6 +1021,7 @@ class KeyboardLayout(private val context: Context) {
         view: TextView,
         defaultText: String,
         isDark: Boolean,
+        themeMode: String = "auto",
         onSpaceAction: () -> Unit,
         onCursorMove: (Int, Int) -> Unit
     ) {
@@ -967,11 +1034,12 @@ class KeyboardLayout(private val context: Context) {
         var lastStepY = 0f
         val stepDistanceX = dp(12).toFloat()
         val stepDistanceY = dp(14).toFloat()
+        val isWoody = (themeMode == "woody")
 
         val activateRunnable = Runnable {
             isTrackpadActive = true
             view.text = "│   geser kursor   │"
-            view.setTextColor(ContextCompat.getColor(context, R.color.ios_blue))
+            view.setTextColor(if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
             view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
             view.parent?.requestDisallowInterceptTouchEvent(true)
             try {
@@ -1068,7 +1136,7 @@ class KeyboardLayout(private val context: Context) {
                     if (isTrackpadActive) {
                         isTrackpadActive = false
                         view.text = defaultText
-                        view.setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+                        view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
                         view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
                     } else {
                         onSpaceAction()

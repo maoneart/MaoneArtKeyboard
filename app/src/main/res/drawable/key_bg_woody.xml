@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Pressed state: Wood pressed down -->
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <solid android:color="#26160F" />
+                </shape>
+            </item>
+            <item android:bottom="1dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#3E271D"
+                        android:endColor="#331E15" />
+                    <stroke
+                        android:width="0.8dp"
+                        android:color="#4A2F23" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <!-- Default state: Fine polished wood block key -->
+    <item>
+        <layer-list>
+            <!-- Drop shadow / wooden bevel -->
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <solid android:color="#1A0E09" />
+                </shape>
+            </item>
+            <!-- Main polished wood key surface -->
+            <item android:bottom="1.5dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#543828"
+                        android:centerColor="#4A3022"
+                        android:endColor="#3D261A" />
+                    <stroke
+                        android:width="0.8dp"
+                        android:color="#6A4834" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>

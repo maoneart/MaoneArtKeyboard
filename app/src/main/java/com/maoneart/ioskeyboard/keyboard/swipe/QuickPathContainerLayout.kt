@@ -37,6 +37,10 @@ class QuickPathContainerLayout(
         addView(content, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
+    fun setTrailColor(color: Int) {
+        swipeTrailView.setTrailColor(color)
+    }
+
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (!isSwipeEnabled) return false
 

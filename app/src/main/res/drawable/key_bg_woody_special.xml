@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Pressed state -->
+    <item android:state_pressed="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <solid android:color="#1A0D08" />
+                </shape>
+            </item>
+            <item android:bottom="1dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <solid android:color="#2A1911" />
+                    <stroke
+                        android:width="0.8dp"
+                        android:color="#3A2218" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <!-- Default state: Dark Walnut Wood Special Key -->
+    <item>
+        <layer-list>
+            <!-- Drop shadow / wooden bevel -->
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <solid android:color="#140A06" />
+                </shape>
+            </item>
+            <!-- Main dark walnut surface -->
+            <item android:bottom="1.5dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="5dp" />
+                    <gradient
+                        android:type="linear"
+                        android:angle="270"
+                        android:startColor="#40281D"
+                        android:centerColor="#362016"
+                        android:endColor="#2C1911" />
+                    <stroke
+                        android:width="0.8dp"
+                        android:color="#523425" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</selector>
