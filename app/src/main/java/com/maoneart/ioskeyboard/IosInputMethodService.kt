@@ -323,10 +323,12 @@ class IosInputMethodService : InputMethodService() {
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        updateSuggestions()
-        if (composingWord.isEmpty()) {
-            updateAutoCapitalization()
+        // Reset composingWord when cursor returns to start (e.g. after WhatsApp send or clearing input)
+        if (newSelStart == 0 && newSelEnd == 0) {
+            composingWord.clear()
         }
+        updateSuggestions()
+        updateAutoCapitalization()
     }
 
     private fun isDarkMode(): Boolean {
@@ -621,10 +623,12 @@ class IosInputMethodService : InputMethodService() {
                     themeMode = prefs.themeMode,
                     activeLanguage = prefs.activeLanguage,
                     isSwipeEnabled = prefs.isSwipeTypingEnabled,
+                    isKeyPopupEnabled = prefs.isKeyPopupEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy -> moveCursor2D(dx, dy) },
                     onSwipeComplete = { handleSwipeComplete(it) },
-                    onSwipeHaptic = { audioHaptic.triggerHapticFeedback() }
+                    onSwipeHaptic = { audioHaptic.triggerHapticFeedback() },
+                    onSwipeLiveUpdate = { handleSwipeLiveUpdate(it) }
                 )
                 Mode.SYMBOLS_123 -> layoutEngine.createSymbolsView(
                     isMoreSymbols = false,
@@ -801,11 +805,6 @@ class IosInputMethodService : InputMethodService() {
         if (!prefs.isAutoCapitalizationEnabled) return false
         if (isCapsLock) return false
 
-        // Jika sedang aktif mengetik huruf dalam suatu kata, huruf berikutnya WAJIB huruf kecil!
-        if (composingWord.isNotEmpty()) {
-            return false
-        }
-
         val info = currentInputEditorInfo ?: return false
         val inputType = info.inputType
 
@@ -827,33 +826,49 @@ class IosInputMethodService : InputMethodService() {
 
         // 1. Periksa buffer panel terjemahan jika terbuka
         if (isTranslatePanelOpen) {
-            if (translateCursorPosition == 0 || translatePanelBuffer.isEmpty()) return true
+            if (translateCursorPosition == 0 || translatePanelBuffer.isEmpty()) {
+                composingWord.clear()
+                return true
+            }
             val textBefore = translatePanelBuffer.substring(0, translateCursorPosition.coerceIn(0, translatePanelBuffer.length))
-            if (textBefore.trim().isEmpty()) return true
-            if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) return true
-            return Regex("""[.!?]\s+$""").containsMatchIn(textBefore)
+            if (textBefore.trim().isEmpty()) {
+                composingWord.clear()
+                return true
+            }
+            if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) {
+                composingWord.clear()
+                return true
+            }
+            if (Regex("""[.!?]\s+$""").containsMatchIn(textBefore)) {
+                composingWord.clear()
+                return true
+            }
+            return false
         }
 
         // 2. Inspeksi teks sebelum kursor dari InputConnection
         val ic = currentInputConnection ?: return false
         val textBefore = ic.getTextBeforeCursor(32, 0)?.toString()
 
-        // Jika benar-benar kosong atau hanya spasi awal -> awal kalimat pertama
+        // Jika benar-benar kosong atau hanya spasi awal -> awal kalimat pertama / pesan baru (misal setelah kirim WA)
         if (textBefore.isNullOrEmpty() || textBefore.trim().isEmpty()) {
+            composingWord.clear()
             return true
         }
 
         // Jika berada tepat setelah baris baru (Enter)
         if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) {
+            composingWord.clear()
             return true
         }
 
         // HANYA aktif jika teks berakhiran tanda baca (.!?) diikuti spasi (misal ". ", "? ", "! ")
-        // Bukan spasi biasa antar kata ("Saya ") dan bukan titik tanpa spasi ("Saya.")
         if (Regex("""[.!?]\s+$""").containsMatchIn(textBefore)) {
+            composingWord.clear()
             return true
         }
 
+        // Jika sedang aktif mengetik huruf dalam suatu kata (misal "Ha..."), huruf berikutnya wajib huruf kecil!
         return false
     }
 
@@ -1256,6 +1271,18 @@ class IosInputMethodService : InputMethodService() {
             // Immediately chain to the next word prediction! ("Nulis Otomatis")
             updateSuggestions()
             updateAutoCapitalization()
+        } catch (_: Throwable) {}
+    }
+
+    private fun handleSwipeLiveUpdate(swipedChars: List<Char>) {
+        try {
+            if (swipedChars.size < 2) return
+            val rawMatched = quickPathEngine.matchSwipe(swipedChars, prefs.activeLanguage) ?: swipedChars.joinToString("")
+            val shouldCapitalize = (isCapsLock || (composingWord.isNotEmpty() && composingWord.first().isUpperCase()))
+            val displayWord = if (shouldCapitalize) rawMatched.replaceFirstChar { it.uppercase() } else rawMatched
+            candidate2?.text = "✦ $displayWord"
+            candidate1?.text = ""
+            candidate3?.text = ""
         } catch (_: Throwable) {}
     }
 

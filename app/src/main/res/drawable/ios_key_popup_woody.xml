@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Deep Wooden Shadow -->
+    <item android:left="1dp" android:right="1dp" android:top="2dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="11dp" />
+            <solid android:color="#60000000" />
+        </shape>
+    </item>
+    <!-- Warm Walnut Carved Wooden Pop-up -->
+    <item android:left="1dp" android:right="1dp" android:top="0dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <solid android:color="#4E342E" />
+            <stroke android:width="1dp" android:color="#80FFA726" />
+        </shape>
+    </item>
+</layer-list>

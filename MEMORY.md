@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.37)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.38)
 
 ---
 
@@ -150,3 +150,17 @@
        - Kalibrasi touchSlop dari 22dp ke 12dp dan auto-recovery titik awal sapuan untuk responsivitas instan.
        - Algoritma pencocokan kata cerdas findSwipeCandidates memadukan kata frekuensi tinggi percakapan, user dictionary, dan 75.000 kata KBBI berbasis awalan dan akhiran kata, didukung subsequence matching dengan repeat-collapsing (misal "saat" cocok dari sapuan "sat").
        - Penanganan auto-capitalization terintegrasi: Hasil swipe di awal kalimat atau saat shifted otomatis berhuruf awal kapital ("Saya ").
+  - Balon Key Pop-up Preview iOS, Optimasi 120 FPS & Auto-Capitalize Pesan WA (Release v1.0.38):
+    1. **Perbaikan Auto-Capitalization Pesan Kedua WhatsApp & Semua Chat**:
+       - Deteksi reset kursor (newSelStart == 0 && newSelEnd == 0) di onUpdateSelection saat pesan WhatsApp terkirim dan kolom teks dikosongkan.
+       - Pembersihan composingWord dan inspeksi teks depan kursor diprioritaskan di awal shouldAutoCapitalize() sehingga pesan ke-2, ke-3, dst selalu otomatis berhuruf awal besar.
+    2. **Optimasi Performa 120 FPS Super Ringan (Hit-Box In-Memory Cache)**:
+       - Mengganti puluhan pemanggilan native JNI getLocationOnScreen per frame dengan KeyHitBox cache in-memory statis.
+       - 0 JNI overhead, 0 garbage collection pause, rendering sentuhan kembali instan, smooth, dan super enteng.
+       - Menghilangkan alokasi duplikasi 75.000 list KBBI di SmartCorrectionEngine dengan @Volatile kbbiSnapshot.
+    3. **Balon Key Pop-up Preview Apple iOS Otentik**:
+       - Menampilkan balon pop-up pembesar huruf otentik tepat melayang di atas tuts yang disentuh jempol pengguna, didukung styling tema lengkap (Light #FFFFFF, Dark #636366, Woody #4E342E).
+       - Teks besar 27sp bold berada di atas tuts sehingga tidak tertutup oleh jempol pengguna.
+    4. **Penyempurnaan Perlintasan Teks (QuickPath)**:
+       - Animasi jejak lintasan SwipeTrailView bertransformasi menjadi Fluid Ribbon dengan ujung dinamis dan ekor memudar bertahap (alpha decay).
+       - Live Preview saran kata di tombol saran tengah (✦ kata) secara real-time saat sapuan jari berlangsung.

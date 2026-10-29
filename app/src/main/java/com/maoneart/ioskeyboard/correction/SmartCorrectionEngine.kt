@@ -377,6 +377,7 @@ class SmartCorrectionEngine(private val context: Context) {
     // 74,500+ Official KBBI Dictionary loaded in background for instant O(log N) prefix retrieval
     private val kbbiWords = ArrayList<String>(75000)
     private val kbbiSet = HashSet<String>(75000)
+    @Volatile private var kbbiSnapshot: List<String> = emptyList()
 
     // User Dynamic Self-Learning Dictionary (tracks words user frequently types, prioritizes top frequencies)
     private val userDictionary = ConcurrentHashMap<String, Int>()
@@ -444,6 +445,7 @@ class SmartCorrectionEngine(private val context: Context) {
                             kbbiWords.addAll(tempWords)
                             kbbiSet.clear()
                             kbbiSet.addAll(tempWords)
+                            kbbiSnapshot = ArrayList(tempWords)
                         }
                     }
                 }
@@ -494,7 +496,7 @@ class SmartCorrectionEngine(private val context: Context) {
     }
 
     fun findKbbiPrefixMatches(prefix: String, maxCount: Int = 8): List<String> {
-        val list = synchronized(kbbiWords) { if (kbbiWords.isEmpty()) emptyList() else ArrayList(kbbiWords) }
+        val list = kbbiSnapshot
         if (list.isEmpty()) return emptyList()
 
         var idx = Collections.binarySearch(list, prefix)
@@ -573,7 +575,7 @@ class SmartCorrectionEngine(private val context: Context) {
         }
 
         // 5. 75,000 KBBI Dictionary (Indexed binary search by startChar)
-        val list = synchronized(kbbiWords) { if (kbbiWords.isEmpty()) emptyList() else ArrayList(kbbiWords) }
+        val list = kbbiSnapshot
         if (list.isNotEmpty()) {
             var idx = Collections.binarySearch(list, startStr)
             if (idx < 0) {

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Subtle iOS Key Drop Shadow -->
+    <item android:left="1dp" android:right="1dp" android:top="2dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="11dp" />
+            <solid android:color="#28000000" />
+        </shape>
+    </item>
+    <!-- Crisp White iOS Pop-up Bubble Surface -->
+    <item android:left="1dp" android:right="1dp" android:top="0dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <solid android:color="#FFFFFF" />
+            <stroke android:width="0.75dp" android:color="#1A000000" />
+        </shape>
+    </item>
+</layer-list>

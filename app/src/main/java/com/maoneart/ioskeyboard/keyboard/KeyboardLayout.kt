@@ -62,6 +62,41 @@ class KeyboardLayout(private val context: Context) {
     private var shiftButtonRef: ImageButton? = null
     private var returnButtonRef: ReturnButtonLayout? = null
 
+    data class KeyHitBox(
+        val tv: TextView,
+        val charStr: String,
+        val hitRect: android.graphics.Rect,
+        val centerX: Float,
+        val centerY: Float
+    )
+
+    private var cachedHitBoxes: List<KeyHitBox> = emptyList()
+
+    fun rebuildHitBoxCache() {
+        val loc = IntArray(2)
+        val boxes = mutableListOf<KeyHitBox>()
+        for ((tv, charStr) in letterKeyViews) {
+            if (!tv.isShown || tv.width == 0) continue
+            tv.getLocationOnScreen(loc)
+            val l = loc[0]
+            val t = loc[1]
+            val r = l + tv.width
+            val b = t + tv.height
+            boxes.add(
+                KeyHitBox(
+                    tv = tv,
+                    charStr = charStr,
+                    hitRect = android.graphics.Rect(l, t, r, b),
+                    centerX = l + tv.width / 2f,
+                    centerY = t + tv.height / 2f
+                )
+            )
+        }
+        if (boxes.isNotEmpty()) {
+            cachedHitBoxes = boxes
+        }
+    }
+
     // Update letter cases in 0.1ms without rebuilding views
     fun updateShiftState(isShifted: Boolean) {
         for ((tv, baseChar) in letterKeyViews) {
@@ -135,12 +170,15 @@ class KeyboardLayout(private val context: Context) {
         themeMode: String = "auto",
         activeLanguage: String,
         isSwipeEnabled: Boolean = true,
+        isKeyPopupEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int) -> Unit = { _, _ -> },
         onSwipeComplete: (List<Char>) -> Unit = {},
-        onSwipeHaptic: () -> Unit = {}
+        onSwipeHaptic: () -> Unit = {},
+        onSwipeLiveUpdate: (List<Char>) -> Unit = {}
     ): View {
         letterKeyViews.clear()
+        cachedHitBoxes = emptyList()
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -316,57 +354,67 @@ class KeyboardLayout(private val context: Context) {
         val container = com.maoneart.ioskeyboard.keyboard.swipe.QuickPathContainerLayout(
             context = context,
             isSwipeEnabled = isSwipeEnabled,
-            findLetterAtCoords = { rx, ry -> findLetterAt(rx, ry) },
+            isKeyPopupEnabled = isKeyPopupEnabled,
+            themeMode = themeMode,
+            isDark = isDark,
+            findKeyAtCoords = { rx, ry -> findKeyAt(rx, ry) },
             onSwipeCompleted = onSwipeComplete,
-            onSwipeCharDetected = onSwipeHaptic
+            onSwipeCharDetected = onSwipeHaptic,
+            onSwipeLiveUpdate = onSwipeLiveUpdate
         )
         if (isWoody) {
-            container.setTrailColor(Color.parseColor("#FFA726"))
+            container.setTrailColor(Color.parseColor("#99FFA726"))
+        } else if (isDark) {
+            container.setTrailColor(Color.parseColor("#9964D2FF"))
+        } else {
+            container.setTrailColor(Color.parseColor("#99007AFF"))
         }
         container.setKeyboardContentView(root)
+
+        root.post { rebuildHitBoxCache() }
+        root.viewTreeObserver.addOnGlobalLayoutListener { rebuildHitBoxCache() }
+
         return container
     }
 
-    private fun findLetterAt(rawX: Float, rawY: Float): String? {
-        val loc = IntArray(2)
+    private fun findKeyAt(rawX: Float, rawY: Float): Pair<String, android.graphics.Rect>? {
+        var boxes = cachedHitBoxes
+        if (boxes.isEmpty()) {
+            rebuildHitBoxCache()
+            boxes = cachedHitBoxes
+        }
+        if (boxes.isEmpty()) return null
+
         val rx = rawX.toInt()
         val ry = rawY.toInt()
-
-        // 1. Direct hit on key bounding box with 4dp margin tolerance
         val tol = dp(4)
-        for ((tv, charStr) in letterKeyViews) {
-            if (!tv.isShown) continue
-            tv.getLocationOnScreen(loc)
-            val left = loc[0] - tol
-            val top = loc[1] - tol
-            val right = loc[0] + tv.width + tol
-            val bottom = loc[1] + tv.height + tol
-            if (rx in left..right && ry in top..bottom) {
-                return charStr
+
+        // 1. Direct hit on key bounding box (In-Memory, Zero JNI)
+        for (box in boxes) {
+            val r = box.hitRect
+            if (rx in (r.left - tol)..(r.right + tol) &&
+                ry in (r.top - tol)..(r.bottom + tol)) {
+                return Pair(box.tv.text.toString(), r)
             }
         }
 
         // 2. Nearest key center within snap radius (28dp) for fluid gesture sweeps
-        var closestChar: String? = null
+        var closest: KeyHitBox? = null
         var closestDistSq = Float.MAX_VALUE
         val maxSnapRadius = dp(28).toFloat()
         val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
 
-        for ((tv, charStr) in letterKeyViews) {
-            if (!tv.isShown) continue
-            tv.getLocationOnScreen(loc)
-            val centerX = loc[0] + tv.width / 2f
-            val centerY = loc[1] + tv.height / 2f
-            val dx = rawX - centerX
-            val dy = rawY - centerY
+        for (box in boxes) {
+            val dx = rawX - box.centerX
+            val dy = rawY - box.centerY
             val distSq = dx * dx + dy * dy
             if (distSq < closestDistSq && distSq <= maxSnapRadiusSq) {
                 closestDistSq = distSq
-                closestChar = charStr
+                closest = box
             }
         }
 
-        return closestChar
+        return closest?.let { Pair(it.tv.text.toString(), it.hitRect) }
     }
 
     // --- 2. SYMBOLS LAYOUT (123 & #+=) ---
