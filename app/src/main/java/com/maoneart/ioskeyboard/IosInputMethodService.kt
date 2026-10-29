@@ -585,7 +585,7 @@ class IosInputMethodService : InputMethodService() {
                     activeLanguage = prefs.activeLanguage,
                     isSwipeEnabled = prefs.isSwipeTypingEnabled,
                     onKeyAction = { handleKeyAction(it) },
-                    onCursorMove = { moveCursorBy(it) },
+                    onCursorMove = { dx, dy -> moveCursor2D(dx, dy) },
                     onSwipeComplete = { handleSwipeComplete(it) },
                     onSwipeHaptic = { audioHaptic.triggerHapticFeedback() }
                 )
@@ -593,13 +593,13 @@ class IosInputMethodService : InputMethodService() {
                     isMoreSymbols = false,
                     isDark = isDark,
                     onKeyAction = { handleKeyAction(it) },
-                    onCursorMove = { moveCursorBy(it) }
+                    onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
                 )
                 Mode.SYMBOLS_MORE -> layoutEngine.createSymbolsView(
                     isMoreSymbols = true,
                     isDark = isDark,
                     onKeyAction = { handleKeyAction(it) },
-                    onCursorMove = { moveCursorBy(it) }
+                    onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
                 )
                 Mode.EMOJI -> layoutEngine.createEmojiView(
                     isDark = isDark,
@@ -630,17 +630,49 @@ class IosInputMethodService : InputMethodService() {
         }
     }
 
-    private fun moveCursorBy(direction: Int) {
+    private fun moveCursor2D(dx: Int, dy: Int) {
         try {
             if (!prefs.isSpaceTrackpadEnabled) return
-            val ic = currentInputConnection ?: return
-            if (direction > 0) {
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
-            } else if (direction < 0) {
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT))
+
+            if (isTranslatePanelOpen) {
+                if (dx > 0) {
+                    translateCursorPosition = (translateCursorPosition + dx).coerceAtMost(translatePanelBuffer.length)
+                } else if (dx < 0) {
+                    translateCursorPosition = (translateCursorPosition + dx).coerceAtLeast(0)
+                }
+                updateTranslateInputBoxVisual()
+                audioHaptic.triggerHapticFeedback()
+                return
             }
+
+            val ic = currentInputConnection ?: return
+
+            // 1. Horizontal Cursor Navigation (Left / Right)
+            if (dx > 0) {
+                for (i in 0 until dx) {
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+                }
+            } else if (dx < 0) {
+                for (i in 0 until kotlin.math.abs(dx)) {
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT))
+                }
+            }
+
+            // 2. Vertical Multiline Navigation (Up / Down across paragraphs & line breaks)
+            if (dy < 0) {
+                for (i in 0 until kotlin.math.abs(dy)) {
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP))
+                }
+            } else if (dy > 0) {
+                for (i in 0 until dy) {
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN))
+                }
+            }
+
             audioHaptic.triggerHapticFeedback()
             updateSuggestions()
         } catch (_: Throwable) {}

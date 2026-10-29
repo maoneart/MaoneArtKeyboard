@@ -93,3 +93,7 @@
     1. Mengganti simbol panah `↵` dengan teks tulisan lowercase otentik Apple iOS: `return` (ukuran 15sp, presisi font proporsional).
     2. Menyelaraskan warna background tombol `return` default dengan tuts fungsi abu-abu sistem (`key_bg_special`), bukan biru konstan, sehingga 100% identik dengan keyboard Apple iPhone.
     3. Mode adaptif kontekstual cerdas: latar biru hanya aktif saat kolom input membutuhkan aksi Search (kaca pembesar putih), Go ("Buka"), atau Send ("Kirim").
+  - Navigasi Kursor 4-Arah Penuh pada Spasi Trackpad (Release v1.0.32):
+    1. **Trackpad Virtual 2D Penuh (Atas, Bawah, Kiri, Kanan)**: Tahan tombol spasi untuk menggeser kursor tidak hanya ke kiri/kanan, tapi juga langsung melompat antar baris ke atas (`KEYCODE_DPAD_UP`) dan ke bawah (`KEYCODE_DPAD_DOWN`) saat ada paragraf/enter tanpa harus mundur satu per satu.
+    2. **Disallow Intercept Touch**: Memastikan sentuhan jari bebas meluncur ke seluruh area keyboard tanpa terputus atau ter-intercept oleh parent layout.
+    3. **Kalibrasi Sensitivitas Nyaman**: `stepDistanceX = 12dp` dan `stepDistanceY = 14dp` untuk presisi navigasi teks yang mulus disertai respon tactile haptic pulse.

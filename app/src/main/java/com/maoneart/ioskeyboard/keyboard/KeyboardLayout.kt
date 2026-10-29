@@ -103,7 +103,7 @@ class KeyboardLayout(private val context: Context) {
         activeLanguage: String,
         isSwipeEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
-        onCursorMove: (Int) -> Unit = {},
+        onCursorMove: (Int, Int) -> Unit = { _, _ -> },
         onSwipeComplete: (List<Char>) -> Unit = {},
         onSwipeHaptic: () -> Unit = {}
     ): View {
@@ -293,7 +293,7 @@ class KeyboardLayout(private val context: Context) {
         isMoreSymbols: Boolean,
         isDark: Boolean,
         onKeyAction: (String) -> Unit,
-        onCursorMove: (Int) -> Unit = {}
+        onCursorMove: (Int, Int) -> Unit = { _, _ -> }
     ): View {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -950,26 +950,30 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // Apple iOS Spacebar Trackpad Cursor Mover
+    // Apple iOS 2D Spacebar Trackpad Cursor Mover (Left, Right, Up, Down)
     private fun setupSpacebarTrackpadTouch(
         view: TextView,
         defaultText: String,
         isDark: Boolean,
         onSpaceAction: () -> Unit,
-        onCursorMove: (Int) -> Unit
+        onCursorMove: (Int, Int) -> Unit
     ) {
         view.isHapticFeedbackEnabled = true
         val handler = Handler(Looper.getMainLooper())
         var isTrackpadActive = false
         var startX = 0f
+        var startY = 0f
         var lastStepX = 0f
-        val stepDistance = dp(14).toFloat()
+        var lastStepY = 0f
+        val stepDistanceX = dp(12).toFloat()
+        val stepDistanceY = dp(14).toFloat()
 
         val activateRunnable = Runnable {
             isTrackpadActive = true
             view.text = "│   geser kursor   │"
             view.setTextColor(ContextCompat.getColor(context, R.color.ios_blue))
             view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
+            view.parent?.requestDisallowInterceptTouchEvent(true)
             try {
                 view.performHapticFeedback(
                     android.view.HapticFeedbackConstants.LONG_PRESS,
@@ -983,7 +987,9 @@ class KeyboardLayout(private val context: Context) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
                     startX = event.x
+                    startY = event.y
                     lastStepX = event.x
+                    lastStepY = event.y
                     isTrackpadActive = false
                     try {
                         v.performHapticFeedback(
@@ -996,25 +1002,50 @@ class KeyboardLayout(private val context: Context) {
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (isTrackpadActive) {
+                        v.parent?.requestDisallowInterceptTouchEvent(true)
+
+                        // 1. Sumbu Horisontal (Kiri / Kanan)
                         val deltaX = event.x - lastStepX
-                        if (deltaX > stepDistance) {
-                            val steps = (deltaX / stepDistance).toInt()
-                            for (i in 0 until steps) {
-                                onCursorMove(1)
-                            }
-                            lastStepX += steps * stepDistance
+                        if (deltaX > stepDistanceX) {
+                            val steps = (deltaX / stepDistanceX).toInt()
+                            onCursorMove(steps, 0)
+                            lastStepX += steps * stepDistanceX
                             try {
                                 v.performHapticFeedback(
                                     android.view.HapticFeedbackConstants.KEYBOARD_TAP,
                                     android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
                                 )
                             } catch (_: Throwable) {}
-                        } else if (deltaX < -stepDistance) {
-                            val steps = (kotlin.math.abs(deltaX) / stepDistance).toInt()
-                            for (i in 0 until steps) {
-                                onCursorMove(-1)
-                            }
-                            lastStepX -= steps * stepDistance
+                        } else if (deltaX < -stepDistanceX) {
+                            val steps = (kotlin.math.abs(deltaX) / stepDistanceX).toInt()
+                            onCursorMove(-steps, 0)
+                            lastStepX -= steps * stepDistanceX
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+                        }
+
+                        // 2. Sumbu Vertikal (Atas / Bawah baris teks)
+                        val deltaY = event.y - lastStepY
+                        if (deltaY < -stepDistanceY) {
+                            // Jari digeser ke ATAS
+                            val steps = (kotlin.math.abs(deltaY) / stepDistanceY).toInt()
+                            onCursorMove(0, -steps)
+                            lastStepY -= steps * stepDistanceY
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+                        } else if (deltaY > stepDistanceY) {
+                            // Jari digeser ke BAWAH
+                            val steps = (deltaY / stepDistanceY).toInt()
+                            onCursorMove(0, steps)
+                            lastStepY += steps * stepDistanceY
                             try {
                                 v.performHapticFeedback(
                                     android.view.HapticFeedbackConstants.KEYBOARD_TAP,
@@ -1023,13 +1054,15 @@ class KeyboardLayout(private val context: Context) {
                             } catch (_: Throwable) {}
                         }
                     } else {
-                        if (kotlin.math.abs(event.x - startX) > dp(20)) {
+                        val moveDist = kotlin.math.hypot((event.x - startX).toDouble(), (event.y - startY).toDouble()).toFloat()
+                        if (moveDist > dp(25)) {
                             handler.removeCallbacks(activateRunnable)
                         }
                     }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
                     handler.removeCallbacks(activateRunnable)
                     v.isPressed = false
                     if (isTrackpadActive) {
