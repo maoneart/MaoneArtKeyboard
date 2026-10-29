@@ -1195,6 +1195,105 @@ class KeyboardLayout(private val context: Context) {
         }
         headerRow.addView(btnMode)
 
+        // Modal Action Container (Overlay Glassmorphism)
+        var modalOverlay: FrameLayout? = null
+
+        fun hideModal() {
+            modalOverlay?.let { root.removeView(it) }
+            modalOverlay = null
+        }
+
+        fun showClearConfirmModal() {
+            hideModal()
+            val overlay = FrameLayout(context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setBackgroundColor(Color.parseColor("#99000000"))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { hideModal() }
+            }
+
+            val dialogCard = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                ).apply { setMargins(dp(22), 0, dp(22), 0) }
+                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody else if (isDark) R.drawable.key_bg_special_dark else R.drawable.card_bg_ios)
+                setPadding(dp(18), dp(16), dp(18), dp(16))
+                isClickable = true
+            }
+
+            val tvTitle = TextView(context).apply {
+                text = "Bersihkan Papan Klip?"
+                textSize = 15.5f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setTextColor(textColor)
+                gravity = Gravity.CENTER
+            }
+            dialogCard.addView(tvTitle)
+
+            val tvDesc = TextView(context).apply {
+                text = "Semua riwayat yang tidak disematkan akan dihapus. Item yang di-pin (📌) akan tetap tersimpan aman."
+                textSize = 12.5f
+                setTextColor(subtextColor)
+                gravity = Gravity.CENTER
+                setPadding(0, dp(6), 0, dp(14))
+            }
+            dialogCard.addView(tvDesc)
+
+            // Symmetrical 2-Column Action Grid (MaoneArt Glassmorphism Rule)
+            val btnRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(42)
+                )
+            }
+
+            val btnCancel = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                    setMargins(0, 0, dp(6), 0)
+                }
+                background = ContextCompat.getDrawable(context, if (isDark || isWoody) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+                text = "Batal"
+                setTextColor(textColor)
+                textSize = 13.5f
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) { hideModal() }
+            }
+            btnRow.addView(btnCancel)
+
+            val btnConfirm = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                    setMargins(dp(6), 0, 0, 0)
+                }
+                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_action else R.drawable.key_bg_blue)
+                text = "🗑️ Bersihkan"
+                setTextColor(Color.WHITE)
+                textSize = 13.5f
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) {
+                    hideModal()
+                    onClearUnpinnedAction()
+                }
+            }
+            btnRow.addView(btnConfirm)
+            dialogCard.addView(btnRow)
+
+            overlay.addView(dialogCard)
+            modalOverlay = overlay
+            root.addView(overlay)
+        }
+
         // Clear Unpinned Button
         if (items.any { !it.isPinned }) {
             val btnClear = TextView(context).apply {
@@ -1206,7 +1305,7 @@ class KeyboardLayout(private val context: Context) {
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = false
-                setupInstantTouch(this) { onClearUnpinnedAction() }
+                setupInstantTouch(this) { showClearConfirmModal() }
             }
             headerRow.addView(btnClear)
         }
@@ -1225,14 +1324,6 @@ class KeyboardLayout(private val context: Context) {
         }
         headerRow.addView(btnClose)
         mainLayout.addView(headerRow)
-
-        // Modal Action Container (Overlay Glassmorphism)
-        var modalOverlay: FrameLayout? = null
-
-        fun hideModal() {
-            modalOverlay?.let { root.removeView(it) }
-            modalOverlay = null
-        }
 
         fun showActionModal(item: com.maoneart.ioskeyboard.clipboard.ClipboardItem) {
             hideModal()

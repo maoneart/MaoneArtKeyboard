@@ -20,6 +20,7 @@ class ClipboardHistoryManager(private val context: Context) {
     private val file = File(context.filesDir, "clipboard_history.json")
     private val gson = Gson()
     private val items = mutableListOf<ClipboardItem>()
+    private var ignoredClipText: String? = null
 
     init {
         loadFromDisk()
@@ -53,6 +54,13 @@ class ClipboardHistoryManager(private val context: Context) {
             if (clip != null && clip.itemCount > 0) {
                 val text = clip.getItemAt(0)?.coerceToText(context)?.toString()?.trim()
                 if (!text.isNullOrEmpty()) {
+                    // Do not resurrect text that was explicitly cleared or deleted by user
+                    if (text == ignoredClipText) {
+                        return
+                    }
+                    // When user copies something new, reset the ignored text
+                    ignoredClipText = null
+
                     val existingIdx = items.indexOfFirst { it.text == text }
                     if (existingIdx >= 0) {
                         val existing = items[existingIdx]
@@ -68,7 +76,12 @@ class ClipboardHistoryManager(private val context: Context) {
                         if (firstUnpinned >= 0) {
                             items.add(firstUnpinned, newItem)
                         } else {
-                            items.add(0, newItem)
+                            val lastPinned = items.indexOfLast { it.isPinned }
+                            if (lastPinned >= 0) {
+                                items.add(lastPinned + 1, newItem)
+                            } else {
+                                items.add(0, newItem)
+                            }
                         }
                         // Prune oldest unpinned items if over capacity (keep pinned forever)
                         val unpinnedCount = items.count { !it.isPinned }
@@ -96,11 +109,41 @@ class ClipboardHistoryManager(private val context: Context) {
     }
 
     fun deleteItem(id: String) {
+        val itemToDelete = items.find { it.id == id }
+        if (itemToDelete != null) {
+            try {
+                val currentClipText = clipboard?.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()
+                if (currentClipText == itemToDelete.text) {
+                    ignoredClipText = currentClipText
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        clipboard?.clearPrimaryClip()
+                    } else {
+                        clipboard?.setPrimaryClip(ClipData.newPlainText("", ""))
+                    }
+                }
+            } catch (_: Throwable) {}
+        }
         items.removeAll { it.id == id }
         saveToDisk()
     }
 
     fun clearAllUnpinned() {
+        try {
+            val currentClipText = clipboard?.primaryClip?.getItemAt(0)?.coerceToText(context)?.toString()?.trim()
+            if (!currentClipText.isNullOrEmpty()) {
+                val isCurrentClipPinned = items.any { it.isPinned && it.text == currentClipText }
+                if (!isCurrentClipPinned) {
+                    ignoredClipText = currentClipText
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        clipboard?.clearPrimaryClip()
+                    } else {
+                        clipboard?.setPrimaryClip(ClipData.newPlainText("", ""))
+                    }
+                }
+            }
+        } catch (_: Throwable) {}
+
+        // Remove ALL unpinned items (pinned items are 100% preserved)
         items.removeAll { !it.isPinned }
         saveToDisk()
     }

@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.44)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.45)
 
 ---
 
@@ -223,3 +223,12 @@
        - Memanggil `ic.finishComposingText()` terlebih dahulu agar teks query pencarian telah final secara utuh di search bar.
        - Menjalankan `ic.performEditorAction(targetAction)` diikuti fallback resmi framework `sendDefaultEditorAction(false)`. Aksi tombol Search tidak akan pernah lagi membocorkan karakter newline `\n`.
        - Percabangan multiline (`ic.commitText("\n", 1)`) kini diisolasi eksklusif hanya untuk kolom teks tanpa aksi eksplisit (`IME_ACTION_NONE` / `IME_ACTION_UNSPECIFIED`) seperti pada WhatsApp, Telegram, dan Notes sehingga tombol Enter di aplikasi chat tetap 100% mulus membuat baris baru.
+  - **Perbaikan Pembersihan Riwayat Papan Klip & Proteksi Item Pinned (Release v1.0.45)**:
+    1. **Root Cause Masalah Bersih Papan Klip**:
+       - Saat menekan tombol "🗑️ Bersih", `clearAllUnpinned()` berhasil menghapus semua item tidak disematkan dari memori dan disk. Namun sesaat setelahnya saat layout di-*render* ulang, `getItems()` memanggil `fetchCurrentClip()` yang membaca `primaryClip` aktif dari sistem Android.
+       - Teks terakhir yang disalin masih tersimpan di clipboard sistem Android sehingga dianggap sebagai klip baru dan seketika dimasukkan kembali ke daftar riwayat, menyebabkan item terakhir salin seolah-olah tidak terhapus.
+    2. **Solusi Anti-Resurrection & Modal Konfirmasi Glassmorphism**:
+       - `ignoredClipText`: Mencatat teks klip sistem yang sedang aktif saat tombol "Bersih" atau "Hapus" ditekan (selama bukan item pinned) dan membersihkan `primaryClip` via `clipboard.clearPrimaryClip()` / empty clip.
+       - `fetchCurrentClip()` memblokir kebangkitan kembali teks yang sudah dibersihkan (`text == ignoredClipText`), dan hanya menerima klip baru saat pengguna menyalin teks berbeda.
+       - Item yang disematkan (📌 pinned) dijamin 100% aman dan tidak pernah terhapus.
+       - Menambahkan **MaoneArt Glassmorphism Confirmation Modal** (`showClearConfirmModal`) sebelum eksekusi tombol "🗑️ Bersih" dengan grid 2-tombol simetris (`Batal` dan `🗑️ Bersihkan`) sesuai standar UI MaoneArt.
