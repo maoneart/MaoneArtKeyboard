@@ -285,7 +285,7 @@ class IosInputMethodService : InputMethodService() {
             updateTranslatePanelUI()
             rootView?.let { applyThemeStyling(it) }
             renderCurrentLayout()
-            layoutEngine.updateReturnButton(info)
+            layoutEngine.updateReturnButton(info, isDarkMode())
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error onStartInputView", t)
         }
@@ -624,7 +624,7 @@ class IosInputMethodService : InputMethodService() {
             }
 
             container.addView(contentView)
-            layoutEngine.updateReturnButton(currentInputEditorInfo)
+            layoutEngine.updateReturnButton(currentInputEditorInfo, isDarkMode())
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in renderCurrentLayout", t)
         }

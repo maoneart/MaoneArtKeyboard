@@ -89,3 +89,7 @@
     5. **Tombol Spasi Trackpad Kursor**: Tekan tahan tombol spasi (>260ms) mengaktifkan mode trackpad kursor ("│ geser kursor │") untuk menggeser posisi kursor teks kiri/kanan dengan tactile haptic feedback.
     6. **Pintasan Teks (Text Replacement)**: Mengetik singkatan (`otw` ➔ `On the way`, `brb` ➔ `Be right back`, `asap`, `ty`, `gpp`, dll) otomatis berubah menjadi frasa lengkap saat menekan spasi, dilengkapi hub manajemen pintasan teks di Pengaturan.
     7. **Ikon Search & Emoji Datar Monokrom Apple**: Mengganti emoji kuning 3D dan emoji search 3D dengan ikon outline putih datar (`ic_search_white.xml`) serta ikon wajah outline monokrom flat (`ic_emoji_smile.xml`) yang elegan dan otentik ala Apple iOS.
+  - Tombol Return Otentik Apple iOS (Release v1.0.31):
+    1. Mengganti simbol panah `↵` dengan teks tulisan lowercase otentik Apple iOS: `return` (ukuran 15sp, presisi font proporsional).
+    2. Menyelaraskan warna background tombol `return` default dengan tuts fungsi abu-abu sistem (`key_bg_special`), bukan biru konstan, sehingga 100% identik dengan keyboard Apple iPhone.
+    3. Mode adaptif kontekstual cerdas: latar biru hanya aktif saat kolom input membutuhkan aksi Search (kaca pembesar putih), Go ("Buka"), atau Send ("Kirim").

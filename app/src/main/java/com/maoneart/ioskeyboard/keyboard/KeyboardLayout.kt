@@ -41,12 +41,17 @@ class KeyboardLayout(private val context: Context) {
     }
 
     // Dynamic Context-Adaptive Enter / Return / Search Button (iOS Smart Action)
-    fun updateReturnButton(editorInfo: EditorInfo?) {
+    fun updateReturnButton(editorInfo: EditorInfo?, isDark: Boolean = false) {
         val btn = returnButtonRef ?: return
+        val specialKeyBg = if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light
+        val textColor = if (isDark) Color.WHITE else Color.BLACK
+
         if (editorInfo == null) {
             btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
-            btn.text = "↵"
-            btn.textSize = 20f
+            btn.background = ContextCompat.getDrawable(context, specialKeyBg)
+            btn.setTextColor(textColor)
+            btn.text = "return"
+            btn.textSize = 15f
             return
         }
 
@@ -54,49 +59,41 @@ class KeyboardLayout(private val context: Context) {
         val variation = editorInfo.inputType and InputType.TYPE_MASK_VARIATION
         val isMultiLine = (editorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
 
-        // 1. Web Search or Filter: Show Flat White Search Icon (ic_search_white)
+        // 1. Web Search or Filter: Show Flat White Search Icon with Blue BG
         if (imeAction == EditorInfo.IME_ACTION_SEARCH ||
             variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
             btn.text = ""
+            btn.background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             btn.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_search_white, 0, 0, 0)
             return
         }
 
         btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
 
-        // 2. Browser URL or Web Address: Show "Buka"
+        // 2. Browser URL or Web Address: Show "Buka" (Blue BG)
         if (imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI) {
             btn.text = "Buka"
             btn.textSize = 14f
+            btn.setTextColor(Color.WHITE)
+            btn.background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             return
         }
 
-        // 3. WhatsApp, Telegram, Notes & all multiline fields: Show iOS Return Arrow (↵)
-        if (isMultiLine) {
-            btn.text = "↵"
-            btn.textSize = 20f
+        // 3. Form Send Action: Show "Kirim" (Blue BG)
+        if (imeAction == EditorInfo.IME_ACTION_SEND) {
+            btn.text = "Kirim"
+            btn.textSize = 14f
+            btn.setTextColor(Color.WHITE)
+            btn.background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             return
         }
 
-        // 4. Form and Single-line Actions
-        when (imeAction) {
-            EditorInfo.IME_ACTION_SEND -> {
-                btn.text = "Kirim"
-                btn.textSize = 14f
-            }
-            EditorInfo.IME_ACTION_NEXT -> {
-                btn.text = "Lanjut"
-                btn.textSize = 13.5f
-            }
-            EditorInfo.IME_ACTION_DONE -> {
-                btn.text = "Selesai"
-                btn.textSize = 13.5f
-            }
-            else -> {
-                btn.text = "↵"
-                btn.textSize = 20f
-            }
-        }
+        // 4. WhatsApp, Telegram, Notes & all multiline / standard newline:
+        // Authentic Apple iOS "return" key with functional gray background
+        btn.text = "return"
+        btn.textSize = 15f
+        btn.background = ContextCompat.getDrawable(context, specialKeyBg)
+        btn.setTextColor(textColor)
     }
 
     // --- 1. QWERTY LAYOUT ---
@@ -251,14 +248,14 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btnMic)
 
-        // Return / Enter Action Button (↵)
+        // Return / Enter Action Button (return)
         val btnReturn = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
-            text = "↵"
-            setTextColor(Color.WHITE)
-            textSize = 20f
+            background = ContextCompat.getDrawable(context, specialKeyBg)
+            text = "return"
+            setTextColor(textColor)
+            textSize = 15f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
@@ -435,14 +432,14 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnMic)
 
-        // Return / Enter Action Button (↵)
+        // Return / Enter Action Button (return)
         val btnReturn = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
-            text = "↵"
-            setTextColor(Color.WHITE)
-            textSize = 20f
+            background = ContextCompat.getDrawable(context, specialKeyBg)
+            text = "return"
+            setTextColor(textColor)
+            textSize = 15f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
