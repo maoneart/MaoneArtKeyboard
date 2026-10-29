@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.46)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.47)
 
 ---
 
@@ -240,3 +240,15 @@
        - `onStartInputView`, `onFinishInputView`, dan `onWindowHidden` kini selalu mereset `currentMode` ke `Mode.QWERTY` sehingga setiap kali keyboard muncul di layar selalu langsung siap mengetik huruf standar.
        - Membuka (`toggleTranslatePanel`) atau menutup panel terjemahan (`closeTranslatePanel`) secara otomatis mengembalikan keyboard ke `Mode.QWERTY`.
        - Pengiriman kalimat terjemahan (`sendTranslatedSentence`) menutup panel dan langsung menyajikan layout QWERTY.
+  - **Eliminasi Total Teks Dobel Termux & Proteksi Kata Sah Auto-Correction (Release v1.0.47)**:
+    1. **Root Cause Duplikasi Suku Kata di Termux**:
+       - Termux PTY mengabaikan `InputConnection.deleteSurroundingText()`. Akibatnya, saat memilih chip kandidat kata di Termux, teks kandidat di-commit di atas karakter yang sudah ada, menghasilkan kata dobel (misal: `apt` -> `aptupdate `).
+       - Pada Backspace di terminal sebelumnya, `composingWord` langsung di-clear seluruhnya dan saran tidak di-update, sehingga saat mengetik ulang hanya huruf terakhir yang tercatat, menyisakan suku kata basi di layar terminal.
+    2. **Solusi Isolasi PTY Terminal**:
+       - Pada `selectCandidate`: Jika `isTerminalOrRawInput()`, hapus suku kata aktif menggunakan `repeat(lengthToDelete) { sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL) }` sebelum meng-commit kata baru.
+       - Pada `handleBackspace`: Kurangi `composingWord` satu per satu dan kirim `KEYCODE_DEL` serta update saran secara langsung.
+       - Pada `handleSpace`: Bypass total seluruh koreksi otomatis dan text replacement di terminal agar perintah shell (`cd`, `git`, `pkg`, dll) tidak pernah tertimpa.
+    3. **Proteksi Kata Sah pada Auto-Correction WhatsApp & Seluruh Aplikasi**:
+       - Menambahkan pengecekan `isKnownWord()` pada `SmartCorrectionEngine`. Jika kata yang diketik sudah valid dan terdaftar di KBBI (74.500+ entri), kamus belajar mandiri (`userDictionary`), atau kosakata umum, penekanan tombol spasi DILARANG menggantinya secara otomatis.
+       - Koreksi otomatis spasi hanya aktif jika kata terbukti salah ketik/tidak dikenal dan memiliki huruf awal yang sama/bertetangga QWERTY.
+       - `selectCandidate` pada aplikasi umum (WhatsApp, browser, dll) kini memeriksa teks aktual sebelum kursor (`getTextBeforeCursor`) untuk menghitung panjang penghapusan yang presisi bahkan jika kursor dipindahkan oleh pengguna.

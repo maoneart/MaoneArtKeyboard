@@ -335,8 +335,8 @@ class IosInputMethodService : InputMethodService() {
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        // Reset composingWord when cursor returns to start (e.g. after WhatsApp send or clearing input)
-        if (newSelStart == 0 && newSelEnd == 0) {
+        // Reset composingWord when cursor returns to start or jumps (e.g. user tapped elsewhere)
+        if ((newSelStart == 0 && newSelEnd == 0) || newSelStart != newSelEnd || Math.abs(newSelStart - oldSelStart) > 1) {
             composingWord.clear()
         }
         updateSuggestions()
@@ -917,7 +917,11 @@ class IosInputMethodService : InputMethodService() {
                 updateSuggestions(immediate = false)
             } else {
                 currentInputConnection?.commitText(charStr, 1)
-                composingWord.append(charStr)
+                if (charStr.length == 1 && !charStr[0].isLetterOrDigit() && charStr[0] != '\'' && charStr[0] != '-') {
+                    composingWord.clear()
+                } else {
+                    composingWord.append(charStr)
+                }
                 updateSuggestions(immediate = false)
             }
 
@@ -960,10 +964,14 @@ class IosInputMethodService : InputMethodService() {
 
             val ic = currentInputConnection
             if (isTerminalOrRawInput()) {
-                composingWord.clear()
+                if (composingWord.isNotEmpty()) {
+                    composingWord.deleteCharAt(composingWord.length - 1)
+                }
                 if (ic != null) {
                     sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
                 }
+                updateSuggestions()
+                updateAutoCapitalization()
                 return
             }
 
@@ -1004,6 +1012,13 @@ class IosInputMethodService : InputMethodService() {
 
     private fun handleSpace() {
         try {
+            if (isTerminalOrRawInput()) {
+                currentInputConnection?.commitText(" ", 1)
+                composingWord.clear()
+                updateSuggestions()
+                return
+            }
+
             val (activeWord, _) = getTypingContext()
 
             // 1. Apple Text Replacement on Space (e.g. "otw" -> "On the way")
@@ -1034,9 +1049,12 @@ class IosInputMethodService : InputMethodService() {
 
             // 2. Apple Auto-Correction on Spacebar (replaces typo with center candidate)
             if (prefs.isAutoCorrectEnabled && activeWord.length >= 3) {
-                val centerCandidate = candidate2?.text?.toString()?.trim() ?: ""
+                var centerCandidate = candidate2?.text?.toString()?.trim() ?: ""
+                if (centerCandidate.startsWith("⚡ ")) centerCandidate = centerCandidate.removePrefix("⚡ ").trim()
+                if (centerCandidate.startsWith("✦ ")) centerCandidate = centerCandidate.removePrefix("✦ ").trim()
+
                 if (centerCandidate.isNotEmpty() && !centerCandidate.equals(activeWord, ignoreCase = true)) {
-                    if (correctionEngine.isCorrectionMatch(activeWord, centerCandidate)) {
+                    if (correctionEngine.isCorrectionMatch(activeWord, centerCandidate, prefs.activeLanguage)) {
                         val len = activeWord.length
                         if (isTranslatePanelOpen) {
                             val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
@@ -1242,6 +1260,10 @@ class IosInputMethodService : InputMethodService() {
                 return extractWordsFromContext(textBefore)
             }
 
+            if (isTerminalOrRawInput()) {
+                return Pair(composingWord.toString(), "")
+            }
+
             // Fast-path in-memory: while user is actively typing a word, return immediately without Binder IPC!
             if (composingWord.isNotEmpty()) {
                 return Pair(composingWord.toString(), "")
@@ -1392,13 +1414,14 @@ class IosInputMethodService : InputMethodService() {
                 cleanCandidate = cleanCandidate.removePrefix("✦ ").trim()
             }
 
-            val (currentWord, _) = getTypingContext()
-            val lengthToDelete = currentWord.length
+            val ic = currentInputConnection
 
             // Dynamic Self-Learning: Catat kata yang dipilih pengguna dengan prioritas frekuensi tinggi!
             correctionEngine.recordWordUsage(cleanCandidate, 2)
 
             if (isTranslatePanelOpen) {
+                val (currentWord, _) = getTypingContext()
+                val lengthToDelete = currentWord.length
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
                 if (lengthToDelete > 0 && pos >= lengthToDelete) {
                     translatePanelBuffer.delete(pos - lengthToDelete, pos)
@@ -1407,8 +1430,23 @@ class IosInputMethodService : InputMethodService() {
                 translatePanelBuffer.insert(translateCursorPosition, "$cleanCandidate ")
                 translateCursorPosition += cleanCandidate.length + 1
                 updateTranslateInputBoxVisual()
+            } else if (isTerminalOrRawInput()) {
+                // In Termux PTY, deleteSurroundingText() is ignored by the terminal buffer.
+                // We MUST use KEYCODE_DEL key events, and rely on composingWord length.
+                val lengthToDelete = composingWord.length
+                if (lengthToDelete > 0 && ic != null) {
+                    repeat(lengthToDelete) {
+                        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                    }
+                }
+                ic?.commitText("$cleanCandidate ", 1)
             } else {
-                val ic = currentInputConnection
+                // In normal apps (WhatsApp, Chrome, Notes, etc.):
+                // Query real text before cursor to find the exact token touching the cursor!
+                val textBefore = ic?.getTextBeforeCursor(64, 0)?.toString() ?: ""
+                val wordAtCursor = if (textBefore.isNotEmpty()) extractWordsFromContext(textBefore).first else ""
+                val lengthToDelete = if (wordAtCursor.isNotEmpty()) wordAtCursor.length else composingWord.length
+
                 if (ic != null) {
                     if (lengthToDelete > 0) {
                         ic.deleteSurroundingText(lengthToDelete, 0)

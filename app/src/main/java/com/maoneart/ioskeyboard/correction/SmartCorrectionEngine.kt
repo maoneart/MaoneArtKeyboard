@@ -528,6 +528,27 @@ class SmartCorrectionEngine(private val context: Context) {
     }
 
     /**
+     * Checks if a word is a valid, recognized word in any of our dictionaries:
+     * - User's self-learned personal vocabulary (highest priority)
+     * - 74,500+ Official KBBI vocabulary
+     * - Indonesian or English common vocabulary
+     * - Next-word conversational models
+     */
+    fun isKnownWord(word: String, lang: String = "id"): Boolean {
+        val w = word.trim().lowercase()
+        if (w.isEmpty()) return false
+        if (userDictionary.containsKey(w)) return true
+        if (customWords.contains(w)) return true
+        if (indonesianWords.contains(w)) return true
+        if (englishWords.contains(w)) return true
+        if (nextWordMapId.containsKey(w) || nextWordMapEn.containsKey(w)) return true
+        synchronized(kbbiWords) {
+            if (kbbiSet.contains(w)) return true
+        }
+        return false
+    }
+
+    /**
      * Gathers all candidate words matching the gesture swipe start and end characters.
      * Uses indexed search across user dictionary, common words, next-word predictions, and 75k KBBI.
      */
@@ -799,19 +820,37 @@ class SmartCorrectionEngine(private val context: Context) {
 
     /**
      * Determines whether a candidate is a confident auto-correction match for a typed word.
+     * HARD RULE: Valid, recognized words in KBBI / user dictionary are NEVER replaced automatically on spacebar!
      */
-    fun isCorrectionMatch(typedWord: String, candidate: String): Boolean {
+    fun isCorrectionMatch(typedWord: String, candidate: String, lang: String = "id"): Boolean {
         val typed = typedWord.trim().lowercase()
         val cand = candidate.trim().lowercase()
         if (typed.isEmpty() || cand.isEmpty()) return false
         if (typed == cand) return false
         if (typed.length < 2 || cand.length < 2) return false
 
-        // 1. Direct typo / abbreviation match
-        if (commonAbbreviations[typed]?.contains(cand) == true) return true
+        // 1. HARD RULE: If the user typed a recognized/valid word in KBBI or dictionary, NEVER auto-replace!
+        if (isKnownWord(typed, lang)) {
+            return false
+        }
 
-        // 2. Damerau-Levenshtein distance <= 1 (or 2 for words with 4+ characters)
-        val maxDist = if (typed.length <= 3) 1 else 2
+        // 2. Direct abbreviation / chat slang match (e.g. "kmu" -> "kamu", "bsa" -> "bisa", "jg" -> "juga")
+        val expansions = commonAbbreviations[typed]
+        if (expansions != null && expansions.contains(cand)) {
+            return true
+        }
+
+        // 3. Typo correction via Damerau-Levenshtein distance:
+        // Must start with identical or adjacent QWERTY character to prevent aggressive unrelated replacements
+        if (typed.isNotEmpty() && cand.isNotEmpty()) {
+            val firstTyped = typed[0]
+            val firstCand = cand[0]
+            if (firstTyped != firstCand && !isQwertyNeighbor(firstTyped, firstCand)) {
+                return false
+            }
+        }
+
+        val maxDist = if (typed.length <= 4) 1 else 2
         val dist = damerauLevenshtein(typed, cand)
         return dist <= maxDist
     }
