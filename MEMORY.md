@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.43)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.44)
 
 ---
 
@@ -213,3 +213,13 @@
        - Mengatasi celah sentuhan mati pada margin antar tuts (gap 4dp), padding samping baris ke-2 (18dp di kiri huruf 'A' dan kanan 'L'), serta jarak antar baris keyboard.
        - Menambahkan fallback hit-resolver di `QuickPathContainerLayout.onTouchEvent`: Setiap kali sentuhan mendarat di celah kosong atau padding, sistem otomatis memindai tuts terdekat dalam radius hingga 36dp (`findKeyAtCoords` & `findKeyViewAtCoords`).
        - Tuts terdekat langsung dieksekusi secara instan dengan tactile haptic feedback dan balon preview huruf, sehingga sentuhan jempol besar atau miring tidak pernah meleset atau gagal ketik lagi.
+  - **Perbaikan Aksi Tombol Search Play Store & Dynamic Action Resolver (Release v1.0.44)**:
+    1. **Root Cause Masalah Tombol Search Play Store Jadi Enter**:
+       - Pada versi sebelumnya, pengecekan `isMultiLine` dievaluasi di awal sebelum memeriksa apakah tombol memiliki aksi khusus (`imeAction == IME_ACTION_SEARCH`).
+       - Google Play Store modern dibangun dengan Jetpack Compose di mana search text field secara default membawa flag `TYPE_TEXT_FLAG_MULTI_LINE` internal saat memakai `BasicTextField`. Akibatnya, sentuhan pada tombol search selalu tertangkap oleh percabangan multiline dan mengeksekusi `commitText("\n", 1)`, menghasilkan enter/newline alih-alih melakukan pencarian.
+       - Selain itu, `finishComposingText()` sebelumnya tidak dipanggil sebelum pengiriman aksi, dan fallback `sendKeyEvent(KEYCODE_ENTER)` mengirim raw key event tanpa flag IME soft keyboard yang tepat.
+    2. **Solusi Dynamic Action Resolver**:
+       - Prioritas utama diarahkan pada resolusi aksi eksplisit (`targetAction`): `isSearchAction` (`IME_ACTION_SEARCH`, `TYPE_TEXT_VARIATION_FILTER`, atau `actionId == IME_ACTION_SEARCH`), Browser Go (`IME_ACTION_GO` / URI), Send (`IME_ACTION_SEND`), Next, dan Done.
+       - Memanggil `ic.finishComposingText()` terlebih dahulu agar teks query pencarian telah final secara utuh di search bar.
+       - Menjalankan `ic.performEditorAction(targetAction)` diikuti fallback resmi framework `sendDefaultEditorAction(false)`. Aksi tombol Search tidak akan pernah lagi membocorkan karakter newline `\n`.
+       - Percabangan multiline (`ic.commitText("\n", 1)`) kini diisolasi eksklusif hanya untuk kolom teks tanpa aksi eksplisit (`IME_ACTION_NONE` / `IME_ACTION_UNSPECIFIED`) seperti pada WhatsApp, Telegram, dan Notes sehingga tombol Enter di aplikasi chat tetap 100% mulus membuat baris baru.

@@ -143,7 +143,8 @@ class KeyboardLayout(private val context: Context) {
 
         // 1. Web Search or Filter: Show Flat White Search Icon with Action BG (100% Dead Center)
         if (imeAction == EditorInfo.IME_ACTION_SEARCH ||
-            variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
+            variation == InputType.TYPE_TEXT_VARIATION_FILTER ||
+            editorInfo.actionId == EditorInfo.IME_ACTION_SEARCH) {
             btn.showIcon(R.drawable.ic_search_white, actionKeyBg)
             return
         }

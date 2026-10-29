@@ -1091,31 +1091,64 @@ class IosInputMethodService : InputMethodService() {
 
             val ic = currentInputConnection ?: return
             val info = currentInputEditorInfo
-            val imeAction = info?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
-            val isMultiLine = info != null && ((info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0)
 
-            // Multiline field (WhatsApp, Telegram, Notes): Always insert a newline!
-            if (isMultiLine) {
-                ic.commitText("\n", 1)
-                composingWord.clear()
+            // Commit/finish any pending composing text so target field has complete input
+            ic.finishComposingText()
+            composingWord.clear()
+
+            if (info == null) {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
                 updateSuggestions()
                 updateAutoCapitalization()
                 return
             }
 
-            if (imeAction != EditorInfo.IME_ACTION_NONE && imeAction != EditorInfo.IME_ACTION_UNSPECIFIED) {
-                val handled = ic.performEditorAction(imeAction)
-                if (!handled) {
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
-                }
-            } else {
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+            val imeAction = info.imeOptions and EditorInfo.IME_MASK_ACTION
+            val variation = info.inputType and InputType.TYPE_MASK_VARIATION
+            val isMultiLine = (info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+
+            val isSearchAction = (imeAction == EditorInfo.IME_ACTION_SEARCH) ||
+                    (variation == InputType.TYPE_TEXT_VARIATION_FILTER) ||
+                    (info.actionId == EditorInfo.IME_ACTION_SEARCH)
+
+            // 1. Resolve specific action (Search in Play Store, Go in Browser, Send, Done, Next, etc.)
+            val targetAction = when {
+                info.actionId != 0 -> info.actionId
+                isSearchAction -> EditorInfo.IME_ACTION_SEARCH
+                imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI -> EditorInfo.IME_ACTION_GO
+                imeAction == EditorInfo.IME_ACTION_SEND -> EditorInfo.IME_ACTION_SEND
+                imeAction == EditorInfo.IME_ACTION_DONE -> EditorInfo.IME_ACTION_DONE
+                imeAction == EditorInfo.IME_ACTION_NEXT -> EditorInfo.IME_ACTION_NEXT
+                imeAction != EditorInfo.IME_ACTION_NONE && imeAction != EditorInfo.IME_ACTION_UNSPECIFIED -> imeAction
+                else -> EditorInfo.IME_ACTION_NONE
             }
 
-            composingWord.clear()
+            if (targetAction != EditorInfo.IME_ACTION_NONE) {
+                // Execute editor action (e.g. Play Store Search / Chrome Go / Form Send)
+                val handled = ic.performEditorAction(targetAction)
+                if (!handled) {
+                    if (!sendDefaultEditorAction(false)) {
+                        sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+                    }
+                }
+            } else {
+                // 2. Standard Enter / Return key (No explicit action)
+                if (isMultiLine) {
+                    // Multiline chat fields (WhatsApp, Telegram, Notes): Always insert a clean newline!
+                    ic.commitText("\n", 1)
+                } else if (isTerminalOrRawInput()) {
+                    // Termux / Terminal PTY: Send standard hardware enter key
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+                } else {
+                    // Standard single-line enter fallback
+                    if (!sendDefaultEditorAction(true)) {
+                        sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+                    }
+                }
+            }
+
             updateSuggestions()
+            updateAutoCapitalization()
         } catch (_: Throwable) {}
     }
 
