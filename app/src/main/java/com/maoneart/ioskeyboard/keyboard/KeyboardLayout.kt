@@ -44,6 +44,7 @@ class KeyboardLayout(private val context: Context) {
     fun updateReturnButton(editorInfo: EditorInfo?) {
         val btn = returnButtonRef ?: return
         if (editorInfo == null) {
+            btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
             btn.text = "↵"
             btn.textSize = 20f
             return
@@ -53,13 +54,15 @@ class KeyboardLayout(private val context: Context) {
         val variation = editorInfo.inputType and InputType.TYPE_MASK_VARIATION
         val isMultiLine = (editorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
 
-        // 1. Web Search or Filter: Show Search Icon (🔍)
+        // 1. Web Search or Filter: Show Flat White Search Icon (ic_search_white)
         if (imeAction == EditorInfo.IME_ACTION_SEARCH ||
             variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
-            btn.text = "🔍"
-            btn.textSize = 18f
+            btn.text = ""
+            btn.setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_search_white, 0, 0, 0)
             return
         }
+
+        btn.setCompoundDrawablesWithIntrinsicBounds(0, 0, 0, 0)
 
         // 2. Browser URL or Web Address: Show "Buka"
         if (imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI) {
@@ -101,7 +104,11 @@ class KeyboardLayout(private val context: Context) {
         isShifted: Boolean,
         isDark: Boolean,
         activeLanguage: String,
-        onKeyAction: (String) -> Unit
+        isSwipeEnabled: Boolean = true,
+        onKeyAction: (String) -> Unit,
+        onCursorMove: (Int) -> Unit = {},
+        onSwipeComplete: (List<Char>) -> Unit = {},
+        onSwipeHaptic: () -> Unit = {}
     ): View {
         letterKeyViews.clear()
 
@@ -175,7 +182,7 @@ class KeyboardLayout(private val context: Context) {
         r3Layout.addView(btnBackspace)
         root.addView(r3Layout)
 
-        // Row 4 (123 + Emoji Smiley + Space + Return/Enter)
+        // Row 4 (123 + iOS Flat Outline Smiley + Space + Dictation Mic + Return/Enter)
         val r4Layout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LinearLayout.LayoutParams(
@@ -187,7 +194,7 @@ class KeyboardLayout(private val context: Context) {
 
         // 123 Button
         val btn123 = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.3f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.25f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = "123"
@@ -200,37 +207,24 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btn123)
 
-        // Emoji Button (Apple Emoji Smiley with Tactile Bounce)
-        val btnEmoji = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
+        // Emoji Button (Apple iOS Outline Smiley Icon, Monochrome Tint)
+        val btnEmoji = ImageButton(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
-            text = "😊"
-            textSize = 21f
-            gravity = Gravity.CENTER
+            setImageResource(R.drawable.ic_emoji_smile)
+            setColorFilter(textColor)
+            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
             isClickable = true
             isFocusable = false
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.animate().scaleX(1.35f).scaleY(1.35f).setDuration(100).setInterpolator(OvershootInterpolator(2.5f)).start()
-                        onKeyAction("ACTION_EMOJI")
-                        true
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120).start()
-                        true
-                    }
-                    else -> false
-                }
-            }
+            setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
         }
         r4Layout.addView(btnEmoji)
 
-        // Space Button (with active language indicator)
+        // Space Button with Spacebar Trackpad Mode
         val langLabel = if (activeLanguage == "en") "space" else "spasi"
         val btnSpace = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.4f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.3f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = langLabel
@@ -239,13 +233,27 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupInstantTouch(this) { onKeyAction(" ") }
+            setupSpacebarTrackpadTouch(this, langLabel, isDark, { onKeyAction(" ") }, onCursorMove)
         }
         r4Layout.addView(btnSpace)
 
+        // Dictation Microphone Button (Apple iOS Monochrome Mic)
+        val btnMic = ImageButton(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
+                .apply { setMargins(dp(2), 0, dp(2), 0) }
+            background = ContextCompat.getDrawable(context, specialKeyBg)
+            setImageResource(R.drawable.ic_mic_ios)
+            setColorFilter(textColor)
+            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            isClickable = true
+            isFocusable = false
+            setupInstantTouch(this) { onKeyAction("ACTION_DICTATION") }
+        }
+        r4Layout.addView(btnMic)
+
         // Return / Enter Action Button (↵)
         val btnReturn = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.0f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             text = "↵"
@@ -260,14 +268,35 @@ class KeyboardLayout(private val context: Context) {
         r4Layout.addView(btnReturn)
         root.addView(r4Layout)
 
-        return root
+        val container = com.maoneart.ioskeyboard.keyboard.swipe.QuickPathContainerLayout(
+            context = context,
+            isSwipeEnabled = isSwipeEnabled,
+            findLetterAtCoords = { rx, ry -> findLetterAt(rx, ry) },
+            onSwipeCompleted = onSwipeComplete,
+            onSwipeCharDetected = onSwipeHaptic
+        )
+        container.setKeyboardContentView(root)
+        return container
+    }
+
+    private fun findLetterAt(rawX: Float, rawY: Float): String? {
+        val hitRect = android.graphics.Rect()
+        for ((tv, charStr) in letterKeyViews) {
+            if (!tv.isShown) continue
+            tv.getGlobalVisibleRect(hitRect)
+            if (hitRect.contains(rawX.toInt(), rawY.toInt())) {
+                return charStr
+            }
+        }
+        return null
     }
 
     // --- 2. SYMBOLS LAYOUT (123 & #+=) ---
     fun createSymbolsView(
         isMoreSymbols: Boolean,
         isDark: Boolean,
-        onKeyAction: (String) -> Unit
+        onKeyAction: (String) -> Unit,
+        onCursorMove: (Int) -> Unit = {}
     ): View {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -352,7 +381,7 @@ class KeyboardLayout(private val context: Context) {
         }
 
         val btnAbc = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.3f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.25f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = "ABC"
@@ -365,34 +394,21 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnAbc)
 
-        val btnEmoji = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
+        val btnEmoji = ImageButton(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
-            text = "😊"
-            textSize = 21f
-            gravity = Gravity.CENTER
+            setImageResource(R.drawable.ic_emoji_smile)
+            setColorFilter(textColor)
+            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
             isClickable = true
             isFocusable = false
-            setOnTouchListener { v, event ->
-                when (event.action) {
-                    MotionEvent.ACTION_DOWN -> {
-                        v.animate().scaleX(1.35f).scaleY(1.35f).setDuration(100).setInterpolator(OvershootInterpolator(2.5f)).start()
-                        onKeyAction("ACTION_EMOJI")
-                        true
-                    }
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120).start()
-                        true
-                    }
-                    else -> false
-                }
-            }
+            setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
         }
         r4.addView(btnEmoji)
 
         val btnSpace = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.4f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.3f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = "spasi"
@@ -401,13 +417,27 @@ class KeyboardLayout(private val context: Context) {
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupInstantTouch(this) { onKeyAction(" ") }
+            setupSpacebarTrackpadTouch(this, "spasi", isDark, { onKeyAction(" ") }, onCursorMove)
         }
         r4.addView(btnSpace)
 
+        // Dictation Microphone Button (Apple iOS Monochrome Mic)
+        val btnMic = ImageButton(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
+                .apply { setMargins(dp(2), 0, dp(2), 0) }
+            background = ContextCompat.getDrawable(context, specialKeyBg)
+            setImageResource(R.drawable.ic_mic_ios)
+            setColorFilter(textColor)
+            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            isClickable = true
+            isFocusable = false
+            setupInstantTouch(this) { onKeyAction("ACTION_DICTATION") }
+        }
+        r4.addView(btnMic)
+
         // Return / Enter Action Button (↵)
         val btnReturn = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.0f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
             text = "↵"
@@ -920,6 +950,103 @@ class KeyboardLayout(private val context: Context) {
             isFocusable = false
             isHapticFeedbackEnabled = true
             setupInstantTouch(this) { onKeyAction(text.toString()) }
+        }
+    }
+
+    // Apple iOS Spacebar Trackpad Cursor Mover
+    private fun setupSpacebarTrackpadTouch(
+        view: TextView,
+        defaultText: String,
+        isDark: Boolean,
+        onSpaceAction: () -> Unit,
+        onCursorMove: (Int) -> Unit
+    ) {
+        view.isHapticFeedbackEnabled = true
+        val handler = Handler(Looper.getMainLooper())
+        var isTrackpadActive = false
+        var startX = 0f
+        var lastStepX = 0f
+        val stepDistance = dp(14).toFloat()
+
+        val activateRunnable = Runnable {
+            isTrackpadActive = true
+            view.text = "│   geser kursor   │"
+            view.setTextColor(ContextCompat.getColor(context, R.color.ios_blue))
+            view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
+            try {
+                view.performHapticFeedback(
+                    android.view.HapticFeedbackConstants.LONG_PRESS,
+                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                )
+            } catch (_: Throwable) {}
+        }
+
+        view.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    startX = event.x
+                    lastStepX = event.x
+                    isTrackpadActive = false
+                    try {
+                        v.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
+                    handler.postDelayed(activateRunnable, 260L)
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (isTrackpadActive) {
+                        val deltaX = event.x - lastStepX
+                        if (deltaX > stepDistance) {
+                            val steps = (deltaX / stepDistance).toInt()
+                            for (i in 0 until steps) {
+                                onCursorMove(1)
+                            }
+                            lastStepX += steps * stepDistance
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+                        } else if (deltaX < -stepDistance) {
+                            val steps = (kotlin.math.abs(deltaX) / stepDistance).toInt()
+                            for (i in 0 until steps) {
+                                onCursorMove(-1)
+                            }
+                            lastStepX -= steps * stepDistance
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+                        }
+                    } else {
+                        if (kotlin.math.abs(event.x - startX) > dp(20)) {
+                            handler.removeCallbacks(activateRunnable)
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(activateRunnable)
+                    v.isPressed = false
+                    if (isTrackpadActive) {
+                        isTrackpadActive = false
+                        view.text = defaultText
+                        view.setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+                        view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
+                    } else {
+                        onSpaceAction()
+                    }
+                    true
+                }
+                else -> false
+            }
         }
     }
 

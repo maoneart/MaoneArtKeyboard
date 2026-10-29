@@ -493,7 +493,7 @@ class SmartCorrectionEngine(private val context: Context) {
         }
     }
 
-    private fun findKbbiPrefixMatches(prefix: String, maxCount: Int = 8): List<String> {
+    fun findKbbiPrefixMatches(prefix: String, maxCount: Int = 8): List<String> {
         val list = synchronized(kbbiWords) { if (kbbiWords.isEmpty()) emptyList() else ArrayList(kbbiWords) }
         if (list.isEmpty()) return emptyList()
 
@@ -503,7 +503,8 @@ class SmartCorrectionEngine(private val context: Context) {
         }
         val matches = ArrayList<String>()
         var count = 0
-        while (idx < list.size && count < maxCount * 3) {
+        val fetchLimit = (maxCount * 3).coerceAtLeast(maxCount)
+        while (idx < list.size && count < fetchLimit) {
             val candidate = list[idx]
             if (candidate.startsWith(prefix)) {
                 matches.add(candidate)
@@ -709,5 +710,24 @@ class SmartCorrectionEngine(private val context: Context) {
             }
         }
         return d[len1][len2]
+    }
+
+    /**
+     * Determines whether a candidate is a confident auto-correction match for a typed word.
+     */
+    fun isCorrectionMatch(typedWord: String, candidate: String): Boolean {
+        val typed = typedWord.trim().lowercase()
+        val cand = candidate.trim().lowercase()
+        if (typed.isEmpty() || cand.isEmpty()) return false
+        if (typed == cand) return false
+        if (typed.length < 2 || cand.length < 2) return false
+
+        // 1. Direct typo / abbreviation match
+        if (commonAbbreviations[typed]?.contains(cand) == true) return true
+
+        // 2. Damerau-Levenshtein distance <= 1 (or 2 for words with 4+ characters)
+        val maxDist = if (typed.length <= 3) 1 else 2
+        val dist = damerauLevenshtein(typed, cand)
+        return dist <= maxDist
     }
 }

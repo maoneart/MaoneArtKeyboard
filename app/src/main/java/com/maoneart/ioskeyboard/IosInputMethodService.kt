@@ -55,6 +55,9 @@ class IosInputMethodService : InputMethodService() {
     private lateinit var clipboardManager: ClipboardHistoryManager
     private lateinit var stickerManager: com.maoneart.ioskeyboard.sticker.StickerManager
     private lateinit var layoutEngine: KeyboardLayout
+    private lateinit var textReplacementManager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager
+    private lateinit var voiceDictationManager: com.maoneart.ioskeyboard.dictation.VoiceDictationManager
+    private lateinit var quickPathEngine: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathEngine
 
     private var currentMode = Mode.QWERTY
     private var isShifted = false
@@ -100,6 +103,27 @@ class IosInputMethodService : InputMethodService() {
             clipboardManager = ClipboardHistoryManager(this)
             stickerManager = com.maoneart.ioskeyboard.sticker.StickerManager(this)
             layoutEngine = KeyboardLayout(this)
+            textReplacementManager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
+            quickPathEngine = com.maoneart.ioskeyboard.keyboard.swipe.QuickPathEngine(correctionEngine)
+            voiceDictationManager = com.maoneart.ioskeyboard.dictation.VoiceDictationManager(
+                this,
+                onPartialResult = { partial ->
+                    candidate2?.text = "🎙️ $partial..."
+                },
+                onFinalResult = { text ->
+                    currentInputConnection?.commitText("$text ", 1)
+                    updateSuggestions()
+                },
+                onStatusChange = { isListening, statusMsg ->
+                    if (isListening) {
+                        candidate2?.text = "🎙️ $statusMsg"
+                    } else if (statusMsg.isNotEmpty() && statusMsg != "Selesai") {
+                        candidate2?.text = statusMsg
+                    } else {
+                        updateSuggestions()
+                    }
+                }
+            )
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in onCreate", t)
         }
@@ -559,17 +583,23 @@ class IosInputMethodService : InputMethodService() {
                     isShifted = isShifted || isCapsLock,
                     isDark = isDark,
                     activeLanguage = prefs.activeLanguage,
-                    onKeyAction = { handleKeyAction(it) }
+                    isSwipeEnabled = prefs.isSwipeTypingEnabled,
+                    onKeyAction = { handleKeyAction(it) },
+                    onCursorMove = { moveCursorBy(it) },
+                    onSwipeComplete = { handleSwipeComplete(it) },
+                    onSwipeHaptic = { audioHaptic.triggerHapticFeedback() }
                 )
                 Mode.SYMBOLS_123 -> layoutEngine.createSymbolsView(
                     isMoreSymbols = false,
                     isDark = isDark,
-                    onKeyAction = { handleKeyAction(it) }
+                    onKeyAction = { handleKeyAction(it) },
+                    onCursorMove = { moveCursorBy(it) }
                 )
                 Mode.SYMBOLS_MORE -> layoutEngine.createSymbolsView(
                     isMoreSymbols = true,
                     isDark = isDark,
-                    onKeyAction = { handleKeyAction(it) }
+                    onKeyAction = { handleKeyAction(it) },
+                    onCursorMove = { moveCursorBy(it) }
                 )
                 Mode.EMOJI -> layoutEngine.createEmojiView(
                     isDark = isDark,
@@ -598,6 +628,33 @@ class IosInputMethodService : InputMethodService() {
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in renderCurrentLayout", t)
         }
+    }
+
+    private fun moveCursorBy(direction: Int) {
+        try {
+            if (!prefs.isSpaceTrackpadEnabled) return
+            val ic = currentInputConnection ?: return
+            if (direction > 0) {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+            } else if (direction < 0) {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT))
+            }
+            audioHaptic.triggerHapticFeedback()
+            updateSuggestions()
+        } catch (_: Throwable) {}
+    }
+
+    private fun handleDictationAction() {
+        try {
+            if (!prefs.isDictationEnabled) return
+            if (voiceDictationManager.isListening) {
+                voiceDictationManager.stopListening()
+            } else {
+                voiceDictationManager.startListening(prefs.activeLanguage)
+            }
+        } catch (_: Throwable) {}
     }
 
     private fun handleKeyAction(action: String) {
@@ -633,6 +690,9 @@ class IosInputMethodService : InputMethodService() {
                 }
                 "ACTION_EMOJI" -> {
                     switchMode(Mode.EMOJI)
+                }
+                "ACTION_DICTATION" -> {
+                    handleDictationAction()
                 }
                 "ACTION_RETURN" -> {
                     handleReturn()
@@ -694,6 +754,59 @@ class IosInputMethodService : InputMethodService() {
     private fun handleSpace() {
         try {
             val (activeWord, _) = getTypingContext()
+
+            // 1. Apple Text Replacement on Space (e.g. "otw" -> "On the way")
+            if (activeWord.isNotEmpty()) {
+                val replacement = textReplacementManager.getReplacement(activeWord)
+                if (replacement != null) {
+                    val len = activeWord.length
+                    if (isTranslatePanelOpen) {
+                        val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                        if (pos >= len) {
+                            translatePanelBuffer.delete(pos - len, pos)
+                            translateCursorPosition = pos - len
+                        }
+                        translatePanelBuffer.insert(translateCursorPosition, "$replacement ")
+                        translateCursorPosition += replacement.length + 1
+                        updateTranslateInputBoxVisual()
+                    } else {
+                        currentInputConnection?.deleteSurroundingText(len, 0)
+                        currentInputConnection?.commitText("$replacement ", 1)
+                    }
+                    correctionEngine.recordWordUsage(replacement, 2)
+                    composingWord.clear()
+                    updateSuggestions()
+                    return
+                }
+            }
+
+            // 2. Apple Auto-Correction on Spacebar (replaces typo with center candidate)
+            if (prefs.isAutoCorrectEnabled && activeWord.length >= 3) {
+                val centerCandidate = candidate2?.text?.toString()?.trim() ?: ""
+                if (centerCandidate.isNotEmpty() && !centerCandidate.equals(activeWord, ignoreCase = true)) {
+                    if (correctionEngine.isCorrectionMatch(activeWord, centerCandidate)) {
+                        val len = activeWord.length
+                        if (isTranslatePanelOpen) {
+                            val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                            if (pos >= len) {
+                                translatePanelBuffer.delete(pos - len, pos)
+                                translateCursorPosition = pos - len
+                            }
+                            translatePanelBuffer.insert(translateCursorPosition, "$centerCandidate ")
+                            translateCursorPosition += centerCandidate.length + 1
+                            updateTranslateInputBoxVisual()
+                        } else {
+                            currentInputConnection?.deleteSurroundingText(len, 0)
+                            currentInputConnection?.commitText("$centerCandidate ", 1)
+                        }
+                        correctionEngine.recordWordUsage(centerCandidate, 2)
+                        composingWord.clear()
+                        updateSuggestions()
+                        return
+                    }
+                }
+            }
+
             if (activeWord.length >= 2) {
                 correctionEngine.recordWordUsage(activeWord, 1)
             }
@@ -883,7 +996,7 @@ class IosInputMethodService : InputMethodService() {
      */
     private fun updateSuggestions() {
         try {
-            if (!prefs.isAutoCorrectEnabled) {
+            if (!prefs.isPredictiveTextEnabled) {
                 candidate1?.text = ""
                 candidate2?.text = ""
                 candidate3?.text = ""
@@ -975,8 +1088,58 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    private fun handleSwipeComplete(swipedChars: List<Char>) {
+        try {
+            if (swipedChars.size < 2) return
+            audioHaptic.playClickSound()
+            audioHaptic.triggerHapticFeedback()
+
+            // Remove the 1 initial char that was committed on ACTION_DOWN
+            if (isTranslatePanelOpen) {
+                if (translatePanelBuffer.isNotEmpty() && translateCursorPosition > 0) {
+                    translatePanelBuffer.deleteCharAt(translateCursorPosition - 1)
+                    translateCursorPosition--
+                    updateTranslateInputBoxVisual()
+                }
+            } else {
+                currentInputConnection?.deleteSurroundingText(1, 0)
+            }
+            if (composingWord.isNotEmpty()) {
+                composingWord.deleteCharAt(composingWord.length - 1)
+            }
+
+            val matchedWord = quickPathEngine.matchSwipe(swipedChars, prefs.activeLanguage)
+            if (matchedWord != null) {
+                if (isTranslatePanelOpen) {
+                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                    translatePanelBuffer.insert(pos, "$matchedWord ")
+                    translateCursorPosition = pos + matchedWord.length + 1
+                    updateTranslateInputBoxVisual()
+                } else {
+                    currentInputConnection?.commitText("$matchedWord ", 1)
+                }
+                correctionEngine.recordWordUsage(matchedWord, 2)
+                composingWord.clear()
+                updateSuggestions()
+            } else {
+                val fallback = swipedChars.joinToString("")
+                if (isTranslatePanelOpen) {
+                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                    translatePanelBuffer.insert(pos, "$fallback ")
+                    translateCursorPosition = pos + fallback.length + 1
+                    updateTranslateInputBoxVisual()
+                } else {
+                    currentInputConnection?.commitText("$fallback ", 1)
+                }
+                composingWord.clear()
+                updateSuggestions()
+            }
+        } catch (_: Throwable) {}
+    }
+
     override fun onDestroy() {
         try {
+            voiceDictationManager.destroy()
             correctionEngine.flushUserDictionary()
             serviceScope.cancel()
         } catch (_: Throwable) {}

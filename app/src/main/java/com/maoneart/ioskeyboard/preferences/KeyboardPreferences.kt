@@ -53,4 +53,20 @@ class KeyboardPreferences(context: Context) {
     var translateTargetLang: String
         get() = prefs.getString("translate_target_lang", "en") ?: "en"
         set(value) = prefs.edit().putString("translate_target_lang", value).apply()
+
+    var isPredictiveTextEnabled: Boolean
+        get() = prefs.getBoolean("predictive_text_enabled", true)
+        set(value) = prefs.edit().putBoolean("predictive_text_enabled", value).apply()
+
+    var isSwipeTypingEnabled: Boolean
+        get() = prefs.getBoolean("swipe_typing_enabled", true)
+        set(value) = prefs.edit().putBoolean("swipe_typing_enabled", value).apply()
+
+    var isSpaceTrackpadEnabled: Boolean
+        get() = prefs.getBoolean("space_trackpad_enabled", true)
+        set(value) = prefs.edit().putBoolean("space_trackpad_enabled", value).apply()
+
+    var isDictationEnabled: Boolean
+        get() = prefs.getBoolean("dictation_enabled", true)
+        set(value) = prefs.edit().putBoolean("dictation_enabled", value).apply()
 }

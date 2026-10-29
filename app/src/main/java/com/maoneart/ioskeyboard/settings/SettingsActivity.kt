@@ -184,6 +184,26 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(Intent(this, LanguageDownloadActivity::class.java))
         }
 
+        findViewById<SwitchMaterial>(R.id.switchPredictiveText)?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isPredictiveTextEnabled = isChecked
+        }
+
+        findViewById<LinearLayout>(R.id.rowTextReplacement)?.setOnClickListener {
+            showTextReplacementDialog()
+        }
+
+        findViewById<SwitchMaterial>(R.id.switchSwipeTyping)?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isSwipeTypingEnabled = isChecked
+        }
+
+        findViewById<SwitchMaterial>(R.id.switchSpaceTrackpad)?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isSpaceTrackpadEnabled = isChecked
+        }
+
+        findViewById<SwitchMaterial>(R.id.switchDictation)?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isDictationEnabled = isChecked
+        }
+
         switchLiveTranslate.setOnCheckedChangeListener { _, isChecked ->
             prefs.isLiveTranslateEnabled = isChecked
         }
@@ -214,6 +234,10 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<SwitchMaterial>(R.id.switchHaptic).isChecked = prefs.isHapticEnabled
         findViewById<SwitchMaterial>(R.id.switchAutoCorrect).isChecked = prefs.isAutoCorrectEnabled
         findViewById<SwitchMaterial>(R.id.switchDoubleSpace).isChecked = prefs.isDoubleSpacePeriodEnabled
+        findViewById<SwitchMaterial>(R.id.switchPredictiveText)?.isChecked = prefs.isPredictiveTextEnabled
+        findViewById<SwitchMaterial>(R.id.switchSwipeTyping)?.isChecked = prefs.isSwipeTypingEnabled
+        findViewById<SwitchMaterial>(R.id.switchSpaceTrackpad)?.isChecked = prefs.isSpaceTrackpadEnabled
+        findViewById<SwitchMaterial>(R.id.switchDictation)?.isChecked = prefs.isDictationEnabled
         findViewById<SwitchMaterial>(R.id.switchLiveTranslate).isChecked = prefs.isLiveTranslateEnabled
     }
 
@@ -369,6 +393,79 @@ class SettingsActivity : AppCompatActivity() {
                 prefs.translateSourceLang = selected.first
                 prefs.translateTargetLang = selected.second
                 updateTranslatePairLabel()
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun showTextReplacementDialog() {
+        val manager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
+        val shortcuts = manager.getAllReplacements().toSortedMap()
+
+        val items = ArrayList<String>()
+        items.add("➕ Tambah Pintasan Baru")
+        for ((shortcut, phrase) in shortcuts) {
+            items.add("$shortcut ➔ $phrase")
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pintasan Teks (Text Replacement)")
+            .setItems(items.toTypedArray()) { _, which ->
+                if (which == 0) {
+                    showAddShortcutDialog(manager)
+                } else {
+                    val entry = shortcuts.entries.elementAt(which - 1)
+                    showManageShortcutDialog(manager, entry.key, entry.value)
+                }
+            }
+            .setPositiveButton("Tutup", null)
+            .show()
+    }
+
+    private fun showAddShortcutDialog(manager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager) {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 30, 50, 10)
+        }
+
+        val etShortcut = EditText(this).apply {
+            hint = "Singkatan (misal: otw, slm)"
+            setSingleLine(true)
+        }
+        val etPhrase = EditText(this).apply {
+            hint = "Frasa lengkap (misal: On the way)"
+            setSingleLine(true)
+        }
+
+        layout.addView(etShortcut)
+        layout.addView(etPhrase)
+
+        AlertDialog.Builder(this)
+            .setTitle("Tambah Pintasan Baru")
+            .setView(layout)
+            .setPositiveButton("Simpan") { _, _ ->
+                val s = etShortcut.text.toString().trim()
+                val p = etPhrase.text.toString().trim()
+                if (s.isNotEmpty() && p.isNotEmpty()) {
+                    manager.addOrUpdate(s, p)
+                    Toast.makeText(this, "Pintasan '$s' tersimpan", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Batal", null)
+            .show()
+    }
+
+    private fun showManageShortcutDialog(
+        manager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager,
+        shortcut: String,
+        phrase: String
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle("Pintasan: $shortcut")
+            .setMessage("Frasa saat ini:\n\"$phrase\"")
+            .setPositiveButton("Hapus") { _, _ ->
+                manager.remove(shortcut)
+                Toast.makeText(this, "Pintasan '$shortcut' dihapus", Toast.LENGTH_SHORT).show()
             }
             .setNegativeButton("Batal", null)
             .show()

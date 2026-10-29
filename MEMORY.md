@@ -81,3 +81,11 @@
     1. **Toolbar QuickType Lega**: Menghapus tombol emoji di sebelah clipboard di toolbar atas sehingga bilah saran kata mendapat ruang penuh yang lapang dan lega.
     2. **Perbaikan Total Scroll Emoji (Anti Salah Pencet)**: Mengganti touch listener yang mengonsumsi ACTION_DOWN dengan setOnClickListener standar Android sehingga gerakan usap scroll vertikal laci emoji 100% mulus dan tidak memicu pengetikan emoji tanpa sengaja saat menggulir.
     3. **Bilah Pemilih Bahasa Langsung di Keyboard**: Di panel terjemahan, kini terdapat deretan chip tombol bahasa instan (`🇺🇸 English`, `🇸🇦 Arab`, `🇯🇵 Jepang`, `🇰🇷 Korea`, `🇨🇳 Mandarin`, `🇪🇸 Spanyol`, `🇫🇷 Prancis`, `🇩🇪 Jerman`, dll) yang dapat diganti dengan 1-tap langsung dari keyboard tanpa perlu membuka menu pengaturan! Tersedia juga tombol `🌐 Semua...` untuk memilih puluhan bahasa dunia.
+  - 6 Fitur Unggulan Otentik iOS & Desain Ikon Datar Monokrom (Release v1.0.30):
+    1. **Predictive Text (Prediksi Kata QuickType)**: Bilah QuickType 3-slot memunculkan prediksi kata berikutnya berdasarkan N-gram percakapan dan kamus belajar mandiri.
+    2. **Dictation (Dikte / Mengetik dengan Suara)**: Tombol mikrofon monokrom (`ic_mic_ios.xml`) di baris ke-4 keyboard untuk input suara live via Android SpeechRecognizer.
+    3. **Auto-Correction**: Koreksi kata salah ketik otomatis saat menekan tombol spasi yang mencocokkan kata typo dengan kandidat tengah.
+    4. **QuickPath (Swipe Typing)**: Pengetikan usap antar tuts huruf tanpa mengangkat jari, dilengkapi jejak garis biru iOS (`SwipeTrailView`) dan pencocokan cerdas 75.000 kata KBBI (`QuickPathEngine`).
+    5. **Tombol Spasi Trackpad Kursor**: Tekan tahan tombol spasi (>260ms) mengaktifkan mode trackpad kursor ("│ geser kursor │") untuk menggeser posisi kursor teks kiri/kanan dengan tactile haptic feedback.
+    6. **Pintasan Teks (Text Replacement)**: Mengetik singkatan (`otw` ➔ `On the way`, `brb` ➔ `Be right back`, `asap`, `ty`, `gpp`, dll) otomatis berubah menjadi frasa lengkap saat menekan spasi, dilengkapi hub manajemen pintasan teks di Pengaturan.
+    7. **Ikon Search & Emoji Datar Monokrom Apple**: Mengganti emoji kuning 3D dan emoji search 3D dengan ikon outline putih datar (`ic_search_white.xml`) serta ikon wajah outline monokrom flat (`ic_emoji_smile.xml`) yang elegan dan otentik ala Apple iOS.
