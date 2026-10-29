@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.41)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.42)
 
 ---
 
@@ -197,3 +197,10 @@
        - Solusi: Menambahkan deteksi `isTerminalOrRawInput()` (deteksi `TYPE_NULL` dan package `com.termux`, `terminal`, `ssh`).
        - Saat berada di Termux, keyboard langsung mengirim `sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)` ke terminal PTY.
        - Penghapusan karakter single tap maupun tekan-tahan rapid repeating backspace kini berfungsi 100% lancar dan responsif di Termux.
+  - **Pemulihan Total Haptic Feedback & Vibrasi Tegas (Release v1.0.42)**:
+    1. **Restorasi Direct View Haptic pada Tuts Huruf**:
+       - Mengembalikan `v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)` langsung pada tuts huruf di `setupLetterKeyTouch` saat `ACTION_DOWN` (0ms delay).
+    2. **Kalibrasi Ulang Hardware Vibrator Motor**:
+       - Menghapus scaling buatan `0.35f` (8–24ms) yang sebelumnya berada di bawah ambang inersia motor vibrator HP Android.
+       - Mengembalikan durasi pulsa penuh sesuai preferensi pengguna `prefs.hapticStrength` (terkalibrasi 45ms) dengan amplitude 120–255 dan sonification audio attributes.
+       - Sensasi getaran kembali tegas, empuk, dan responsif di setiap tombol huruf, angka, simbol, maupun fungsi.

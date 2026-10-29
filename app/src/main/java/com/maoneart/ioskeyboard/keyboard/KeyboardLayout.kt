@@ -1599,13 +1599,19 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated)
+    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback)
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         view.setOnTouchListener { v, event ->
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
+                    try {
+                        v.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
                     popupController?.showPopupForKey(v, view.text.toString())
                     onTrigger()
                     true
