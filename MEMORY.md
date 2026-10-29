@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.36)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.37)
 
 ---
 
@@ -140,3 +140,13 @@
        - Mengatasi masalah keyboard meninggi/tertarik ke atas akibat intrinsic height gambar background 1920px.
        - Memotong `woody_bg.jpg` ke dimensi proporsional keyboard (1080x650) dan menetapkan `minimumHeight = 0` serta `android:minHeight="0dp"` pada `keyboardRoot`.
        - Tinggi keyboard tema Woody kini 100% sama dan proporsional persis seperti tema Light dan Dark (279dp).
+  - Perbaikan Crash Hapus Stiker & Swipe Typing QuickPath Mulus (Release v1.0.37):
+    1. **Perbaikan Crash Stiker Long-Press (MaoneArt Glassmorphism In-Layout Modal)**:
+       - Menghapus pemanggilan android.app.AlertDialog.Builder yang memicu BadTokenException fatal saat dijalankan dari context InputMethodService.
+       - Menerapkan showDeleteStickerModal berbasis FrameLayout overlay in-layout sesuai MaoneArt Glassmorphism Modal Standard (overlay #99000000, card rounded, preview gambar stiker, teks konfirmasi, dan 2-kolom tombol simetris Batal & 🗑️ Hapus).
+    2. **Perbaikan Tuntas QuickPath (Swipe / Gesture Typing)**:
+       - Mengganti getGlobalVisibleRect dengan tv.getLocationOnScreen(loc) untuk deteksi koordinat fisik layar yang sinkron dengan ev.rawX, ev.rawY.
+       - 2-pass key detection: Pass 1 bounding box tuts dengan toleransi 4dp, Pass 2 nearest center distance snap (28dp) menghilangkan dead zone antar-tuts saat sapuan jari berlangsung.
+       - Kalibrasi touchSlop dari 22dp ke 12dp dan auto-recovery titik awal sapuan untuk responsivitas instan.
+       - Algoritma pencocokan kata cerdas findSwipeCandidates memadukan kata frekuensi tinggi percakapan, user dictionary, dan 75.000 kata KBBI berbasis awalan dan akhiran kata, didukung subsequence matching dengan repeat-collapsing (misal "saat" cocok dari sapuan "sat").
+       - Penanganan auto-capitalization terintegrasi: Hasil swipe di awal kalimat atau saat shifted otomatis berhuruf awal kapital ("Saya ").

@@ -328,15 +328,45 @@ class KeyboardLayout(private val context: Context) {
     }
 
     private fun findLetterAt(rawX: Float, rawY: Float): String? {
-        val hitRect = android.graphics.Rect()
+        val loc = IntArray(2)
+        val rx = rawX.toInt()
+        val ry = rawY.toInt()
+
+        // 1. Direct hit on key bounding box with 4dp margin tolerance
+        val tol = dp(4)
         for ((tv, charStr) in letterKeyViews) {
             if (!tv.isShown) continue
-            tv.getGlobalVisibleRect(hitRect)
-            if (hitRect.contains(rawX.toInt(), rawY.toInt())) {
+            tv.getLocationOnScreen(loc)
+            val left = loc[0] - tol
+            val top = loc[1] - tol
+            val right = loc[0] + tv.width + tol
+            val bottom = loc[1] + tv.height + tol
+            if (rx in left..right && ry in top..bottom) {
                 return charStr
             }
         }
-        return null
+
+        // 2. Nearest key center within snap radius (28dp) for fluid gesture sweeps
+        var closestChar: String? = null
+        var closestDistSq = Float.MAX_VALUE
+        val maxSnapRadius = dp(28).toFloat()
+        val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
+
+        for ((tv, charStr) in letterKeyViews) {
+            if (!tv.isShown) continue
+            tv.getLocationOnScreen(loc)
+            val centerX = loc[0] + tv.width / 2f
+            val centerY = loc[1] + tv.height / 2f
+            val dx = rawX - centerX
+            val dy = rawY - centerY
+            val distSq = dx * dx + dy * dy
+            if (distSq < closestDistSq && distSq <= maxSnapRadiusSq) {
+                closestDistSq = distSq
+                closestChar = charStr
+            }
+        }
+
+        return closestChar
     }
 
     // --- 2. SYMBOLS LAYOUT (123 & #+=) ---
@@ -526,12 +556,134 @@ class KeyboardLayout(private val context: Context) {
         onAddStickerAction: () -> Unit,
         onBackAction: () -> Unit
     ): View {
-        val root = LinearLayout(context).apply {
+        val root = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val mainLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
+        }
+
+        // Modal Action Container (Overlay Glassmorphism)
+        var modalOverlay: FrameLayout? = null
+
+        fun hideModal() {
+            modalOverlay?.let { root.removeView(it) }
+            modalOverlay = null
+        }
+
+        fun showDeleteStickerModal(stickerFile: java.io.File, onDeleted: () -> Unit) {
+            hideModal()
+            val overlay = FrameLayout(context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setBackgroundColor(Color.parseColor("#99000000"))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { hideModal() }
+            }
+
+            val dialogCard = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                ).apply { setMargins(dp(28), 0, dp(28), 0) }
+                background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.card_bg_ios)
+                setPadding(dp(18), dp(16), dp(18), dp(16))
+                isClickable = true
+            }
+
+            // Preview Image
+            val ivPreview = android.widget.ImageView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(72), dp(72)).apply {
+                    setMargins(0, 0, 0, dp(10))
+                }
+                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                try {
+                    val bmp = android.graphics.BitmapFactory.decodeFile(stickerFile.absolutePath)
+                    setImageBitmap(bmp)
+                } catch (_: Throwable) {}
+            }
+            dialogCard.addView(ivPreview)
+
+            val tvTitle = TextView(context).apply {
+                text = "Hapus Stiker?"
+                textSize = 15.5f
+                setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                gravity = Gravity.CENTER
+            }
+            dialogCard.addView(tvTitle)
+
+            val tvSubtitle = TextView(context).apply {
+                text = "Stiker ini akan dihapus permanen dari keyboard."
+                textSize = 12f
+                setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+                gravity = Gravity.CENTER
+                setPadding(0, dp(4), 0, dp(12))
+            }
+            dialogCard.addView(tvSubtitle)
+
+            // Symmetrical 2-Column Action Grid (MaoneArt Glassmorphism Modal Rule)
+            val btnRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(42)
+                )
+            }
+
+            // Button 1: Batal
+            val btnCancel = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                    setMargins(0, 0, dp(6), 0)
+                }
+                background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_special_light)
+                text = "Batal"
+                setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+                textSize = 13.5f
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) { hideModal() }
+            }
+            btnRow.addView(btnCancel)
+
+            // Button 2: Hapus
+            val btnDelete = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                    setMargins(dp(6), 0, 0, 0)
+                }
+                background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_special_light)
+                text = "🗑️ Hapus"
+                setTextColor(Color.parseColor("#FF3B30"))
+                textSize = 13.5f
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) {
+                    hideModal()
+                    onDeleted()
+                }
+            }
+            btnRow.addView(btnDelete)
+            dialogCard.addView(btnRow)
+
+            overlay.addView(dialogCard)
+            modalOverlay = overlay
+            root.addView(overlay)
         }
 
         // Top Category Bar (Smileys, Hands, Hearts, Animals, Food, Activities, Symbols, Stickers, + Add)
@@ -647,15 +799,11 @@ class KeyboardLayout(private val context: Context) {
                             }
 
                             setOnLongClickListener {
-                                android.app.AlertDialog.Builder(context)
-                                    .setTitle("Hapus Stiker")
-                                    .setMessage("Hapus stiker ini dari keyboard?")
-                                    .setPositiveButton("Hapus") { _, _ ->
-                                        stickerManager.deleteSticker(stickerFile)
-                                        renderContent("STICKERS")
-                                    }
-                                    .setNegativeButton("Batal", null)
-                                    .show()
+                                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                showDeleteStickerModal(stickerFile) {
+                                    stickerManager.deleteSticker(stickerFile)
+                                    renderContent("STICKERS")
+                                }
                                 true
                             }
                         }
@@ -817,13 +965,13 @@ class KeyboardLayout(private val context: Context) {
         }
 
         tabsScroll.addView(tabsLayout)
-        root.addView(tabsScroll)
+        mainLayout.addView(tabsScroll)
 
         // Initial content render
         updateTabStyles()
         renderContent(activeCat)
 
-        root.addView(contentContainer)
+        mainLayout.addView(contentContainer)
 
         // Bottom Bar (ABC + Backspace)
         val bottomBar = LinearLayout(context).apply {
@@ -862,8 +1010,9 @@ class KeyboardLayout(private val context: Context) {
             setupRapidBackspaceTouch(this) { onEmojiAction("ACTION_BACKSPACE") }
         }
         bottomBar.addView(btnBackspace)
-        root.addView(bottomBar)
+        mainLayout.addView(bottomBar)
 
+        root.addView(mainLayout)
         return root
     }
 

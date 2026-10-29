@@ -1265,6 +1265,8 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.playClickSound()
             audioHaptic.triggerHapticFeedback()
 
+            val shouldCapitalize = (isCapsLock || (composingWord.isNotEmpty() && composingWord.first().isUpperCase()))
+
             // Remove the 1 initial char that was committed on ACTION_DOWN
             if (isTranslatePanelOpen) {
                 if (translatePanelBuffer.isNotEmpty() && translateCursorPosition > 0) {
@@ -1279,7 +1281,13 @@ class IosInputMethodService : InputMethodService() {
                 composingWord.deleteCharAt(composingWord.length - 1)
             }
 
-            val matchedWord = quickPathEngine.matchSwipe(swipedChars, prefs.activeLanguage)
+            val rawMatched = quickPathEngine.matchSwipe(swipedChars, prefs.activeLanguage)
+            val matchedWord = if (rawMatched != null && shouldCapitalize) {
+                rawMatched.replaceFirstChar { it.uppercase() }
+            } else {
+                rawMatched
+            }
+
             if (matchedWord != null) {
                 if (isTranslatePanelOpen) {
                     val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
@@ -1289,12 +1297,13 @@ class IosInputMethodService : InputMethodService() {
                 } else {
                     currentInputConnection?.commitText("$matchedWord ", 1)
                 }
-                correctionEngine.recordWordUsage(matchedWord, 2)
+                correctionEngine.recordWordUsage(rawMatched ?: matchedWord, 2)
                 composingWord.clear()
                 updateSuggestions()
                 updateAutoCapitalization()
             } else {
-                val fallback = swipedChars.joinToString("")
+                val rawFallback = swipedChars.joinToString("")
+                val fallback = if (shouldCapitalize) rawFallback.replaceFirstChar { it.uppercase() } else rawFallback
                 if (isTranslatePanelOpen) {
                     val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
                     translatePanelBuffer.insert(pos, "$fallback ")

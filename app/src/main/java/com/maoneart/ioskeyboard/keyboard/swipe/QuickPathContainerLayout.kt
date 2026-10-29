@@ -23,7 +23,7 @@ class QuickPathContainerLayout(
         isFocusable = false
     }
 
-    private val touchSlop = 22f * resources.displayMetrics.density
+    private val touchSlop = 12f * resources.displayMetrics.density
 
     init {
         addView(
@@ -57,12 +57,30 @@ class QuickPathContainerLayout(
                 return false
             }
             MotionEvent.ACTION_MOVE -> {
-                if (swipedChars.isNotEmpty() && !isSwiping) {
+                if (!isSwiping) {
                     val dist = hypot((ev.rawX - startX).toDouble(), (ev.rawY - startY).toDouble()).toFloat()
                     if (dist > touchSlop) {
-                        isSwiping = true
-                        swipeTrailView.addPoint(ev.x, ev.y)
-                        return true // Intercept touch! Letter key gets ACTION_CANCEL
+                        // If swipedChars was empty on DOWN, try detecting initial letter at start coords or current coords
+                        if (swipedChars.isEmpty()) {
+                            val startCh = findLetterAtCoords(startX, startY) ?: findLetterAtCoords(ev.rawX, ev.rawY)
+                            if (!startCh.isNullOrEmpty() && startCh[0].isLetter()) {
+                                swipedChars.add(startCh[0].lowercaseChar())
+                            }
+                        }
+
+                        if (swipedChars.isNotEmpty()) {
+                            isSwiping = true
+                            swipeTrailView.addPoint(ev.x, ev.y)
+                            val currentCh = findLetterAtCoords(ev.rawX, ev.rawY)
+                            if (!currentCh.isNullOrEmpty() && currentCh[0].isLetter()) {
+                                val c = currentCh[0].lowercaseChar()
+                                if (swipedChars.last() != c) {
+                                    swipedChars.add(c)
+                                    onSwipeCharDetected()
+                                }
+                            }
+                            return true // Intercept touch! Letter key gets ACTION_CANCEL
+                        }
                     }
                 }
                 return isSwiping
@@ -82,16 +100,18 @@ class QuickPathContainerLayout(
 
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
-                swipeTrailView.addPoint(ev.x, ev.y)
-                val ch = findLetterAtCoords(ev.rawX, ev.rawY)
-                if (!ch.isNullOrEmpty() && ch[0].isLetter()) {
-                    val c = ch[0].lowercaseChar()
-                    if (swipedChars.isEmpty() || swipedChars.last() != c) {
-                        swipedChars.add(c)
-                        onSwipeCharDetected()
+                if (isSwiping) {
+                    swipeTrailView.addPoint(ev.x, ev.y)
+                    val ch = findLetterAtCoords(ev.rawX, ev.rawY)
+                    if (!ch.isNullOrEmpty() && ch[0].isLetter()) {
+                        val c = ch[0].lowercaseChar()
+                        if (swipedChars.isEmpty() || swipedChars.last() != c) {
+                            swipedChars.add(c)
+                            onSwipeCharDetected()
+                        }
                     }
+                    return true
                 }
-                return true
             }
             MotionEvent.ACTION_UP -> {
                 swipeTrailView.clearTrail()

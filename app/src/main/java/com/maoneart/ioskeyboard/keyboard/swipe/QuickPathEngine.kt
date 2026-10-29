@@ -26,15 +26,8 @@ class QuickPathEngine(private val correctionEngine: SmartCorrectionEngine) {
         val endChar = cleanLetters.last()
         val targetLettersStr = cleanLetters.joinToString("")
 
-        // Gather dictionary candidates starting with startChar & 2-letter prefix from 75k KBBI
-        val candidatePool = linkedSetOf<String>()
-
-        if (cleanLetters.size >= 2) {
-            val prefix2 = "${cleanLetters[0]}${cleanLetters[1]}"
-            candidatePool.addAll(correctionEngine.findKbbiPrefixMatches(prefix2, 250))
-        }
-        candidatePool.addAll(correctionEngine.findKbbiPrefixMatches(startChar.toString(), 250))
-        candidatePool.addAll(correctionEngine.getSuggestions(startChar.toString(), lang))
+        // Gather candidates starting with startChar and ending near/at endChar
+        val candidatePool = correctionEngine.findSwipeCandidates(startChar, endChar, lang)
 
         var bestWord: String? = null
         var bestScore = Int.MAX_VALUE
@@ -46,17 +39,23 @@ class QuickPathEngine(private val correctionEngine: SmartCorrectionEngine) {
             // Must match starting character
             if (candLower.first() != startChar) continue
 
-            // Must be subsequence in the swipe trace
+            // Must be subsequence in the swipe trace (supporting collapsed repeats like 'saat' -> 'sat')
             if (!isSubsequence(candLower, targetLettersStr)) continue
 
             val endsMatch = (candLower.last() == endChar)
 
-            // Scoring: lower score is better match
-            var score = abs(candLower.length - cleanLetters.size) * 8
+            // Length difference penalty
+            var score = abs(candLower.length - cleanLetters.size) * 6
+
+            // High priority boost for common everyday words and user vocabulary
+            if (correctionEngine.isCommonWord(candLower)) {
+                score -= 40
+            }
+
             if (endsMatch) {
-                score -= 30 // High boost when end letter matches perfectly
+                score -= 25 // High boost when ending letter matches exactly
             } else {
-                score += 45 // Penalty when ending letter differs
+                score += 35 // Moderate penalty when ending letter is a QWERTY neighbor
             }
 
             if (score < bestScore) {
@@ -65,7 +64,12 @@ class QuickPathEngine(private val correctionEngine: SmartCorrectionEngine) {
             }
         }
 
-        // If no candidate from prefix matches, try looking at top KBBI words for startChar
+        // If no candidate from pool, try exact 2-letter fallback
+        if (bestWord == null && cleanLetters.size == 2) {
+            bestWord = targetLettersStr
+        }
+
+        // If still null, try looking at suggestions for the first 3 letters
         if (bestWord == null) {
             val fallbackMatches = correctionEngine.getSuggestions(cleanLetters.take(3).joinToString(""), lang)
             if (fallbackMatches.isNotEmpty()) {
@@ -76,15 +80,27 @@ class QuickPathEngine(private val correctionEngine: SmartCorrectionEngine) {
         return bestWord
     }
 
+    private fun collapseConsecutiveRepeats(s: String): String {
+        val sb = StringBuilder()
+        for (ch in s) {
+            if (sb.isEmpty() || sb.last() != ch) {
+                sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
     private fun isSubsequence(needle: String, haystack: String): Boolean {
+        // Match both exact needle and collapsed needle (e.g. 'saat' matches 'sat')
+        val needleCollapsed = collapseConsecutiveRepeats(needle)
         var i = 0
         var j = 0
-        while (i < needle.length && j < haystack.length) {
-            if (needle[i] == haystack[j]) {
+        while (i < needleCollapsed.length && j < haystack.length) {
+            if (needleCollapsed[i] == haystack[j]) {
                 i++
             }
             j++
         }
-        return i == needle.length
+        return i == needleCollapsed.length
     }
 }

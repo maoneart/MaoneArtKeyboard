@@ -518,6 +518,81 @@ class SmartCorrectionEngine(private val context: Context) {
     }
 
     /**
+     * Checks if a word belongs to the high-frequency common Indonesian words or user's dictionary
+     */
+    fun isCommonWord(word: String): Boolean {
+        val w = word.lowercase()
+        return indonesianWords.contains(w) || userDictionary.containsKey(w) || nextWordMapId.containsKey(w)
+    }
+
+    /**
+     * Gathers all candidate words matching the gesture swipe start and end characters.
+     * Uses indexed search across user dictionary, common words, next-word predictions, and 75k KBBI.
+     */
+    fun findSwipeCandidates(startChar: Char, endChar: Char, lang: String): List<String> {
+        val candidates = LinkedHashSet<String>()
+        val startStr = startChar.toString()
+        val neighbors = qwertyNeighbors[endChar] ?: ""
+
+        // 1. User typed words (highest priority personal dictionary)
+        for ((word, _) in userDictionary) {
+            if (word.length >= 2 && word.first() == startChar) {
+                if (word.last() == endChar || neighbors.contains(word.last())) {
+                    candidates.add(word)
+                }
+            }
+        }
+
+        // 2. High Frequency everyday words
+        for (word in indonesianWords) {
+            if (word.length >= 2 && word.first() == startChar) {
+                if (word.last() == endChar || neighbors.contains(word.last())) {
+                    candidates.add(word)
+                }
+            }
+        }
+
+        // 3. Next-Word Prediction keywords
+        for (word in nextWordMapId.keys) {
+            if (word.length >= 2 && word.first() == startChar) {
+                if (word.last() == endChar || neighbors.contains(word.last())) {
+                    candidates.add(word)
+                }
+            }
+        }
+
+        // 4. English words if active language is English
+        if (lang == "en") {
+            for (word in nextWordMapEn.keys) {
+                if (word.length >= 2 && word.first() == startChar) {
+                    if (word.last() == endChar || neighbors.contains(word.last())) {
+                        candidates.add(word)
+                    }
+                }
+            }
+        }
+
+        // 5. 75,000 KBBI Dictionary (Indexed binary search by startChar)
+        val list = synchronized(kbbiWords) { if (kbbiWords.isEmpty()) emptyList() else ArrayList(kbbiWords) }
+        if (list.isNotEmpty()) {
+            var idx = Collections.binarySearch(list, startStr)
+            if (idx < 0) {
+                idx = -(idx + 1)
+            }
+            while (idx < list.size) {
+                val w = list[idx]
+                if (!w.startsWith(startStr)) break
+                if (w.length >= 2 && (w.last() == endChar || neighbors.contains(w.last()))) {
+                    candidates.add(w)
+                }
+                idx++
+            }
+        }
+
+        return candidates.toList()
+    }
+
+    /**
      * Next-Word Prediction for continuous predictive typing ("Nulis Otomatis")
      * Triggered when cursor follows a space or punctuation.
      */
