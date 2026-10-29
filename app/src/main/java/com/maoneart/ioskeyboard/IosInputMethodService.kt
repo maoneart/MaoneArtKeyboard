@@ -6,6 +6,8 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.inputmethodservice.InputMethodService
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.text.TextUtils
 import android.text.Spannable
@@ -72,6 +74,8 @@ class IosInputMethodService : InputMethodService() {
     private var translateCursorPosition = 0
     private val composingWord = StringBuilder()
     private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
+    private val suggestionHandler = Handler(Looper.getMainLooper())
+    private var suggestionRunnable: Runnable? = null
 
     // View References
     private var rootView: View? = null
@@ -893,11 +897,11 @@ class IosInputMethodService : InputMethodService() {
                 translateCursorPosition = pos + charStr.length
                 updateTranslateInputBoxVisual()
                 tvTranslateStatus?.text = "Kalimat siap (${prefs.translateSourceLang.uppercase()} ➔ ${prefs.translateTargetLang.uppercase()})"
-                updateSuggestions()
+                updateSuggestions(immediate = false)
             } else {
                 currentInputConnection?.commitText(charStr, 1)
                 composingWord.append(charStr)
-                updateSuggestions()
+                updateSuggestions(immediate = false)
             }
 
             if (isShifted && !isCapsLock) {
@@ -913,8 +917,10 @@ class IosInputMethodService : InputMethodService() {
             if (isTranslatePanelOpen) {
                 if (translatePanelBuffer.isNotEmpty() && translateCursorPosition > 0) {
                     val pos = translateCursorPosition.coerceIn(1, translatePanelBuffer.length)
-                    translatePanelBuffer.deleteCharAt(pos - 1)
-                    translateCursorPosition = pos - 1
+                    val charBefore = translatePanelBuffer[pos - 1]
+                    val charsToDelete = if (Character.isLowSurrogate(charBefore) && pos >= 2 && Character.isHighSurrogate(translatePanelBuffer[pos - 2])) 2 else 1
+                    translatePanelBuffer.delete(pos - charsToDelete, pos)
+                    translateCursorPosition = pos - charsToDelete
                     updateTranslateInputBoxVisual()
                 }
                 updateSuggestions()
@@ -923,9 +929,31 @@ class IosInputMethodService : InputMethodService() {
             }
 
             if (composingWord.isNotEmpty()) {
-                composingWord.deleteCharAt(composingWord.length - 1)
+                val lastIdx = composingWord.length - 1
+                val lastCh = composingWord[lastIdx]
+                val charsToDel = if (Character.isLowSurrogate(lastCh) && composingWord.length >= 2 && Character.isHighSurrogate(composingWord[lastIdx - 1])) 2 else 1
+                composingWord.delete(composingWord.length - charsToDel, composingWord.length)
             }
-            currentInputConnection?.deleteSurroundingText(1, 0)
+
+            val ic = currentInputConnection
+            if (ic != null) {
+                val deleted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    ic.deleteSurroundingTextInCodePoints(1, 0)
+                } else {
+                    false
+                }
+                if (!deleted) {
+                    val textBefore = ic.getTextBeforeCursor(4, 0)?.toString()
+                    if (!textBefore.isNullOrEmpty()) {
+                        val lastChar = textBefore.last()
+                        val charsToDelete = if (Character.isLowSurrogate(lastChar) && textBefore.length >= 2 && Character.isHighSurrogate(textBefore[textBefore.length - 2])) 2 else 1
+                        ic.deleteSurroundingText(charsToDelete, 0)
+                    } else {
+                        ic.deleteSurroundingText(1, 0)
+                    }
+                }
+            }
+
             updateSuggestions()
             updateAutoCapitalization()
         } catch (_: Throwable) {}
@@ -1131,56 +1159,78 @@ class IosInputMethodService : InputMethodService() {
      */
     private fun getTypingContext(): Pair<String, String> {
         try {
-            val textBefore: String = if (isTranslatePanelOpen) {
+            if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
-                translatePanelBuffer.substring(0, pos)
-            } else {
-                val ic = currentInputConnection
-                val chars = ic?.getTextBeforeCursor(60, 0)
-                chars?.toString() ?: composingWord.toString()
+                val textBefore = translatePanelBuffer.substring(0, pos)
+                if (textBefore.isEmpty()) return Pair("", "")
+                return extractWordsFromContext(textBefore)
             }
 
+            // Fast-path in-memory: while user is actively typing a word, return immediately without Binder IPC!
+            if (composingWord.isNotEmpty()) {
+                return Pair(composingWord.toString(), "")
+            }
+
+            val ic = currentInputConnection
+            val chars = ic?.getTextBeforeCursor(60, 0)
+            val textBefore = chars?.toString() ?: ""
             if (textBefore.isEmpty()) return Pair("", "")
 
-            // If cursor directly follows a space or punctuation:
-            if (textBefore.last().isWhitespace() || textBefore.last() in ".,!?") {
-                val trimmed = textBefore.trimEnd { it.isWhitespace() || it in ".,!?" }
-                if (trimmed.isEmpty()) return Pair("", "")
-                var i = trimmed.length - 1
-                while (i >= 0 && !trimmed[i].isWhitespace() && trimmed[i] !in ".,!?\n") {
-                    i--
-                }
-                val lastWord = trimmed.substring(i + 1)
-                return Pair("", lastWord)
-            }
-
-            // Otherwise, cursor is at the end of a word being typed or backspaced:
-            var i = textBefore.length - 1
-            while (i >= 0 && !textBefore[i].isWhitespace() && textBefore[i] !in ".,!?\n") {
-                i--
-            }
-            val currentWord = textBefore.substring(i + 1)
-
-            // Also find previous word before this current word
-            val priorText = textBefore.substring(0, (i + 1).coerceAtLeast(0)).trimEnd { it.isWhitespace() || it in ".,!?" }
-            var j = priorText.length - 1
-            while (j >= 0 && !priorText[j].isWhitespace() && priorText[j] !in ".,!?\n") {
-                j--
-            }
-            val previousWord = if (priorText.isNotEmpty()) priorText.substring(j + 1) else ""
-
-            return Pair(currentWord, previousWord)
+            return extractWordsFromContext(textBefore)
         } catch (_: Throwable) {
             return Pair(composingWord.toString(), "")
         }
     }
 
+    private fun extractWordsFromContext(textBefore: String): Pair<String, String> {
+        // If cursor directly follows a space or punctuation:
+        if (textBefore.last().isWhitespace() || textBefore.last() in ".,!?") {
+            val trimmed = textBefore.trimEnd { it.isWhitespace() || it in ".,!?" }
+            if (trimmed.isEmpty()) return Pair("", "")
+            var i = trimmed.length - 1
+            while (i >= 0 && !trimmed[i].isWhitespace() && trimmed[i] !in ".,!?\n") {
+                i--
+            }
+            val lastWord = trimmed.substring(i + 1)
+            return Pair("", lastWord)
+        }
+
+        // Otherwise, cursor is at the end of a word being typed or backspaced:
+        var i = textBefore.length - 1
+        while (i >= 0 && !textBefore[i].isWhitespace() && textBefore[i] !in ".,!?\n") {
+            i--
+        }
+        val currentWord = textBefore.substring(i + 1)
+
+        // Also find previous word before this current word
+        val priorText = textBefore.substring(0, (i + 1).coerceAtLeast(0)).trimEnd { it.isWhitespace() || it in ".,!?" }
+        var j = priorText.length - 1
+        while (j >= 0 && !priorText[j].isWhitespace() && priorText[j] !in ".,!?\n") {
+            j--
+        }
+        val previousWord = if (priorText.isNotEmpty()) priorText.substring(j + 1) else ""
+
+        return Pair(currentWord, previousWord)
+    }
+
     /**
      * Updates QuickType Candidate Bar:
-     * - In-word typing -> Typo correction, Slang expansion, Prefix completions
-     * - Space boundary -> Next-Word Prediction for continuous automatic sentence writing ("Nulis Otomatis")
+     * - In-word typing -> Typo correction, Slang expansion, Prefix completions (debounced 20ms)
+     * - Space boundary / backspace -> Next-Word Prediction / Instant Update
      */
-    private fun updateSuggestions() {
+    private fun updateSuggestions(immediate: Boolean = true) {
+        if (!immediate) {
+            suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
+            val r = Runnable { executeSuggestionUpdate() }
+            suggestionRunnable = r
+            suggestionHandler.postDelayed(r, 20L)
+            return
+        }
+        suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
+        executeSuggestionUpdate()
+    }
+
+    private fun executeSuggestionUpdate() {
         try {
             if (!prefs.isPredictiveTextEnabled) {
                 candidate1?.text = ""
@@ -1192,8 +1242,17 @@ class IosInputMethodService : InputMethodService() {
             val (currentWord, previousWord) = getTypingContext()
 
             val suggestions = if (currentWord.isNotEmpty()) {
-                // User is actively typing or backspacing a word
-                correctionEngine.getSuggestions(currentWord, prefs.activeLanguage)
+                // Periksa apakah kata yang sedang diketik cocok dengan singkatan Text Replacement
+                val shortcutMatch = textReplacementManager.getReplacement(currentWord)
+                val rawSuggs = correctionEngine.getSuggestions(currentWord, prefs.activeLanguage)
+                if (shortcutMatch != null) {
+                    val list = mutableListOf<String>()
+                    list.add("⚡ $shortcutMatch")
+                    list.addAll(rawSuggs.filter { !it.equals(shortcutMatch, ignoreCase = true) })
+                    list
+                } else {
+                    rawSuggs
+                }
             } else if (previousWord.isNotEmpty()) {
                 // User pressed space: continuous predictive typing ("Nulis Otomatis")
                 correctionEngine.getNextWordPredictions(previousWord, prefs.activeLanguage)
@@ -1228,6 +1287,12 @@ class IosInputMethodService : InputMethodService() {
 
     private fun formatCandidateCase(candidate: String, original: String): String {
         if (original.isEmpty()) return candidate
+        if (candidate.startsWith("⚡ ")) {
+            val phrase = candidate.removePrefix("⚡ ").trim()
+            val formatted = if (original[0].isUpperCase()) phrase.replaceFirstChar { it.uppercase() } else phrase
+            return "⚡ $formatted"
+        }
+        if (candidate.startsWith("✦ ")) return candidate
         if (original.all { it.isUpperCase() } && original.length > 1) {
             return candidate.uppercase()
         }
@@ -1243,11 +1308,19 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.playClickSound()
             audioHaptic.triggerHapticFeedback()
 
+            var cleanCandidate = candidate.trim()
+            if (cleanCandidate.startsWith("⚡ ")) {
+                cleanCandidate = cleanCandidate.removePrefix("⚡ ").trim()
+            }
+            if (cleanCandidate.startsWith("✦ ")) {
+                cleanCandidate = cleanCandidate.removePrefix("✦ ").trim()
+            }
+
             val (currentWord, _) = getTypingContext()
             val lengthToDelete = currentWord.length
 
             // Dynamic Self-Learning: Catat kata yang dipilih pengguna dengan prioritas frekuensi tinggi!
-            correctionEngine.recordWordUsage(candidate, 2)
+            correctionEngine.recordWordUsage(cleanCandidate, 2)
 
             if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
@@ -1255,8 +1328,8 @@ class IosInputMethodService : InputMethodService() {
                     translatePanelBuffer.delete(pos - lengthToDelete, pos)
                     translateCursorPosition = pos - lengthToDelete
                 }
-                translatePanelBuffer.insert(translateCursorPosition, "$candidate ")
-                translateCursorPosition += candidate.length + 1
+                translatePanelBuffer.insert(translateCursorPosition, "$cleanCandidate ")
+                translateCursorPosition += cleanCandidate.length + 1
                 updateTranslateInputBoxVisual()
             } else {
                 val ic = currentInputConnection
@@ -1264,7 +1337,7 @@ class IosInputMethodService : InputMethodService() {
                     if (lengthToDelete > 0) {
                         ic.deleteSurroundingText(lengthToDelete, 0)
                     }
-                    ic.commitText("$candidate ", 1)
+                    ic.commitText("$cleanCandidate ", 1)
                 }
             }
 
@@ -1349,6 +1422,7 @@ class IosInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         try {
+            suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
             voiceDictationManager.destroy()
             correctionEngine.flushUserDictionary()
             serviceScope.cancel()

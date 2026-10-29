@@ -33,8 +33,12 @@ class QuickPathContainerLayout(
         isFocusable = false
     }
 
-    private val touchSlop = 12f * resources.displayMetrics.density
+    private val touchSlop = 26f * resources.displayMetrics.density
     private val containerLoc = IntArray(2)
+
+    private val popupW = (48 * resources.displayMetrics.density).toInt()
+    private val popupH = (60 * resources.displayMetrics.density).toInt()
+    private val popupOffsetTop = (8 * resources.displayMetrics.density).toInt()
 
     // Authentic Apple iOS Key Preview Bubble
     private val tvPopupChar = TextView(context).apply {
@@ -77,9 +81,10 @@ class QuickPathContainerLayout(
             swipeTrailView,
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         )
+        // Fixed dimensions once: zero requestLayout() passes during rapid typing
         addView(
             popupBubble,
-            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+            LayoutParams(popupW, popupH)
         )
     }
 
@@ -96,6 +101,11 @@ class QuickPathContainerLayout(
         swipeTrailView.setTrailColor(color)
     }
 
+    /**
+     * Ultra-Snappy 120 FPS Key Bubble:
+     * Uses Hardware-Accelerated translationX / translationY instead of layoutParams.
+     * Prevents expensive requestLayout() measure passes on every single keystroke.
+     */
     fun showPopupForKey(keyView: View, label: String) {
         if (!isKeyPopupEnabled) return
         val loc = IntArray(2)
@@ -103,21 +113,17 @@ class QuickPathContainerLayout(
         keyView.getLocationOnScreen(loc)
         getLocationOnScreen(myLoc)
 
-        val popupW = (48 * resources.displayMetrics.density).toInt()
-        val popupH = (60 * resources.displayMetrics.density).toInt()
         val keyCenterX = loc[0] + keyView.width / 2
         val targetX = (keyCenterX - myLoc[0]) - popupW / 2
-        val targetY = (loc[1] - myLoc[1]) - popupH + (8 * resources.displayMetrics.density).toInt()
+        val targetY = (loc[1] - myLoc[1]) - popupH + popupOffsetTop
 
-        val lp = popupBubble.layoutParams as LayoutParams
-        lp.width = popupW
-        lp.height = popupH
-        lp.leftMargin = targetX
-        lp.topMargin = targetY
-        popupBubble.layoutParams = lp
+        popupBubble.translationX = targetX.toFloat()
+        popupBubble.translationY = targetY.toFloat()
 
         tvPopupChar.text = label
-        popupBubble.visibility = View.VISIBLE
+        if (popupBubble.visibility != View.VISIBLE) {
+            popupBubble.visibility = View.VISIBLE
+        }
     }
 
     fun hidePopup() {
@@ -142,29 +148,23 @@ class QuickPathContainerLayout(
             MotionEvent.ACTION_MOVE -> {
                 if (!isSwiping) {
                     val dist = hypot((ev.rawX - startX).toDouble(), (ev.rawY - startY).toDouble()).toFloat()
+                    // Swipe only triggers when finger moves beyond touchSlop AND visits another distinct letter key
                     if (isSwipeEnabled && dist > touchSlop) {
-                        // Start QuickPath Swipe!
-                        hidePopup()
-                        if (swipedChars.isEmpty()) {
-                            val startKey = findKeyAtCoords(startX, startY) ?: findKeyAtCoords(ev.rawX, ev.rawY)
-                            if (startKey != null && startKey.first.isNotEmpty() && startKey.first[0].isLetter()) {
-                                swipedChars.add(startKey.first[0].lowercaseChar())
+                        val currentKey = findKeyAtCoords(ev.rawX, ev.rawY)
+                        if (currentKey != null && currentKey.first.isNotEmpty() && currentKey.first[0].isLetter()) {
+                            val c = currentKey.first[0].lowercaseChar()
+                            if (swipedChars.isEmpty()) {
+                                swipedChars.add(c)
+                            } else if (swipedChars.last() != c) {
+                                // Genuinely moving to another key -> start QuickPath gesture!
+                                hidePopup()
+                                isSwiping = true
+                                swipeTrailView.addPoint(ev.x, ev.y)
+                                swipedChars.add(c)
+                                onSwipeCharDetected()
+                                onSwipeLiveUpdate(ArrayList(swipedChars))
+                                return true // Intercept touch! Letter key gets ACTION_CANCEL
                             }
-                        }
-
-                        if (swipedChars.isNotEmpty()) {
-                            isSwiping = true
-                            swipeTrailView.addPoint(ev.x, ev.y)
-                            val currentKey = findKeyAtCoords(ev.rawX, ev.rawY)
-                            if (currentKey != null && currentKey.first.isNotEmpty() && currentKey.first[0].isLetter()) {
-                                val c = currentKey.first[0].lowercaseChar()
-                                if (swipedChars.last() != c) {
-                                    swipedChars.add(c)
-                                    onSwipeCharDetected()
-                                    onSwipeLiveUpdate(ArrayList(swipedChars))
-                                }
-                            }
-                            return true // Intercept touch! Letter key gets ACTION_CANCEL
                         }
                     }
                 }

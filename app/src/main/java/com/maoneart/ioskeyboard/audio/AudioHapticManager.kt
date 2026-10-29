@@ -53,10 +53,10 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
     }
 
     /**
-     * Direct Physical Vibrator Engine:
-     * Uses explicit OneShot pulse (with AudioAttributes ASSISTANCE_SONIFICATION)
-     * so that every single character keystroke produces a definite physical vibration
-     * on all Android ROMs (Xiaomi/HyperOS, Samsung OneUI, Oppo, Vivo, Realme, Pixel).
+     * Apple iOS Taptic Engine Tactile Click Simulation:
+     * High-speed, ultra-crisp micro-pulse (12-25ms) that overcomes motor inertia
+     * without flooding the Android vibrator queue during rapid 120 FPS typing.
+     * Produces a snappy, tight "neket" click feeling on every keystroke.
      */
     fun triggerHapticFeedback(view: View? = null) {
         if (!prefs.isHapticEnabled) return
@@ -64,19 +64,23 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
         val durationMs = prefs.hapticStrength.toLong().coerceIn(10L, 120L)
         if (durationMs <= 0L) return
 
-        // 1. Hardware View Haptic (WindowManager tap)
+        // 1. Hardware View Haptic (WindowManager instant tap, 0ms kernel latency)
+        var viewHandled = false
         try {
             val targetView = view ?: activeRootView
-            targetView?.performHapticFeedback(
+            viewHandled = targetView?.performHapticFeedback(
                 HapticFeedbackConstants.KEYBOARD_TAP,
                 HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-            )
+            ) ?: false
         } catch (_: Throwable) {}
 
-        // 2. Direct Physical Hardware Vibration (OneShot pulse overcoming motor inertia)
+        // 2. Direct Physical Hardware Vibration: Crisp micro-pulse (8-24ms)
+        // Scaled sharply so it doesn't buzz or lag during fast bursts of typing
         try {
             val vib = vibrator ?: return
             if (!vib.hasVibrator()) return
+
+            val pulseDuration = (durationMs * 0.35f).toLong().coerceIn(8L, 24L)
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val audioAttributes = AudioAttributes.Builder()
@@ -84,8 +88,8 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
                     .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
                     .build()
 
-                val amplitude = ((durationMs.toFloat() / 100f) * 255).toInt().coerceIn(90, 255)
-                val effect = VibrationEffect.createOneShot(durationMs, amplitude)
+                val amplitude = ((durationMs.toFloat() / 100f) * 255).toInt().coerceIn(120, 255)
+                val effect = VibrationEffect.createOneShot(pulseDuration, amplitude)
 
                 try {
                     vib.vibrate(effect, audioAttributes)
@@ -94,7 +98,7 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
                 }
             } else {
                 @Suppress("DEPRECATION")
-                vib.vibrate(durationMs)
+                vib.vibrate(pulseDuration)
             }
         } catch (_: Throwable) {}
     }

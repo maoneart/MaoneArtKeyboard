@@ -695,39 +695,48 @@ class SmartCorrectionEngine(private val context: Context) {
         }
 
         // 7. Typo Buster: Damerau-Levenshtein distance + QWERTY keyboard proximity
-        if (result.size < 5) {
-            val typoPool = dict + userDictionary.keys
+        if (result.size < 5 && word.length >= 2) {
             val maxDist = if (word.length <= 3) 1 else 2
             val typoCandidates = mutableListOf<Pair<String, Int>>()
 
-            for (candidate in typoPool) {
-                if (abs(candidate.length - word.length) > 2) continue
-                // Optimization: if word is 3+ chars and candidate starts with unrelated key, skip
-                if (word.length >= 3 && candidate[0] != word[0] && !isQwertyNeighbor(word[0], candidate[0])) continue
-
-                val dist = damerauLevenshtein(word, candidate)
-                if (dist <= maxDist) {
-                    var score = dist * 10
-                    // Bonus if first letter matches
-                    if (candidate.isNotEmpty() && word.isNotEmpty() && candidate[0] == word[0]) {
-                        score -= 3
-                    }
-                    // Bonus for QWERTY neighbor substitutions (e.g. 'g' <-> 'h', 'u' <-> 'y')
-                    if (candidate.length == word.length) {
-                        var neighborMatches = 0
-                        for (i in word.indices) {
-                            if (word[i] != candidate[i] && isQwertyNeighbor(word[i], candidate[i])) {
-                                neighborMatches++
+            val checkCandidate: (String) -> Unit = { candidate ->
+                if (abs(candidate.length - word.length) <= 2) {
+                    if (!(word.length >= 3 && candidate.isNotEmpty() && candidate[0] != word[0] && !isQwertyNeighbor(word[0], candidate[0]))) {
+                        val dist = damerauLevenshtein(word, candidate)
+                        if (dist <= maxDist) {
+                            var score = dist * 10
+                            // Bonus if first letter matches
+                            if (candidate.isNotEmpty() && candidate[0] == word[0]) {
+                                score -= 3
                             }
+                            // Bonus for QWERTY neighbor substitutions
+                            if (candidate.length == word.length) {
+                                var neighborMatches = 0
+                                for (i in word.indices) {
+                                    if (word[i] != candidate[i] && isQwertyNeighbor(word[i], candidate[i])) {
+                                        neighborMatches++
+                                    }
+                                }
+                                score -= neighborMatches * 3
+                            }
+                            val userFreq = userDictionary[candidate] ?: 0
+                            if (userFreq > 0) {
+                                score -= min(15, userFreq * 2)
+                            }
+                            typoCandidates.add(Pair(candidate, score))
                         }
-                        score -= neighborMatches * 3
                     }
-                    val userFreq = userDictionary[candidate] ?: 0
-                    if (userFreq > 0) {
-                        score -= min(15, userFreq * 2)
-                    }
-                    typoCandidates.add(Pair(candidate, score))
                 }
+            }
+
+            for (c in dict) {
+                checkCandidate(c)
+                if (typoCandidates.size >= 12) break
+            }
+            for (c in userDictionary.keys) {
+                checkCandidate(c)
+                if (typoCandidates.size >= 16) break
+            }
             }
 
             typoCandidates.sortBy { it.second }
