@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.45)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.46)
 
 ---
 
@@ -232,3 +232,11 @@
        - `fetchCurrentClip()` memblokir kebangkitan kembali teks yang sudah dibersihkan (`text == ignoredClipText`), dan hanya menerima klip baru saat pengguna menyalin teks berbeda.
        - Item yang disematkan (📌 pinned) dijamin 100% aman dan tidak pernah terhapus.
        - Menambahkan **MaoneArt Glassmorphism Confirmation Modal** (`showClearConfirmModal`) sebelum eksekusi tombol "🗑️ Bersih" dengan grid 2-tombol simetris (`Batal` dan `🗑️ Bersihkan`) sesuai standar UI MaoneArt.
+  - **Auto-Reset Default Keyboard Mode & Transisi Mulus Mode Terjemahan (Release v1.0.46)**:
+    1. **Root Cause Masalah Mode Tertahan**:
+       - Status `currentMode` (`Mode.EMOJI`, `Mode.CLIPBOARD`, dll) sebelumnya tidak di-reset ke `Mode.QWERTY` saat sesi input baru dimulai (`onStartInputView`), saat keyboard ditutup (`onFinishInputView`), maupun saat jendela disembunyikan (`onWindowHidden`). Akibatnya, saat keyboard dibuka kembali di aplikasi lain atau obrolan baru, tampilannya masih tertahan di laci emoji/clipboard alih-alih keyboard normal.
+       - Saat panel terjemahan dibuka dari mode emoji/clipboard, tampilan keyboard di bawahnya tidak otomatis beralih ke QWERTY sehingga pengguna tidak bisa langsung mengetik kalimat terjemahan.
+    2. **Solusi Auto-Reset & Smart Mode Transition**:
+       - `onStartInputView`, `onFinishInputView`, dan `onWindowHidden` kini selalu mereset `currentMode` ke `Mode.QWERTY` sehingga setiap kali keyboard muncul di layar selalu langsung siap mengetik huruf standar.
+       - Membuka (`toggleTranslatePanel`) atau menutup panel terjemahan (`closeTranslatePanel`) secara otomatis mengembalikan keyboard ke `Mode.QWERTY`.
+       - Pengiriman kalimat terjemahan (`sendTranslatedSentence`) menutup panel dan langsung menyajikan layout QWERTY.

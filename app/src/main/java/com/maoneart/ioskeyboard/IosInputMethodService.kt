@@ -281,8 +281,11 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.activeRootView = rootView
             composingWord.clear()
 
+            // Always reset to standard QWERTY keyboard mode whenever keyboard appears
+            currentMode = Mode.QWERTY
+
             // Auto-Close translate panel when opening a new chat/input session
-            if (!restarting && isTranslatePanelOpen) {
+            if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
 
@@ -307,7 +310,8 @@ class IosInputMethodService : InputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         try {
-            // Auto-close translate panel when user exits keyboard or switches chat
+            // Always reset mode to QWERTY when keyboard is closed
+            currentMode = Mode.QWERTY
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
@@ -317,6 +321,8 @@ class IosInputMethodService : InputMethodService() {
     override fun onWindowHidden() {
         super.onWindowHidden()
         try {
+            // Always reset mode to QWERTY when keyboard window is hidden
+            currentMode = Mode.QWERTY
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
@@ -417,6 +423,13 @@ class IosInputMethodService : InputMethodService() {
         isTranslatePanelOpen = !isTranslatePanelOpen
         if (isTranslatePanelOpen) {
             translateCursorPosition = translatePanelBuffer.length
+            if (currentMode != Mode.QWERTY) {
+                switchMode(Mode.QWERTY)
+            }
+        } else {
+            if (currentMode != Mode.QWERTY) {
+                switchMode(Mode.QWERTY)
+            }
         }
         updateTranslatePanelUI()
     }
@@ -425,6 +438,9 @@ class IosInputMethodService : InputMethodService() {
         isTranslatePanelOpen = false
         translatePanelBuffer.clear()
         translateCursorPosition = 0
+        if (currentMode != Mode.QWERTY) {
+            switchMode(Mode.QWERTY)
+        }
         updateTranslatePanelUI()
     }
 
