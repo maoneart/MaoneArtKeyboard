@@ -172,6 +172,10 @@ class SettingsActivity : AppCompatActivity() {
             showLanguageDialog()
         }
 
+        findViewById<SwitchMaterial>(R.id.switchAutoCapitalization)?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isAutoCapitalizationEnabled = isChecked
+        }
+
         switchAutoCorrect.setOnCheckedChangeListener { _, isChecked ->
             prefs.isAutoCorrectEnabled = isChecked
         }
@@ -232,6 +236,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<SwitchMaterial>(R.id.switchKeyPopup).isChecked = prefs.isKeyPopupEnabled
         findViewById<SwitchMaterial>(R.id.switchSound).isChecked = prefs.isSoundEnabled
         findViewById<SwitchMaterial>(R.id.switchHaptic).isChecked = prefs.isHapticEnabled
+        findViewById<SwitchMaterial>(R.id.switchAutoCapitalization)?.isChecked = prefs.isAutoCapitalizationEnabled
         findViewById<SwitchMaterial>(R.id.switchAutoCorrect).isChecked = prefs.isAutoCorrectEnabled
         findViewById<SwitchMaterial>(R.id.switchDoubleSpace).isChecked = prefs.isDoubleSpacePeriodEnabled
         findViewById<SwitchMaterial>(R.id.switchPredictiveText)?.isChecked = prefs.isPredictiveTextEnabled

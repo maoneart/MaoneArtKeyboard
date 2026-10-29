@@ -1,48 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Pressed state -->
-    <item android:state_pressed="true">
-        <layer-list>
-            <item>
-                <shape android:shape="rectangle">
-                    <corners android:radius="5dp" />
-                    <solid android:color="#7A3D12" />
-                </shape>
-            </item>
-            <item android:bottom="1dp">
-                <shape android:shape="rectangle">
-                    <corners android:radius="5dp" />
-                    <solid android:color="#A35921" />
-                    <stroke
-                        android:width="0.8dp"
-                        android:color="#BD6B2D" />
-                </shape>
-            </item>
-        </layer-list>
-    </item>
-    <!-- Default state: Amber Bronze Golden Wood -->
-    <item>
-        <layer-list>
-            <item>
-                <shape android:shape="rectangle">
-                    <corners android:radius="5dp" />
-                    <solid android:color="#5C2D0B" />
-                </shape>
-            </item>
-            <item android:bottom="1.5dp">
-                <shape android:shape="rectangle">
-                    <corners android:radius="5dp" />
-                    <gradient
-                        android:type="linear"
-                        android:angle="270"
-                        android:startColor="#DF8F48"
-                        android:centerColor="#C67733"
-                        android:endColor="#A95F24" />
-                    <stroke
-                        android:width="0.8dp"
-                        android:color="#F3A968" />
-                </shape>
-            </item>
-        </layer-list>
-    </item>
+    <item android:state_pressed="true" android:drawable="@drawable/key_woody_action_pressed" />
+    <item android:drawable="@drawable/key_woody_action_normal" />
 </selector>

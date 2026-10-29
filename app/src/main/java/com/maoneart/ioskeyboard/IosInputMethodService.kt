@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.inputmethodservice.InputMethodService
 import android.text.InputType
+import android.text.TextUtils
 import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
@@ -284,8 +285,14 @@ class IosInputMethodService : InputMethodService() {
             updateLanguageBadge()
             updateTranslatePanelUI()
             rootView?.let { applyThemeStyling(it) }
+
+            if (!restarting && !isCapsLock) {
+                isShifted = shouldAutoCapitalize()
+            }
+
             renderCurrentLayout()
             layoutEngine.updateReturnButton(info, themeMode = prefs.themeMode, isDark = isDarkMode())
+            layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode(), prefs.themeMode)
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error onStartInputView", t)
         }
@@ -317,6 +324,7 @@ class IosInputMethodService : InputMethodService() {
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         updateSuggestions()
+        updateAutoCapitalization()
     }
 
     private fun isDarkMode(): Boolean {
@@ -359,8 +367,8 @@ class IosInputMethodService : InputMethodService() {
 
             if (isWoody) {
                 keyboardRoot?.setBackgroundResource(R.drawable.theme_woody_bg)
-                topToolbar?.setBackgroundColor(Color.parseColor("#22140D"))
-                translatePanel?.setBackgroundColor(Color.parseColor("#22140D"))
+                topToolbar?.setBackgroundColor(Color.parseColor("#4D1A0E08"))
+                translatePanel?.setBackgroundColor(Color.parseColor("#661A0E08"))
                 tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_woody)
                 tvTranslateInputBox?.setTextColor(textColor)
             } else {
@@ -784,6 +792,66 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    // --- Auto-Capitalization Engine (Awal Kalimat & Setelah Tanda Titik) ---
+    private fun shouldAutoCapitalize(): Boolean {
+        if (!prefs.isAutoCapitalizationEnabled) return false
+        if (isCapsLock) return false
+        val info = currentInputEditorInfo ?: return true
+        val inputType = info.inputType
+
+        // Jangan auto-kapitalisasi pada field password, angka, email, URL
+        val cls = inputType and InputType.TYPE_MASK_CLASS
+        if (cls != InputType.TYPE_CLASS_TEXT) {
+            if (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE || cls == InputType.TYPE_CLASS_DATETIME) {
+                return false
+            }
+        }
+        val variation = inputType and InputType.TYPE_MASK_VARIATION
+        if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS ||
+            variation == InputType.TYPE_TEXT_VARIATION_URI ||
+            variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
+            return false
+        }
+
+        // 1. Periksa buffer panel terjemahan jika terbuka
+        if (isTranslatePanelOpen) {
+            if (translateCursorPosition == 0 || translatePanelBuffer.isEmpty()) return true
+            val textBefore = translatePanelBuffer.substring(0, translateCursorPosition.coerceIn(0, translatePanelBuffer.length))
+            if (textBefore.trim().isEmpty()) return true
+            return Regex("""[.!?]\s+$""").containsMatchIn(textBefore) || textBefore.endsWith("\n") || textBefore.endsWith("\r")
+        }
+
+        // 2. Periksa flag CursorCapsMode Android
+        val ic = currentInputConnection ?: return true
+        val capsMode = ic.getCursorCapsMode(TextUtils.CAP_MODE_SENTENCES or TextUtils.CAP_MODE_WORDS or TextUtils.CAP_MODE_CHARACTERS)
+        if (capsMode != 0) return true
+
+        // 3. Inspeksi teks sebelum kursor (fallback untuk WhatsApp, Telegram, Notes, dll)
+        val textBefore = ic.getTextBeforeCursor(8, 0)?.toString()
+        if (textBefore.isNullOrEmpty()) return true
+        if (textBefore.trim().isEmpty()) return true
+        if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) return true
+        if (Regex("""[.!?]\s+$""").containsMatchIn(textBefore)) return true
+
+        return false
+    }
+
+    private fun updateAutoCapitalization() {
+        try {
+            if (isCapsLock) return
+            val shouldCap = shouldAutoCapitalize()
+            if (isShifted != shouldCap) {
+                isShifted = shouldCap
+                layoutEngine.updateShiftState(isShifted)
+                layoutEngine.updateShiftButtonVisual(isShifted, false, isDarkMode(), prefs.themeMode)
+            }
+        } catch (_: Throwable) {}
+    }
+
     private fun handleCharacterInput(charStr: String) {
         try {
             if (isTranslatePanelOpen) {
@@ -817,6 +885,7 @@ class IosInputMethodService : InputMethodService() {
                     updateTranslateInputBoxVisual()
                 }
                 updateSuggestions()
+                updateAutoCapitalization()
                 return
             }
 
@@ -825,6 +894,7 @@ class IosInputMethodService : InputMethodService() {
             }
             currentInputConnection?.deleteSurroundingText(1, 0)
             updateSuggestions()
+            updateAutoCapitalization()
         } catch (_: Throwable) {}
     }
 
@@ -853,6 +923,7 @@ class IosInputMethodService : InputMethodService() {
                     correctionEngine.recordWordUsage(replacement, 2)
                     composingWord.clear()
                     updateSuggestions()
+                    updateAutoCapitalization()
                     return
                 }
             }
@@ -879,6 +950,7 @@ class IosInputMethodService : InputMethodService() {
                         correctionEngine.recordWordUsage(centerCandidate, 2)
                         composingWord.clear()
                         updateSuggestions()
+                        updateAutoCapitalization()
                         return
                     }
                 }
@@ -894,6 +966,7 @@ class IosInputMethodService : InputMethodService() {
                 translateCursorPosition = pos + 1
                 updateTranslateInputBoxVisual()
                 updateSuggestions()
+                updateAutoCapitalization()
                 return
             }
 
@@ -903,6 +976,7 @@ class IosInputMethodService : InputMethodService() {
                 currentInputConnection?.commitText(". ", 1)
                 lastSpacePressTime = 0
                 updateSuggestions()
+                updateAutoCapitalization()
                 return
             }
 
@@ -910,6 +984,7 @@ class IosInputMethodService : InputMethodService() {
             currentInputConnection?.commitText(" ", 1)
             composingWord.clear()
             updateSuggestions()
+            updateAutoCapitalization()
         } catch (_: Throwable) {}
     }
 
@@ -936,6 +1011,7 @@ class IosInputMethodService : InputMethodService() {
                 ic.commitText("\n", 1)
                 composingWord.clear()
                 updateSuggestions()
+                updateAutoCapitalization()
                 return
             }
 
@@ -1162,6 +1238,7 @@ class IosInputMethodService : InputMethodService() {
             composingWord.clear()
             // Immediately chain to the next word prediction! ("Nulis Otomatis")
             updateSuggestions()
+            updateAutoCapitalization()
         } catch (_: Throwable) {}
     }
 
@@ -1198,6 +1275,7 @@ class IosInputMethodService : InputMethodService() {
                 correctionEngine.recordWordUsage(matchedWord, 2)
                 composingWord.clear()
                 updateSuggestions()
+                updateAutoCapitalization()
             } else {
                 val fallback = swipedChars.joinToString("")
                 if (isTranslatePanelOpen) {
@@ -1210,6 +1288,7 @@ class IosInputMethodService : InputMethodService() {
                 }
                 composingWord.clear()
                 updateSuggestions()
+                updateAutoCapitalization()
             }
         } catch (_: Throwable) {}
     }

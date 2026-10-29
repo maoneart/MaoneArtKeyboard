@@ -73,4 +73,8 @@ class KeyboardPreferences(context: Context) {
     var clipboardViewMode: String
         get() = prefs.getString("clipboard_view_mode", "card") ?: "card"
         set(value) = prefs.edit().putString("clipboard_view_mode", value).apply()
+
+    var isAutoCapitalizationEnabled: Boolean
+        get() = prefs.getBoolean("auto_capitalization_enabled", true)
+        set(value) = prefs.edit().putBoolean("auto_capitalization_enabled", value).apply()
 }

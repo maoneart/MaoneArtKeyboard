@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.34)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.35)
 
 ---
 
@@ -119,3 +119,15 @@
        - Item yang disematkan (pinned) selalu diprioritaskan di daftar teratas dan berlabel lencana `📌`.
        - Item pinned diproteksi penuh: tidak akan pernah terhapus otomatis saat kuota riwayat penuh maupun saat menekan tombol `🗑️ Bersih`.
        - Riwayat disimpan persisten dalam format JSON (`clipboard_history.json`).
+  - Rekonstruksi Tema Woody Asli Sony Xperia & Kapitalisasi Otomatis (Release v1.0.35):
+    1. **Rekonstruksi Tema Woody Asli Sony Xperia (Berdasarkan APK Asli)**:
+       - Meriset dan mengekstrak aset resmi dari APK tema Woody Sony Xperia (`se.knowit.mobile.woody` / `somc_bg_dark.jpg`).
+       - Mengganti gradien buatan dengan foto tekstur serat kayu alami resolusi tinggi 1080x1920 (`woody_bg.jpg`) yang menyelimuti seluruh keyboard.
+       - Tombol tuts keyboard dikonversi menjadi 9-patch bertekstur kayu ukir nyata (`key_woody_normal.9.png` dan `key_woody_pressed.9.png`), tuts fungsi walnut gelap, serta tombol aksi amber bronze keemasan asli Xperia (`key_woody_action_normal.9.png`).
+       - Top toolbar semi-transparan (`#4D1A0E08`) sehingga tekstur kayu menyatu harmonis.
+    2. **Kapitalisasi Otomatis (Auto-Capitalization)**:
+       - Huruf besar otomatis aktif di awal kalimat / kolom input baru.
+       - Huruf besar otomatis aktif setelah tanda titik (`. `), tanda tanya (`? `), atau tanda seru (`! `).
+       - Huruf besar otomatis aktif di awal baris baru setelah menekan tombol Enter (`\n`).
+       - Deteksi cerdas `shouldAutoCapitalize()` mengevaluasi buffer dan kursor serta mem-bypass otomatis pada field password, angka, email, dan URL.
+       - Tersedia toggle "Kapitalisasi Otomatis" di menu Pengaturan.
