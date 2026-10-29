@@ -641,10 +641,28 @@ class IosInputMethodService : InputMethodService() {
                 )
                 Mode.CLIPBOARD -> layoutEngine.createClipboardView(
                     isDark = isDark,
-                    history = clipboardManager.getHistory(),
+                    themeMode = prefs.themeMode,
+                    items = clipboardManager.getItems(),
+                    currentViewMode = prefs.clipboardViewMode,
                     onPasteAction = { text ->
                         commitDirectText(text)
                         switchMode(Mode.QWERTY)
+                    },
+                    onTogglePinAction = { id ->
+                        clipboardManager.togglePin(id)
+                        renderCurrentLayout()
+                    },
+                    onDeleteAction = { id ->
+                        clipboardManager.deleteItem(id)
+                        renderCurrentLayout()
+                    },
+                    onClearUnpinnedAction = {
+                        clipboardManager.clearAllUnpinned()
+                        renderCurrentLayout()
+                    },
+                    onToggleViewMode = { mode ->
+                        prefs.clipboardViewMode = mode
+                        renderCurrentLayout()
                     },
                     onCloseAction = { switchMode(Mode.QWERTY) }
                 )

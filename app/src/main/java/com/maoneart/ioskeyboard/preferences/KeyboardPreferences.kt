@@ -69,4 +69,8 @@ class KeyboardPreferences(context: Context) {
     var isDictationEnabled: Boolean
         get() = prefs.getBoolean("dictation_enabled", true)
         set(value) = prefs.edit().putBoolean("dictation_enabled", value).apply()
+
+    var clipboardViewMode: String
+        get() = prefs.getString("clipboard_view_mode", "card") ?: "card"
+        set(value) = prefs.edit().putString("clipboard_view_mode", value).apply()
 }

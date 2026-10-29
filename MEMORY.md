@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.29)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.34)
 
 ---
 
@@ -108,3 +108,14 @@
        - Tuts fungsi kayu gelap walnut (`key_bg_woody_special.xml`) dan tuts aksi kayu amber bronze keemasan (`key_bg_woody_action.xml`).
        - Warna teks huruf ivory warm cream (`#FFF3E0`) dan animasi jejak swipe QuickPath berwarna api emas (`#FFA726`).
        - Pilihan tema langsung di Pengaturan Cupertino: "Woody (Sony Xperia Edition) 🪵".
+  - Papan Klip Card Mode, Sematkan (Pin) & Hapus Modal MaoneArt (Release v1.0.34):
+    1. **Clipboard Mode Card & List**:
+       - Pilihan tampilan Mode Card (grid 2-kolom ringkas modern dengan badge pin 📌) dan Mode List (1-kolom lebar penuh).
+       - Tombol beralih instan `🎴 Card` / `📑 List` di toolbar papan klip, tersimpan persisten di preferensi pengguna.
+    2. **Aksi Long Press Sematkan (Pin) & Hapus**:
+       - Tekan tahan (long-press) kartu papan klip memunculkan dialog modal aksi MaoneArt Glassmorphism dengan haptic feedback.
+       - Grid aksi 2-tombol simetris (`📌 Sematkan / Batal Pin` dan `🗑️ Hapus`).
+    3. **Proteksi Item Pinned & Riwayat Persisten JSON**:
+       - Item yang disematkan (pinned) selalu diprioritaskan di daftar teratas dan berlabel lencana `📌`.
+       - Item pinned diproteksi penuh: tidak akan pernah terhapus otomatis saat kuota riwayat penuh maupun saat menekan tombol `🗑️ Bersih`.
+       - Riwayat disimpan persisten dalam format JSON (`clipboard_history.json`).

@@ -867,14 +867,27 @@ class KeyboardLayout(private val context: Context) {
         return root
     }
 
-    // --- 4. CLIPBOARD HISTORY VIEW ---
+    // --- 4. CLIPBOARD HISTORY VIEW (Card & List Mode + Pin/Delete Glassmorphic Action Modal) ---
     fun createClipboardView(
         isDark: Boolean,
-        history: List<String>,
+        themeMode: String = "auto",
+        items: List<com.maoneart.ioskeyboard.clipboard.ClipboardItem>,
+        currentViewMode: String = "card",
         onPasteAction: (String) -> Unit,
+        onTogglePinAction: (String) -> Unit,
+        onDeleteAction: (String) -> Unit,
+        onClearUnpinnedAction: () -> Unit,
+        onToggleViewMode: (String) -> Unit,
         onCloseAction: () -> Unit
     ): View {
-        val root = LinearLayout(context).apply {
+        val root = FrameLayout(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+
+        val mainLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -883,89 +896,327 @@ class KeyboardLayout(private val context: Context) {
             setPadding(dp(10), dp(6), dp(10), dp(6))
         }
 
+        val isWoody = (themeMode == "woody")
+        val cardBg = when {
+            isWoody -> R.drawable.key_bg_woody
+            isDark -> R.drawable.key_bg_ios_dark
+            else -> R.drawable.key_bg_ios_light
+        }
+        val textColor = when {
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+        val subtextColor = when {
+            isWoody -> Color.parseColor("#C4A587")
+            isDark -> Color.parseColor("#98989D")
+            else -> Color.parseColor("#8E8E93")
+        }
+
+        // Header Row
         val headerRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(36)
-            )
+                dp(38)
+            ).apply { setMargins(0, 0, 0, dp(4)) }
         }
 
         val title = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
-            text = "📋 Riwayat Salinan (Clipboard)"
-            setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+            text = "📋 Papan Klip"
+            setTextColor(textColor)
             textSize = 14f
             setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
         headerRow.addView(title)
 
+        // View Mode Toggle Button (Card vs List)
+        val btnMode = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(72), dp(30)).apply { setMargins(0, 0, dp(6), 0) }
+            background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+            text = if (currentViewMode == "card") "🎴 Card" else "📑 List"
+            setTextColor(textColor)
+            textSize = 12f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
+            setupInstantTouch(this) {
+                onToggleViewMode(if (currentViewMode == "card") "list" else "card")
+            }
+        }
+        headerRow.addView(btnMode)
+
+        // Clear Unpinned Button
+        if (items.any { !it.isPinned }) {
+            val btnClear = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(72), dp(30)).apply { setMargins(0, 0, dp(6), 0) }
+                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+                text = "🗑️ Bersih"
+                setTextColor(subtextColor)
+                textSize = 11.5f
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) { onClearUnpinnedAction() }
+            }
+            headerRow.addView(btnClear)
+        }
+
+        // Close Button
         val btnClose = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(70), dp(32))
-            background = ContextCompat.getDrawable(context, R.drawable.key_bg_blue)
+            layoutParams = LinearLayout.LayoutParams(dp(60), dp(30))
+            background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_action else R.drawable.key_bg_blue)
             text = "Tutup"
             setTextColor(Color.WHITE)
-            textSize = 13f
+            textSize = 12.5f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onCloseAction() }
         }
         headerRow.addView(btnClose)
-        root.addView(headerRow)
+        mainLayout.addView(headerRow)
 
+        // Modal Action Container (Overlay Glassmorphism)
+        var modalOverlay: FrameLayout? = null
+
+        fun hideModal() {
+            modalOverlay?.let { root.removeView(it) }
+            modalOverlay = null
+        }
+
+        fun showActionModal(item: com.maoneart.ioskeyboard.clipboard.ClipboardItem) {
+            hideModal()
+            val overlay = FrameLayout(context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setBackgroundColor(Color.parseColor("#99000000"))
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { hideModal() }
+            }
+
+            val dialogCard = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER
+                ).apply { setMargins(dp(20), 0, dp(20), 0) }
+                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody else if (isDark) R.drawable.key_bg_special_dark else R.drawable.card_bg_ios)
+                setPadding(dp(16), dp(14), dp(16), dp(14))
+                isClickable = true
+            }
+
+            // Preview snippet
+            val tvPreview = TextView(context).apply {
+                text = item.text
+                maxLines = 3
+                textSize = 13.5f
+                setTextColor(textColor)
+                setPadding(dp(10), dp(8), dp(10), dp(10))
+                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+            }
+            dialogCard.addView(tvPreview)
+
+            // Symmetrical 2-Column Action Grid (MaoneArt Rule)
+            val btnRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(42)
+                ).apply { setMargins(0, dp(12), 0, 0) }
+            }
+
+            // Button 1: Pin / Unpin
+            val btnPin = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                    setMargins(0, 0, dp(6), 0)
+                }
+                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_action else R.drawable.key_bg_blue)
+                text = if (item.isPinned) "📌 Batal Pin" else "📌 Sematkan"
+                setTextColor(Color.WHITE)
+                textSize = 13.5f
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) {
+                    hideModal()
+                    onTogglePinAction(item.id)
+                }
+            }
+            btnRow.addView(btnPin)
+
+            // Button 2: Delete
+            val btnDelete = TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                    setMargins(dp(6), 0, 0, 0)
+                }
+                background = ContextCompat.getDrawable(context, if (isDark || isWoody) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+                text = "🗑️ Hapus"
+                setTextColor(Color.parseColor("#FF3B30"))
+                textSize = 13.5f
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) {
+                    hideModal()
+                    onDeleteAction(item.id)
+                }
+            }
+            btnRow.addView(btnDelete)
+            dialogCard.addView(btnRow)
+
+            overlay.addView(dialogCard)
+            modalOverlay = overlay
+            root.addView(overlay)
+        }
+
+        // Scroll Content
         val scroll = ScrollView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1.0f
             )
+            isFillViewport = true
         }
-        val listLayout = LinearLayout(context).apply {
+
+        val contentLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
         }
 
-        if (history.isEmpty()) {
+        if (items.isEmpty()) {
             val empty = TextView(context).apply {
                 text = "Belum ada teks yang disalin."
-                setTextColor(Color.GRAY)
+                setTextColor(subtextColor)
                 textSize = 13f
-                setPadding(dp(16), dp(24), dp(16), dp(24))
+                setPadding(dp(16), dp(32), dp(16), dp(32))
                 gravity = Gravity.CENTER
             }
-            listLayout.addView(empty)
+            contentLayout.addView(empty)
         } else {
-            for (textSnippet in history) {
-                val itemCard = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { setMargins(0, dp(4), 0, dp(4)) }
-                    background = ContextCompat.getDrawable(
-                        context,
-                        if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light
-                    )
-                    setPadding(dp(12), dp(10), dp(12), dp(10))
-                    isClickable = true
-                    isFocusable = false
-                    setupInstantTouch(this) { onPasteAction(textSnippet) }
-                }
+            if (currentViewMode == "card") {
+                // 2-Column Grid of Modern Cards
+                val chunks = items.chunked(2)
+                for (chunk in chunks) {
+                    val row = LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            dp(76)
+                        ).apply { setMargins(0, dp(3), 0, dp(3)) }
+                    }
 
-                val snippetView = TextView(context).apply {
-                    text = textSnippet
-                    maxLines = 2
-                    textSize = 13.5f
-                    setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+                    for (item in chunk) {
+                        val card = FrameLayout(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                                setMargins(dp(3), 0, dp(3), 0)
+                            }
+                            background = ContextCompat.getDrawable(context, cardBg)
+                            setPadding(dp(10), dp(8), dp(10), dp(8))
+                            isClickable = true
+                            isFocusable = false
+
+                            setOnClickListener {
+                                onPasteAction(item.text)
+                            }
+                            setOnLongClickListener {
+                                performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                showActionModal(item)
+                                true
+                            }
+                        }
+
+                        val tvText = TextView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            text = item.text
+                            maxLines = 3
+                            textSize = 12.5f
+                            setTextColor(textColor)
+                        }
+                        card.addView(tvText)
+
+                        if (item.isPinned) {
+                            val pinBadge = TextView(context).apply {
+                                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END)
+                                text = "📌"
+                                textSize = 11f
+                            }
+                            card.addView(pinBadge)
+                        }
+                        row.addView(card)
+                    }
+
+                    // Balance empty cell if odd number of items in row
+                    if (chunk.size == 1) {
+                        val dummy = View(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                                setMargins(dp(3), 0, dp(3), 0)
+                            }
+                        }
+                        row.addView(dummy)
+                    }
+                    contentLayout.addView(row)
                 }
-                itemCard.addView(snippetView)
-                listLayout.addView(itemCard)
+            } else {
+                // List Mode (1-Column full width)
+                for (item in items) {
+                    val listCard = FrameLayout(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { setMargins(0, dp(3), 0, dp(3)) }
+                        background = ContextCompat.getDrawable(context, cardBg)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                        isClickable = true
+                        isFocusable = false
+
+                        setOnClickListener {
+                            onPasteAction(item.text)
+                        }
+                        setOnLongClickListener {
+                            performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                            showActionModal(item)
+                            true
+                        }
+                    }
+
+                    val rowLayout = LinearLayout(context).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT)
+                    }
+
+                    if (item.isPinned) {
+                        val pinTv = TextView(context).apply {
+                            text = "📌 "
+                            textSize = 13f
+                        }
+                        rowLayout.addView(pinTv)
+                    }
+
+                    val snippetView = TextView(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
+                        text = item.text
+                        maxLines = 2
+                        textSize = 13.5f
+                        setTextColor(textColor)
+                    }
+                    rowLayout.addView(snippetView)
+                    listCard.addView(rowLayout)
+                    contentLayout.addView(listCard)
+                }
             }
         }
 
-        scroll.addView(listLayout)
-        root.addView(scroll)
+        scroll.addView(contentLayout)
+        mainLayout.addView(scroll)
+        root.addView(mainLayout)
         return root
     }
 
