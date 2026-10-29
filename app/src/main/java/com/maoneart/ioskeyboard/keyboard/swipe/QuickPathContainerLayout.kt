@@ -38,6 +38,11 @@ class QuickPathContainerLayout(
 
     private val touchSlop = 26f * resources.displayMetrics.density
     private var activeFallbackView: View? = null
+    private val keyPopupPositions = HashMap<View, Pair<Float, Float>>()
+
+    fun clearPopupPositionCache() {
+        keyPopupPositions.clear()
+    }
 
     private val popupW = (48 * resources.displayMetrics.density).toInt()
     private val popupH = (60 * resources.displayMetrics.density).toInt()
@@ -108,22 +113,28 @@ class QuickPathContainerLayout(
 
     /**
      * Ultra-Snappy 120 FPS Key Bubble:
-     * Uses Hardware-Accelerated translationX / translationY instead of layoutParams.
-     * Prevents expensive requestLayout() measure passes on every single keystroke.
+     * Uses In-Memory Hardware-Accelerated translationX / translationY cache.
+     * Zero JNI hierarchy traversals and zero requestLayout() passes during rapid typing.
      */
     fun showPopupForKey(keyView: View, label: String) {
         if (!isKeyPopupEnabled) return
-        val loc = IntArray(2)
-        val myLoc = IntArray(2)
-        keyView.getLocationOnScreen(loc)
-        getLocationOnScreen(myLoc)
 
-        val keyCenterX = loc[0] + keyView.width / 2
-        val targetX = (keyCenterX - myLoc[0]) - popupW / 2
-        val targetY = (loc[1] - myLoc[1]) - popupH + popupOffsetTop
+        var pos = keyPopupPositions[keyView]
+        if (pos == null) {
+            val loc = IntArray(2)
+            val myLoc = IntArray(2)
+            keyView.getLocationOnScreen(loc)
+            getLocationOnScreen(myLoc)
 
-        popupBubble.translationX = targetX.toFloat()
-        popupBubble.translationY = targetY.toFloat()
+            val keyCenterX = loc[0] + keyView.width / 2
+            val targetX = (keyCenterX - myLoc[0]) - popupW / 2f
+            val targetY = (loc[1] - myLoc[1]) - popupH + popupOffsetTop.toFloat()
+            pos = Pair(targetX, targetY)
+            keyPopupPositions[keyView] = pos
+        }
+
+        popupBubble.translationX = pos.first
+        popupBubble.translationY = pos.second
 
         tvPopupChar.text = label
         if (popupBubble.visibility != View.VISIBLE) {
@@ -138,6 +149,7 @@ class QuickPathContainerLayout(
     }
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+        if (!isSwipeEnabled) return false
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 val pIdx = ev.actionIndex

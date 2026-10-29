@@ -68,6 +68,7 @@ class IosInputMethodService : InputMethodService() {
     private var isCapsLock = false
     private var lastShiftPressTime: Long = 0
     private var lastSpacePressTime: Long = 0
+    private var lastKeyTypingTime: Long = 0
 
     // Live Translate Panel State with Movable Interactive Cursor
     private var isTranslatePanelOpen = false
@@ -121,6 +122,7 @@ class IosInputMethodService : InputMethodService() {
                     updateSuggestions()
                 },
                 onStatusChange = { isListening, statusMsg ->
+                    layoutEngine.updateDictationVisual(isListening, isDarkMode(), prefs.themeMode)
                     if (isListening) {
                         candidate2?.text = "🎙️ $statusMsg"
                     } else if (statusMsg.isNotEmpty() && statusMsg != "Selesai") {
@@ -315,6 +317,10 @@ class IosInputMethodService : InputMethodService() {
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
+            if (voiceDictationManager.isListening) {
+                voiceDictationManager.stopListening()
+                layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
+            }
         } catch (_: Throwable) {}
     }
 
@@ -326,6 +332,10 @@ class IosInputMethodService : InputMethodService() {
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
+            if (voiceDictationManager.isListening) {
+                voiceDictationManager.stopListening()
+                layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
+            }
         } catch (_: Throwable) {}
     }
 
@@ -335,12 +345,12 @@ class IosInputMethodService : InputMethodService() {
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        // Reset composingWord when cursor returns to start or jumps (e.g. user tapped elsewhere)
+        // Reset composingWord and update capitalization only when cursor jumps, selects range, or resets to 0
         if ((newSelStart == 0 && newSelEnd == 0) || newSelStart != newSelEnd || Math.abs(newSelStart - oldSelStart) > 1) {
             composingWord.clear()
+            updateSuggestions(immediate = false)
+            updateAutoCapitalization()
         }
-        updateSuggestions()
-        updateAutoCapitalization()
     }
 
     private fun isDarkMode(): Boolean {
@@ -646,6 +656,7 @@ class IosInputMethodService : InputMethodService() {
                     activeLanguage = prefs.activeLanguage,
                     isSwipeEnabled = prefs.isSwipeTypingEnabled,
                     isKeyPopupEnabled = prefs.isKeyPopupEnabled,
+                    isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy -> moveCursor2D(dx, dy) },
                     onSwipeComplete = { handleSwipeComplete(it) },
@@ -656,6 +667,7 @@ class IosInputMethodService : InputMethodService() {
                     isMoreSymbols = false,
                     isDark = isDark,
                     themeMode = prefs.themeMode,
+                    isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
                 )
@@ -663,6 +675,7 @@ class IosInputMethodService : InputMethodService() {
                     isMoreSymbols = true,
                     isDark = isDark,
                     themeMode = prefs.themeMode,
+                    isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
                 )
@@ -764,6 +777,11 @@ class IosInputMethodService : InputMethodService() {
     private fun handleDictationAction() {
         try {
             if (!prefs.isDictationEnabled) return
+            val now = System.currentTimeMillis()
+            // Anti-Accidental Touch Guard: Ignore if user was actively typing or word is in-progress
+            if (now - lastKeyTypingTime < 280L || composingWord.isNotEmpty()) {
+                return
+            }
             if (voiceDictationManager.isListening) {
                 voiceDictationManager.stopListening()
             } else {
@@ -908,6 +926,7 @@ class IosInputMethodService : InputMethodService() {
 
     private fun handleCharacterInput(charStr: String) {
         try {
+            lastKeyTypingTime = System.currentTimeMillis()
             if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
                 translatePanelBuffer.insert(pos, charStr)
@@ -1538,6 +1557,7 @@ class IosInputMethodService : InputMethodService() {
         try {
             suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
             voiceDictationManager.destroy()
+            audioHaptic.destroy()
             correctionEngine.flushUserDictionary()
             serviceScope.cancel()
         } catch (_: Throwable) {}

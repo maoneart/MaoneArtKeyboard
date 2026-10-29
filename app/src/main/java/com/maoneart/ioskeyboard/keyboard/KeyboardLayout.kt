@@ -95,6 +95,21 @@ class KeyboardLayout(private val context: Context) {
         }
         if (boxes.isNotEmpty()) {
             cachedHitBoxes = boxes
+            popupController?.clearPopupPositionCache()
+        }
+    }
+
+    private var micButtonRef: ImageButton? = null
+
+    fun updateDictationVisual(isListening: Boolean, isDark: Boolean, themeMode: String = "auto") {
+        micButtonRef?.let { btn ->
+            if (isListening) {
+                btn.setColorFilter(Color.parseColor("#FF3B30")) // Distinct Apple Red recording indicator
+            } else {
+                val isWoody = (themeMode == "woody")
+                val normalColor = if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+                btn.setColorFilter(normalColor)
+            }
         }
     }
 
@@ -173,6 +188,7 @@ class KeyboardLayout(private val context: Context) {
         activeLanguage: String,
         isSwipeEnabled: Boolean = true,
         isKeyPopupEnabled: Boolean = true,
+        isDictationEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int) -> Unit = { _, _ -> },
         onSwipeComplete: (List<Char>) -> Unit = {},
@@ -318,8 +334,9 @@ class KeyboardLayout(private val context: Context) {
 
         // Space Button with Spacebar Trackpad Mode
         val langLabel = if (activeLanguage == "en") "space" else "spasi"
+        val spaceWeight = if (isDictationEnabled) 4.45f else 5.4f
         val btnSpace = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.3f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = langLabel
@@ -332,19 +349,24 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btnSpace)
 
-        // Dictation Microphone Button (Apple iOS Monochrome Mic)
-        val btnMic = ImageButton(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
-                .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, specialKeyBg)
-            setImageResource(R.drawable.ic_mic_ios)
-            setColorFilter(textColor)
-            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-            isClickable = true
-            isFocusable = false
-            setupInstantTouch(this) { onKeyAction("ACTION_DICTATION") }
+        // Dictation Microphone Button (Apple iOS Monochrome Mic) with Anti-Accidental Touch
+        if (isDictationEnabled) {
+            val btnMic = ImageButton(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.95f)
+                    .apply { setMargins(dp(2), 0, dp(2), 0) }
+                background = ContextCompat.getDrawable(context, specialKeyBg)
+                setImageResource(R.drawable.ic_mic_ios)
+                setColorFilter(textColor)
+                scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+                isClickable = true
+                isFocusable = false
+                setupDictationKeyTouch(this) { onKeyAction("ACTION_DICTATION") }
+            }
+            micButtonRef = btnMic
+            r4Layout.addView(btnMic)
+        } else {
+            micButtonRef = null
         }
-        r4Layout.addView(btnMic)
 
         // Return / Enter Action Button (return / Dead Center Search Icon)
         val btnReturn = ReturnButtonLayout(context).apply {
@@ -406,7 +428,7 @@ class KeyboardLayout(private val context: Context) {
             val r = box.hitRect
             if (rx in (r.left - tol)..(r.right + tol) &&
                 ry in (r.top - tol)..(r.bottom + tol)) {
-                return Pair(box.tv.text.toString(), r)
+                return Pair(box.charStr, r)
             }
         }
 
@@ -426,7 +448,7 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        return closest?.let { Pair(it.tv.text.toString(), it.hitRect) }
+        return closest?.let { Pair(it.charStr, it.hitRect) }
     }
 
     private fun findKeyViewAt(rawX: Float, rawY: Float): View? {
@@ -472,6 +494,7 @@ class KeyboardLayout(private val context: Context) {
         isMoreSymbols: Boolean,
         isDark: Boolean,
         themeMode: String = "auto",
+        isDictationEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int) -> Unit = { _, _ -> }
     ): View {
@@ -602,8 +625,9 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnEmoji)
 
+        val spaceWeight = if (isDictationEnabled) 4.45f else 5.4f
         val btnSpace = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 4.3f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
             text = "spasi"
@@ -616,19 +640,22 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnSpace)
 
-        // Dictation Microphone Button (Apple iOS Monochrome Mic)
-        val btnMic = ImageButton(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.1f)
-                .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, specialKeyBg)
-            setImageResource(R.drawable.ic_mic_ios)
-            setColorFilter(textColor)
-            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-            isClickable = true
-            isFocusable = false
-            setupInstantTouch(this) { onKeyAction("ACTION_DICTATION") }
+        // Dictation Microphone Button (Apple iOS Monochrome Mic) with Anti-Accidental Touch
+        if (isDictationEnabled) {
+            val btnMic = ImageButton(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.95f)
+                    .apply { setMargins(dp(2), 0, dp(2), 0) }
+                background = ContextCompat.getDrawable(context, specialKeyBg)
+                setImageResource(R.drawable.ic_mic_ios)
+                setColorFilter(textColor)
+                scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+                isClickable = true
+                isFocusable = false
+                setupDictationKeyTouch(this) { onKeyAction("ACTION_DICTATION") }
+            }
+            micButtonRef = btnMic
+            r4.addView(btnMic)
         }
-        r4.addView(btnMic)
 
         // Return / Enter Action Button (return / Dead Center Search Icon)
         val btnReturn = ReturnButtonLayout(context).apply {
@@ -1782,6 +1809,66 @@ class KeyboardLayout(private val context: Context) {
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    // Anti-Accidental Touch Dictation Key Listener:
+    // Requires deliberate single-pointer tap-and-release within view bounds.
+    // Strictly ignores multi-touch ACTION_POINTER_DOWN during fast two-thumb typing.
+    private fun setupDictationKeyTouch(view: View, onTrigger: () -> Unit) {
+        view.isHapticFeedbackEnabled = true
+        var isEligibleDown = false
+        var downTime = 0L
+
+        view.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    isEligibleDown = true
+                    downTime = System.currentTimeMillis()
+                    v.isPressed = true
+                    true
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    // Multi-touch means user is typing letters with two thumbs -> cancel mic touch!
+                    isEligibleDown = false
+                    v.isPressed = false
+                    false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (isEligibleDown) {
+                        val inBounds = event.x in 0f..v.width.toFloat() && event.y in 0f..v.height.toFloat()
+                        if (!inBounds) {
+                            isEligibleDown = false
+                            v.isPressed = false
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    v.isPressed = false
+                    if (isEligibleDown) {
+                        val inBounds = event.x in 0f..v.width.toFloat() && event.y in 0f..v.height.toFloat()
+                        val duration = System.currentTimeMillis() - downTime
+                        if (inBounds && duration in 40L..1200L) {
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+                            onTrigger()
+                        }
+                    }
+                    isEligibleDown = false
+                    true
+                }
+                MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    isEligibleDown = false
                     v.isPressed = false
                     true
                 }

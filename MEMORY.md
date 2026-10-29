@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.47)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.48)
 
 ---
 
@@ -252,3 +252,19 @@
        - Menambahkan pengecekan `isKnownWord()` pada `SmartCorrectionEngine`. Jika kata yang diketik sudah valid dan terdaftar di KBBI (74.500+ entri), kamus belajar mandiri (`userDictionary`), atau kosakata umum, penekanan tombol spasi DILARANG menggantinya secara otomatis.
        - Koreksi otomatis spasi hanya aktif jika kata terbukti salah ketik/tidak dikenal dan memiliki huruf awal yang sama/bertetangga QWERTY.
        - `selectCandidate` pada aplikasi umum (WhatsApp, browser, dll) kini memeriksa teks aktual sebelum kursor (`getTextBeforeCursor`) untuk menghitung panjang penghapusan yang presisi bahkan jika kursor dipindahkan oleh pengguna.
+  - **Eliminasi Pemicu Dikte Suara Tak Sengaja & Pengetikan 120 FPS Ultra-Smooth (Release v1.0.48)**:
+    1. **Root Cause Masalah Voice/Mic Tiba-Tiba Terpencet Sendiri**:
+       - Tombol mikrofon (`btnMic`) di baris ke-4 sebelumnya menggunakan listener `setupInstantTouch` yang langsung mengeksekusi `ACTION_DICTATION` seketika saat `ACTION_DOWN` maupun `ACTION_POINTER_DOWN` (0ms delay).
+       - Ketika pengguna mengetik cepat dengan dua jempol bergantian atau mengetik spasi dengan jempol kanan, jempol kanan sering mendarat di area mic atau tepi spasi, memicu `ACTION_POINTER_DOWN` pada tombol mic.
+       - Seketika `SpeechRecognizer` Android aktif merekam suara di latar belakang tanpa disadari pengguna, sehingga ucapan percakapan sekitar / desah suara otomatis tertranskrip dan terketik tiba-tiba ke dalam kolom chat ("itu kata kadang perbaiki").
+       - Selain itu, ketika fitur dikte dinonaktifkan di Pengaturan (`switchDictation`), tombol mic sebelumnya tetap ditampilkan secara fisik di baris keyboard dan mempersempit tombol spasi.
+    2. **Solusi Multi-Layer Anti-Accidental Dictation Protocol**:
+       - **Layer 1 (Dedicated `setupDictationKeyTouch`)**: Tombol mic DILARANG memicu aksi pada `ACTION_DOWN` maupun `ACTION_POINTER_DOWN`. Aksi hanya dapat dieksekusi pada `ACTION_UP` bersih di mana jari terbukti mendarat dan terangkat di dalam batas tombol mic tanpa terseret/drag (durasi 40ms–1200ms).
+       - **Layer 2 (Multi-Touch Rejection)**: Event `ACTION_POINTER_DOWN` (mengetik 2 jempol) langsung membatalkan sentuhan tombol mic secara otomatis.
+       - **Layer 3 (Active Typing Guard)**: Pada `handleDictationAction`, sistem memeriksa apakah pengguna sedang aktif mengetik kata (`composingWord.isNotEmpty()`) atau baru saja menekan tombol tuts dalam 280ms terakhir (`now - lastKeyTypingTime < 280L`). Jika ya, pemicuan mic diabaikan 100%.
+       - **Layer 4 (Auto-Hide Saat Dinonaktifkan)**: Jika dikte suara dimatikan di Pengaturan (`prefs.isDictationEnabled == false`), tombol mic dihilangkan total dari baris keyboard dan tombol spasi membesar penuh (`5.4f`), memberikan area ketik spasi yang sangat lega.
+       - **Layer 5 (Visual Feedback & Auto-Stop)**: Indikator ikon mic berubah warna merah Apple (`#FF3B30`) saat mendengarkan suara, dan otomatis berhenti (`stopListening()`) saat keyboard ditutup atau disembunyikan.
+    3. **Pengetikan 120 FPS Ultra-Smooth Tanpa Jeda / Stutter**:
+       - **Eliminasi Binder IPC pada `onUpdateSelection`**: Pengetikan karakter maju sekuensial (`newSelStart == oldSelStart + 1`) kini diproses 100% in-memory tanpa memanggil `getTextBeforeCursor` secara synchronous ke proses aplikasi target.
+       - **In-Memory Cache Balon Preview Huruf**: Menghilangkan 2x pemanggilan native JNI `getLocationOnScreen()` dan alokasi array pada setiap tuts huruf. Koordinat pop-up dicatat ke memori (`keyPopupPositions`) sekali per tuts.
+       - **Async Background Audio & Haptic Execution**: Pemanggilan `AudioManager.playSoundEffect` dan `Vibrator.vibrate` dialihkan ke dedicated single-threaded executor (`asyncExecutor`), membebaskan UI thread dari antrean Binder IPC sistem sehingga pengetikan terasa sangat mulus, responsif, dan enteng di refresh rate 120Hz.
