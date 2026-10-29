@@ -286,11 +286,12 @@ class IosInputMethodService : InputMethodService() {
             updateTranslatePanelUI()
             rootView?.let { applyThemeStyling(it) }
 
-            if (!restarting && !isCapsLock) {
+            if (!isCapsLock) {
                 isShifted = shouldAutoCapitalize()
             }
 
             renderCurrentLayout()
+            layoutEngine.updateShiftState(isShifted || isCapsLock)
             layoutEngine.updateReturnButton(info, themeMode = prefs.themeMode, isDark = isDarkMode())
             layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode(), prefs.themeMode)
         } catch (t: Throwable) {

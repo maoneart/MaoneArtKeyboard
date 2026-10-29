@@ -49,11 +49,14 @@ class QuickPathContainerLayout(
         visibility = View.GONE
         isClickable = false
         isFocusable = false
-        elevation = 16f * resources.displayMetrics.density
+        elevation = 20f * resources.displayMetrics.density
         addView(tvPopupChar)
     }
 
     init {
+        clipChildren = false
+        clipToPadding = false
+
         val isWoody = (themeMode == "woody")
         when {
             isWoody -> {
@@ -81,6 +84,10 @@ class QuickPathContainerLayout(
     }
 
     fun setKeyboardContentView(content: View) {
+        if (content is android.view.ViewGroup) {
+            content.clipChildren = false
+            content.clipToPadding = false
+        }
         // Keyboard keys go underneath the swipe trail and popup bubble
         addView(content, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
@@ -89,27 +96,31 @@ class QuickPathContainerLayout(
         swipeTrailView.setTrailColor(color)
     }
 
-    private fun showKeyPopup(keyLabel: String, keyRect: Rect) {
+    fun showPopupForKey(keyView: View, label: String) {
         if (!isKeyPopupEnabled) return
-        getLocationOnScreen(containerLoc)
+        val loc = IntArray(2)
+        val myLoc = IntArray(2)
+        keyView.getLocationOnScreen(loc)
+        getLocationOnScreen(myLoc)
+
         val popupW = (48 * resources.displayMetrics.density).toInt()
         val popupH = (60 * resources.displayMetrics.density).toInt()
-        val keyCenterX = (keyRect.left + keyRect.right) / 2
-        val targetX = (keyCenterX - containerLoc[0]) - popupW / 2
-        val targetY = (keyRect.top - containerLoc[1]) - popupH + (8 * resources.displayMetrics.density).toInt()
+        val keyCenterX = loc[0] + keyView.width / 2
+        val targetX = (keyCenterX - myLoc[0]) - popupW / 2
+        val targetY = (loc[1] - myLoc[1]) - popupH + (8 * resources.displayMetrics.density).toInt()
 
         val lp = popupBubble.layoutParams as LayoutParams
         lp.width = popupW
         lp.height = popupH
-        lp.leftMargin = targetX.coerceAtLeast(0)
-        lp.topMargin = targetY.coerceAtLeast(0)
+        lp.leftMargin = targetX
+        lp.topMargin = targetY
         popupBubble.layoutParams = lp
 
-        tvPopupChar.text = keyLabel
+        tvPopupChar.text = label
         popupBubble.visibility = View.VISIBLE
     }
 
-    private fun hideKeyPopup() {
+    fun hidePopup() {
         if (popupBubble.visibility != View.GONE) {
             popupBubble.visibility = View.GONE
         }
@@ -125,9 +136,6 @@ class QuickPathContainerLayout(
                 val keyInfo = findKeyAtCoords(ev.rawX, ev.rawY)
                 if (keyInfo != null && keyInfo.first.isNotEmpty() && keyInfo.first[0].isLetter()) {
                     swipedChars.add(keyInfo.first[0].lowercaseChar())
-                    showKeyPopup(keyInfo.first, keyInfo.second)
-                } else {
-                    hideKeyPopup()
                 }
                 return false
             }
@@ -136,7 +144,7 @@ class QuickPathContainerLayout(
                     val dist = hypot((ev.rawX - startX).toDouble(), (ev.rawY - startY).toDouble()).toFloat()
                     if (isSwipeEnabled && dist > touchSlop) {
                         // Start QuickPath Swipe!
-                        hideKeyPopup()
+                        hidePopup()
                         if (swipedChars.isEmpty()) {
                             val startKey = findKeyAtCoords(startX, startY) ?: findKeyAtCoords(ev.rawX, ev.rawY)
                             if (startKey != null && startKey.first.isNotEmpty() && startKey.first[0].isLetter()) {
@@ -158,18 +166,12 @@ class QuickPathContainerLayout(
                             }
                             return true // Intercept touch! Letter key gets ACTION_CANCEL
                         }
-                    } else if (!isSwiping) {
-                        // Gentle slide: update popup location to hovered key
-                        val currentKey = findKeyAtCoords(ev.rawX, ev.rawY)
-                        if (currentKey != null && currentKey.first.isNotEmpty() && currentKey.first[0].isLetter()) {
-                            showKeyPopup(currentKey.first, currentKey.second)
-                        }
                     }
                 }
                 return isSwiping
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                hideKeyPopup()
+                hidePopup()
                 isSwiping = false
                 swipedChars.clear()
                 swipeTrailView.clearTrail()
@@ -183,7 +185,7 @@ class QuickPathContainerLayout(
         when (ev.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 if (isSwiping && isSwipeEnabled) {
-                    hideKeyPopup()
+                    hidePopup()
                     swipeTrailView.addPoint(ev.x, ev.y)
                     val keyInfo = findKeyAtCoords(ev.rawX, ev.rawY)
                     if (keyInfo != null && keyInfo.first.isNotEmpty() && keyInfo.first[0].isLetter()) {
@@ -198,7 +200,7 @@ class QuickPathContainerLayout(
                 }
             }
             MotionEvent.ACTION_UP -> {
-                hideKeyPopup()
+                hidePopup()
                 swipeTrailView.clearTrail()
                 if (isSwiping && swipedChars.size >= 2) {
                     onSwipeCompleted(ArrayList(swipedChars))
@@ -208,7 +210,7 @@ class QuickPathContainerLayout(
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                hideKeyPopup()
+                hidePopup()
                 swipeTrailView.clearTrail()
                 isSwiping = false
                 swipedChars.clear()

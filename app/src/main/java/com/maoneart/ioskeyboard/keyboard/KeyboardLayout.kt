@@ -61,6 +61,7 @@ class KeyboardLayout(private val context: Context) {
     private val letterKeyViews = mutableListOf<Pair<TextView, String>>()
     private var shiftButtonRef: ImageButton? = null
     private var returnButtonRef: ReturnButtonLayout? = null
+    private var popupController: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathContainerLayout? = null
 
     data class KeyHitBox(
         val tv: TextView,
@@ -369,10 +370,12 @@ class KeyboardLayout(private val context: Context) {
         } else {
             container.setTrailColor(Color.parseColor("#99007AFF"))
         }
+        popupController = container
+        root.clipChildren = false
+        root.clipToPadding = false
         container.setKeyboardContentView(root)
 
         root.post { rebuildHitBoxCache() }
-        root.viewTreeObserver.addOnGlobalLayoutListener { rebuildHitBoxCache() }
 
         return container
     }
@@ -1460,7 +1463,7 @@ class KeyboardLayout(private val context: Context) {
             isClickable = true
             isFocusable = false
             isHapticFeedbackEnabled = true
-            setupInstantTouch(this) { onKeyAction(text.toString()) }
+            setupLetterKeyTouch(this) { onKeyAction(text.toString()) }
         }
     }
 
@@ -1589,6 +1592,33 @@ class KeyboardLayout(private val context: Context) {
                     } else {
                         onSpaceAction()
                     }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    // iOS Key Pop-up Preview Touch Handler with Hardware Haptic Feedback
+    private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
+        view.isHapticFeedbackEnabled = true
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    popupController?.showPopupForKey(v, view.text.toString())
+                    try {
+                        v.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
+                    onTrigger()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    popupController?.hidePopup()
                     true
                 }
                 else -> false

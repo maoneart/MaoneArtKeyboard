@@ -4,6 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:minHeight="0dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:orientation="vertical"
     android:background="@color/ios_bg_light">
 
@@ -242,6 +244,8 @@
         android:id="@+id/keyboardContainer"
         android:layout_width="match_parent"
         android:layout_height="235dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:padding="3dp" />
 
 </LinearLayout>

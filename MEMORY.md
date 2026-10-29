@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.38)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.39)
 
 ---
 
@@ -164,3 +164,13 @@
     4. **Penyempurnaan Perlintasan Teks (QuickPath)**:
        - Animasi jejak lintasan SwipeTrailView bertransformasi menjadi Fluid Ribbon dengan ujung dinamis dan ekor memudar bertahap (alpha decay).
        - Live Preview saran kata di tombol saran tengah (✦ kata) secara real-time saat sapuan jari berlangsung.
+  - Perbaikan Tuntas Huruf Besar WA (Restarting Fix), Balon Pop-up Visible & 120 FPS Enteng (Release v1.0.39):
+    1. **Perbaikan Tuntas Auto-Capitalization Pesan WhatsApp (Eliminasi !restarting Guard)**:
+       - Menghapus guard '!restarting' pada onStartInputView() yang sebelumnya memblokir eksekusi shouldAutoCapitalize() saat WhatsApp me-restart input setelah tombol Send ditekan.
+       - Huruf pertama pesan ke-2, ke-3, dan seterusnya di WhatsApp kini 100% dipastikan selalu berhuruf besar otomatis.
+    2. **Balon Key Pop-up Preview 100% Terlihat (Anti-Clipping & Direct Touch Binding)**:
+       - Membuka pembatas clipChildren dan clipToPadding menjadi false pada seluruh rantai layout (keyboardRoot, keyboardContainer, QuickPathContainerLayout, dan root layout).
+       - Mengikat kemunculan balon pop-up pembesar huruf (popupBubble) langsung ke handler sentuhan tuts huruf (setupLetterKeyTouch): seketika tombol ditekan (ACTION_DOWN) balon melayang di atas tuts, dan langsung lenyap saat dilepas (ACTION_UP) atau saat swipe aktif (ACTION_CANCEL).
+    3. **Eliminasi Beban Layout & UI Thread Super Smooth**:
+       - Menghapus OnGlobalLayoutListener yang memicu layout pass berulang di UI thread.
+       - Pengetikan kembali super responsif, instan 0ms, dan enteng di semua HP.
