@@ -737,7 +737,6 @@ class SmartCorrectionEngine(private val context: Context) {
                 checkCandidate(c)
                 if (typoCandidates.size >= 16) break
             }
-            }
 
             typoCandidates.sortBy { it.second }
             for ((cand, _) in typoCandidates) {
