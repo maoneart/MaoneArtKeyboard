@@ -913,6 +913,19 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    private fun isTerminalOrRawInput(): Boolean {
+        val editor = currentInputEditorInfo ?: return false
+        val pkg = (editor.packageName ?: "").lowercase()
+        val type = editor.inputType
+        return (type and InputType.TYPE_MASK_CLASS) == InputType.TYPE_NULL ||
+               type == 0 ||
+               pkg.contains("termux") ||
+               pkg.contains("terminal") ||
+               pkg.contains("connectbot") ||
+               pkg.contains("juicessh") ||
+               pkg.contains("ssh")
+    }
+
     private fun handleBackspace() {
         try {
             if (isTranslatePanelOpen) {
@@ -929,6 +942,15 @@ class IosInputMethodService : InputMethodService() {
                 return
             }
 
+            val ic = currentInputConnection
+            if (isTerminalOrRawInput()) {
+                composingWord.clear()
+                if (ic != null) {
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                }
+                return
+            }
+
             if (composingWord.isNotEmpty()) {
                 val lastIdx = composingWord.length - 1
                 val lastCh = composingWord[lastIdx]
@@ -936,21 +958,25 @@ class IosInputMethodService : InputMethodService() {
                 composingWord.delete(composingWord.length - charsToDel, composingWord.length)
             }
 
-            val ic = currentInputConnection
             if (ic != null) {
-                val deleted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    ic.deleteSurroundingTextInCodePoints(1, 0)
+                val selectedText = ic.getSelectedText(0)
+                if (!selectedText.isNullOrEmpty()) {
+                    ic.commitText("", 1)
                 } else {
-                    false
-                }
-                if (!deleted) {
-                    val textBefore = ic.getTextBeforeCursor(4, 0)?.toString()
-                    if (!textBefore.isNullOrEmpty()) {
-                        val lastChar = textBefore.last()
-                        val charsToDelete = if (Character.isLowSurrogate(lastChar) && textBefore.length >= 2 && Character.isHighSurrogate(textBefore[textBefore.length - 2])) 2 else 1
-                        ic.deleteSurroundingText(charsToDelete, 0)
+                    val deleted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        ic.deleteSurroundingTextInCodePoints(1, 0)
                     } else {
-                        ic.deleteSurroundingText(1, 0)
+                        false
+                    }
+                    if (!deleted) {
+                        val textBefore = ic.getTextBeforeCursor(4, 0)?.toString()
+                        if (!textBefore.isNullOrEmpty()) {
+                            val lastChar = textBefore.last()
+                            val charsToDelete = if (Character.isLowSurrogate(lastChar) && textBefore.length >= 2 && Character.isHighSurrogate(textBefore[textBefore.length - 2])) 2 else 1
+                            ic.deleteSurroundingText(charsToDelete, 0)
+                        } else {
+                            sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                        }
                     }
                 }
             }

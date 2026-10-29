@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.40)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.41)
 
 ---
 
@@ -185,3 +185,15 @@
        - Menampilkan rekomendasi singkatan teks langsung di bilah saran (`⚡ Frasa`).
     3. **Perbaikan Hapus Emoji Anti-Karakter Rusak**:
        - Menggunakan `deleteSurroundingTextInCodePoints(1, 0)` dan deteksi UTF-16 surrogate pairs: Emoji terhapus 100% utuh dalam 1x tap tanpa meninggalkan kotak silang / karakter aneh tanda tanya.
+  - **Redesign iOS White Pintasan Teks & Fix Tombol Delete di Termux (Release v1.0.41)**:
+    1. **Redesign Total Pintasan Teks (Apple iOS 18 Cupertino Inset Grouped)**:
+       - Mengganti dialog dark theme menjadi 100% iOS Light White (`#FFFFFF` pure white card, rounded 20dp, subtle border `#E5E5EA`, latar dim 45%).
+       - Dilengkapi **Cupertino Search Bar** instan dengan `TextWatcher` untuk mencari singkatan/frasa secara real-time.
+       - Header bergaya iOS 18 dengan Pill Button `➕ Tambah` (`#007AFF`) dan footer button `Selesai`.
+       - Form tambah pintasan bergaya Apple Inset Grouped (`#F2F2F7` card, label `FRASA` & `SINGKATAN` dengan pembatas hairline 0.5dp).
+       - Modal konfirmasi hapus dan kelola pintasan mengikuti standar **MaoneArt Glassmorphism Modal** 2-kolom simetris (`Batal` dan `🗑️ Hapus`).
+    2. **Perbaikan Tuntas Tombol Delete/Backspace di Termux**:
+       - Root Cause: Termux menggunakan pseudo-terminal (PTY) dengan `InputType.TYPE_NULL` tanpa buffer `EditText`, sehingga pemanggilan `deleteSurroundingText` diabaikan oleh terminal.
+       - Solusi: Menambahkan deteksi `isTerminalOrRawInput()` (deteksi `TYPE_NULL` dan package `com.termux`, `terminal`, `ssh`).
+       - Saat berada di Termux, keyboard langsung mengirim `sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)` ke terminal PTY.
+       - Penghapusan karakter single tap maupun tekan-tahan rapid repeating backspace kini berfungsi 100% lancar dan responsif di Termux.

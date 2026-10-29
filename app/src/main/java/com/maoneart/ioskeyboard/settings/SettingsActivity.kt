@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.ImageView
@@ -411,37 +413,20 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun isDarkTheme(): Boolean {
-        return when (prefs.themeMode) {
-            "dark" -> true
-            "woody" -> true
-            "light" -> false
-            else -> {
-                val nightModeFlags = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
-                nightModeFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES
-            }
-        }
-    }
-
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     private fun showTextReplacementDialog() {
         val manager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
-        val isDark = isDarkTheme()
 
         val dialog = android.app.Dialog(this).apply {
             requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
             window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            window?.setDimAmount(0.45f)
         }
-
-        val cardBg = if (isDark) R.drawable.key_bg_special_dark else R.drawable.card_bg_ios
-        val textColor = if (isDark) Color.WHITE else Color.BLACK
-        val subColor = if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93")
-        val itemBg = if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_special_light
 
         val rootCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = ContextCompat.getDrawable(this@SettingsActivity, cardBg)
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_modal)
             val pad = dp(20)
             setPadding(pad, pad, pad, pad)
             layoutParams = LinearLayout.LayoutParams(
@@ -450,35 +435,50 @@ class SettingsActivity : AppCompatActivity() {
             )
         }
 
-        // Header Title
-        val tvTitle = TextView(this).apply {
-            text = "⚡ Penggantian Teks"
-            textSize = 17.5f
-            setTextColor(textColor)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
-        }
-        rootCard.addView(tvTitle)
-
-        val tvSubtitle = TextView(this).apply {
-            text = "Ketik singkatan untuk otomatis menjadi frasa lengkap"
-            textSize = 12f
-            setTextColor(subColor)
-            gravity = android.view.Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(4), 0, dp(14))
-        }
-        rootCard.addView(tvSubtitle)
-
-        // Button: Tambah Pintasan Baru
-        val btnAdd = TextView(this).apply {
+        // 1. iOS Top Header with Pill Button
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42)
-            ).apply { setMargins(0, 0, 0, dp(12)) }
-            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.key_bg_blue)
-            text = "➕ Tambah Pintasan Baru"
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val titleCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
+        }
+
+        val tvBadge = TextView(this).apply {
+            text = "⚡ PINTASAN TEKS"
+            textSize = 10.5f
+            setTextColor(Color.parseColor("#FF9500"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            letterSpacing = 0.08f
+        }
+        titleCol.addView(tvBadge)
+
+        val tvTitle = TextView(this).apply {
+            text = "Penggantian Teks"
+            textSize = 19.5f
+            setTextColor(Color.BLACK)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        titleCol.addView(tvTitle)
+        headerRow.addView(titleCol)
+
+        // Apple Pill Button: "+ Tambah"
+        val btnAdd = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(34)
+            )
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_blue)
+            setPadding(dp(14), 0, dp(14), 0)
+            text = "➕ Tambah"
             setTextColor(Color.WHITE)
-            textSize = 14f
+            textSize = 13f
             gravity = android.view.Gravity.CENTER
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             isClickable = true
@@ -487,98 +487,213 @@ class SettingsActivity : AppCompatActivity() {
                 showAddShortcutDialog(manager)
             }
         }
-        rootCard.addView(btnAdd)
+        headerRow.addView(btnAdd)
+        rootCard.addView(headerRow)
 
-        // List Scroll Container
+        val tvSubtitle = TextView(this).apply {
+            text = "Ketik singkatan untuk diganti frasa lengkap secara otomatis saat menekan spasi."
+            textSize = 12f
+            setTextColor(Color.parseColor("#8E8E93"))
+            setPadding(0, dp(4), 0, dp(12))
+        }
+        rootCard.addView(tvSubtitle)
+
+        // 2. iOS Cupertino Search Bar
+        val searchBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_inner)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(38)
+            ).apply { setMargins(0, 0, 0, dp(10)) }
+            setPadding(dp(12), 0, dp(12), 0)
+        }
+
+        val ivSearch = TextView(this).apply {
+            text = "🔍 "
+            textSize = 13f
+        }
+        searchBar.addView(ivSearch)
+
+        val etSearch = EditText(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+            background = null
+            hint = "Cari singkatan atau frasa..."
+            setHintTextColor(Color.parseColor("#8E8E93"))
+            setTextColor(Color.BLACK)
+            textSize = 13.5f
+            setSingleLine(true)
+        }
+        searchBar.addView(etSearch)
+        rootCard.addView(searchBar)
+
+        // 3. Scrollable List Container (Cupertino Inset Group)
+        val outerListCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_inner)
+            setPadding(dp(6), dp(6), dp(6), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
         val scrollView = android.widget.ScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(240)
+                dp(260)
             )
+            isFillViewport = true
         }
+
         val listContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
 
-        val shortcuts = manager.getAllReplacements().toSortedMap()
-        if (shortcuts.isEmpty()) {
-            val emptyTv = TextView(this).apply {
-                text = "Belum ada pintasan teks khusus."
-                setTextColor(subColor)
-                textSize = 13f
-                gravity = android.view.Gravity.CENTER
-                setPadding(0, dp(30), 0, dp(30))
-            }
-            listContainer.addView(emptyTv)
-        } else {
-            for ((shortcut, phrase) in shortcuts) {
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = android.view.Gravity.CENTER_VERTICAL
-                    background = ContextCompat.getDrawable(this@SettingsActivity, itemBg)
-                    setPadding(dp(12), dp(10), dp(12), dp(10))
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { setMargins(0, 0, 0, dp(8)) }
-                    isClickable = true
-                    setOnClickListener {
-                        dialog.dismiss()
-                        showManageShortcutDialog(manager, shortcut, phrase)
-                    }
+        fun populateList(query: String = "") {
+            listContainer.removeAllViews()
+            val shortcuts = manager.getAllReplacements().toSortedMap()
+            val filtered = if (query.isBlank()) {
+                shortcuts.entries.toList()
+            } else {
+                val q = query.trim().lowercase()
+                shortcuts.entries.filter { (s, p) ->
+                    s.lowercase().contains(q) || p.lowercase().contains(q)
                 }
+            }
 
-                // Shortcut Badge
-                val badge = TextView(this).apply {
-                    text = shortcut
-                    textSize = 13.5f
-                    setTextColor(ContextCompat.getColor(this@SettingsActivity, R.color.ios_blue))
+            if (filtered.isEmpty()) {
+                val emptyLayout = LinearLayout(this@SettingsActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = android.view.Gravity.CENTER
+                    setPadding(0, dp(32), 0, dp(32))
+                }
+                val emptyIcon = TextView(this@SettingsActivity).apply {
+                    text = "⚡"
+                    textSize = 30f
+                    gravity = android.view.Gravity.CENTER
+                }
+                emptyLayout.addView(emptyIcon)
+
+                val emptyTitle = TextView(this@SettingsActivity).apply {
+                    text = if (query.isBlank()) "Belum Ada Pintasan" else "Pintasan Tidak Ditemukan"
+                    textSize = 15f
+                    setTextColor(Color.BLACK)
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    setBackgroundColor(Color.TRANSPARENT)
+                    gravity = android.view.Gravity.CENTER
+                    setPadding(0, dp(6), 0, dp(2))
                 }
-                row.addView(badge)
+                emptyLayout.addView(emptyTitle)
 
-                val arrow = TextView(this).apply {
-                    text = " ➔ "
+                val emptyDesc = TextView(this@SettingsActivity).apply {
+                    text = if (query.isBlank()) {
+                        "Ketik singkatan seperti 'otw' untuk memicu 'On the way'."
+                    } else {
+                        "Tidak ada singkatan yang cocok dengan kata '$query'."
+                    }
                     textSize = 12f
-                    setTextColor(subColor)
+                    setTextColor(Color.parseColor("#8E8E93"))
+                    gravity = android.view.Gravity.CENTER
                 }
-                row.addView(arrow)
+                emptyLayout.addView(emptyDesc)
+                listContainer.addView(emptyLayout)
+            } else {
+                for (entry in filtered) {
+                    val sKey = entry.key
+                    val sPhrase = entry.value
 
-                val phraseTv = TextView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
-                    text = phrase
-                    textSize = 13.5f
-                    setTextColor(textColor)
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    val row = LinearLayout(this@SettingsActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = android.view.Gravity.CENTER_VERTICAL
+                        background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios)
+                        setPadding(dp(12), dp(10), dp(12), dp(10))
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { setMargins(0, 0, 0, dp(4)) }
+                        isClickable = true
+                        setOnClickListener {
+                            dialog.dismiss()
+                            showManageShortcutDialog(manager, sKey, sPhrase)
+                        }
+                    }
+
+                    // Shortcut Badge Chip
+                    val badge = TextView(this@SettingsActivity).apply {
+                        text = sKey
+                        textSize = 13f
+                        setTextColor(Color.parseColor("#007AFF"))
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.badge_bg_shortcut)
+                        setPadding(dp(8), dp(3), dp(8), dp(3))
+                    }
+                    row.addView(badge)
+
+                    // Phrase Text
+                    val tvPhrase = TextView(this@SettingsActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f).apply {
+                            setMargins(dp(10), 0, dp(8), 0)
+                        }
+                        text = sPhrase
+                        textSize = 14f
+                        setTextColor(Color.BLACK)
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    }
+                    row.addView(tvPhrase)
+
+                    // Quick Delete Action Button
+                    val btnQuickDel = TextView(this@SettingsActivity).apply {
+                        layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+                        background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_red_subtle)
+                        text = "✕"
+                        textSize = 12f
+                        setTextColor(Color.parseColor("#FF3B30"))
+                        typeface = android.graphics.Typeface.DEFAULT_BOLD
+                        gravity = android.view.Gravity.CENTER
+                        isClickable = true
+                        setOnClickListener {
+                            showDeleteConfirmModal(manager, sKey, sPhrase) {
+                                populateList(etSearch.text.toString())
+                            }
+                        }
+                    }
+                    row.addView(btnQuickDel)
+                    listContainer.addView(row)
                 }
-                row.addView(phraseTv)
-
-                val deleteBtn = TextView(this).apply {
-                    text = "✕"
-                    textSize = 14f
-                    setTextColor(subColor)
-                    setPadding(dp(8), 0, dp(4), 0)
-                }
-                row.addView(deleteBtn)
-
-                listContainer.addView(row)
             }
         }
-        scrollView.addView(listContainer)
-        rootCard.addView(scrollView)
 
-        // Bottom Action Button: Tutup
+        populateList()
+
+        etSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                populateList(s?.toString() ?: "")
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        scrollView.addView(listContainer)
+        outerListCard.addView(scrollView)
+        rootCard.addView(outerListCard)
+
+        // 4. iOS Selesai Bottom Action Button
         val btnClose = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42)
-            ).apply { setMargins(0, dp(12), 0, 0) }
-            background = ContextCompat.getDrawable(this@SettingsActivity, itemBg)
-            text = "Tutup"
-            setTextColor(textColor)
-            textSize = 14f
+                dp(44)
+            ).apply { setMargins(0, dp(14), 0, 0) }
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_gray)
+            text = "Selesai"
+            setTextColor(Color.parseColor("#007AFF"))
+            textSize = 15f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
             isClickable = true
             setOnClickListener { dialog.dismiss() }
@@ -586,24 +701,21 @@ class SettingsActivity : AppCompatActivity() {
         rootCard.addView(btnClose)
 
         dialog.setContentView(rootCard)
+        val dialogWidth = (resources.displayMetrics.widthPixels * 0.92f).toInt()
+        dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
         dialog.show()
     }
 
     private fun showAddShortcutDialog(manager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager) {
-        val isDark = isDarkTheme()
         val dialog = android.app.Dialog(this).apply {
             requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
             window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            window?.setDimAmount(0.45f)
         }
-
-        val cardBg = if (isDark) R.drawable.key_bg_special_dark else R.drawable.card_bg_ios
-        val textColor = if (isDark) Color.WHITE else Color.BLACK
-        val subColor = if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93")
-        val inputBg = if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_special_light
 
         val rootCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = ContextCompat.getDrawable(this@SettingsActivity, cardBg)
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_modal)
             val pad = dp(20)
             setPadding(pad, pad, pad, pad)
             layoutParams = LinearLayout.LayoutParams(
@@ -614,85 +726,120 @@ class SettingsActivity : AppCompatActivity() {
 
         val tvTitle = TextView(this).apply {
             text = "✏️ Tambah Pintasan Baru"
-            textSize = 17f
-            setTextColor(textColor)
+            textSize = 18f
+            setTextColor(Color.BLACK)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER_HORIZONTAL
         }
         rootCard.addView(tvTitle)
 
         val tvSubtitle = TextView(this).apply {
-            text = "Masukkan singkatan dan frasa pengganti"
+            text = "Masukkan frasa lengkap dan singkatan pemicu"
             textSize = 12f
-            setTextColor(subColor)
+            setTextColor(Color.parseColor("#8E8E93"))
             gravity = android.view.Gravity.CENTER_HORIZONTAL
             setPadding(0, dp(4), 0, dp(16))
         }
         rootCard.addView(tvSubtitle)
 
-        // Label 1: SINGKATAN
-        val lbl1 = TextView(this).apply {
-            text = "SINGKATAN (SHORTCUT)"
-            textSize = 11f
-            setTextColor(subColor)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(dp(4), 0, 0, dp(4))
+        // Grouped Input Fields (Apple Settings Style)
+        val inputGroup = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_inner)
+            setPadding(dp(14), dp(4), dp(14), dp(4))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
-        rootCard.addView(lbl1)
 
-        val etShortcut = EditText(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44)).apply {
-                setMargins(0, 0, 0, dp(12))
-            }
-            background = ContextCompat.getDrawable(this@SettingsActivity, inputBg)
-            setPadding(dp(14), 0, dp(14), 0)
-            hint = "Contoh: otw, gpp, slm"
-            setHintTextColor(subColor)
-            setTextColor(textColor)
-            textSize = 14f
-            setSingleLine(true)
+        // Row 1: FRASA
+        val rowPhrase = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
         }
-        rootCard.addView(etShortcut)
-
-        // Label 2: FRASA LENGKAP
-        val lbl2 = TextView(this).apply {
-            text = "FRASA LENGKAP (PHRASE)"
-            textSize = 11f
-            setTextColor(subColor)
+        val lblPhrase = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(85), LinearLayout.LayoutParams.WRAP_CONTENT)
+            text = "FRASA"
+            textSize = 11.5f
+            setTextColor(Color.parseColor("#8E8E93"))
             typeface = android.graphics.Typeface.DEFAULT_BOLD
-            setPadding(dp(4), 0, 0, dp(4))
         }
-        rootCard.addView(lbl2)
+        rowPhrase.addView(lblPhrase)
 
         val etPhrase = EditText(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44)).apply {
-                setMargins(0, 0, 0, dp(18))
-            }
-            background = ContextCompat.getDrawable(this@SettingsActivity, inputBg)
-            setPadding(dp(14), 0, dp(14), 0)
-            hint = "Contoh: On the way, Gak apa-apa"
-            setHintTextColor(subColor)
-            setTextColor(textColor)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+            background = null
+            hint = "Contoh: On the way"
+            setHintTextColor(Color.parseColor("#8E8E93"))
+            setTextColor(Color.BLACK)
             textSize = 14f
             setSingleLine(true)
         }
-        rootCard.addView(etPhrase)
+        rowPhrase.addView(etPhrase)
+        inputGroup.addView(rowPhrase)
+
+        // Hairline Divider
+        val divider = android.view.View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                height = 1
+            }
+            setBackgroundColor(Color.parseColor("#E5E5EA"))
+        }
+        inputGroup.addView(divider)
+
+        // Row 2: SINGKATAN
+        val rowShortcut = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
+        }
+        val lblShortcut = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(85), LinearLayout.LayoutParams.WRAP_CONTENT)
+            text = "SINGKATAN"
+            textSize = 11.5f
+            setTextColor(Color.parseColor("#8E8E93"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        rowShortcut.addView(lblShortcut)
+
+        val etShortcut = EditText(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+            background = null
+            hint = "Contoh: otw, gpp, slm"
+            setHintTextColor(Color.parseColor("#8E8E93"))
+            setTextColor(Color.BLACK)
+            textSize = 14f
+            setSingleLine(true)
+        }
+        rowShortcut.addView(etShortcut)
+        inputGroup.addView(rowShortcut)
+        rootCard.addView(inputGroup)
+
+        val tvTip = TextView(this).apply {
+            text = "💡 Tekan spasi setelah mengetik singkatan untuk otomatis menggantikannya dengan frasa."
+            textSize = 11.5f
+            setTextColor(Color.parseColor("#8E8E93"))
+            setPadding(dp(2), dp(8), dp(2), dp(18))
+        }
+        rootCard.addView(tvTip)
 
         // Symmetrical 2-Column Action Grid (MaoneArt Glassmorphism Standard)
         val btnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(42))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
         }
 
-        // Button 1: Batal
         val btnCancel = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
                 setMargins(0, 0, dp(6), 0)
             }
-            background = ContextCompat.getDrawable(this@SettingsActivity, inputBg)
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_gray)
             text = "Batal"
-            setTextColor(textColor)
-            textSize = 13.5f
+            setTextColor(Color.parseColor("#007AFF"))
+            textSize = 14f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
             isClickable = true
             setOnClickListener {
@@ -702,15 +849,14 @@ class SettingsActivity : AppCompatActivity() {
         }
         btnRow.addView(btnCancel)
 
-        // Button 2: Simpan
         val btnSave = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
                 setMargins(dp(6), 0, 0, 0)
             }
-            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.key_bg_blue)
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_blue)
             text = "Simpan"
             setTextColor(Color.WHITE)
-            textSize = 13.5f
+            textSize = 14f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
             isClickable = true
@@ -731,6 +877,8 @@ class SettingsActivity : AppCompatActivity() {
         rootCard.addView(btnRow)
 
         dialog.setContentView(rootCard)
+        val dialogWidth = (resources.displayMetrics.widthPixels * 0.92f).toInt()
+        dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
         dialog.show()
     }
 
@@ -739,20 +887,15 @@ class SettingsActivity : AppCompatActivity() {
         shortcut: String,
         phrase: String
     ) {
-        val isDark = isDarkTheme()
         val dialog = android.app.Dialog(this).apply {
             requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
             window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            window?.setDimAmount(0.45f)
         }
-
-        val cardBg = if (isDark) R.drawable.key_bg_special_dark else R.drawable.card_bg_ios
-        val textColor = if (isDark) Color.WHITE else Color.BLACK
-        val subColor = if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93")
-        val inputBg = if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_special_light
 
         val rootCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = ContextCompat.getDrawable(this@SettingsActivity, cardBg)
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_modal)
             val pad = dp(20)
             setPadding(pad, pad, pad, pad)
             layoutParams = LinearLayout.LayoutParams(
@@ -762,73 +905,218 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val tvTitle = TextView(this).apply {
-            text = "Pintasan: $shortcut"
-            textSize = 17f
-            setTextColor(textColor)
+            text = "Kelola Pintasan Teks"
+            textSize = 18f
+            setTextColor(Color.BLACK)
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER_HORIZONTAL
         }
         rootCard.addView(tvTitle)
 
-        // Phrase Display Box
-        val boxPhrase = TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(0, dp(12), 0, dp(18))
-            }
-            background = ContextCompat.getDrawable(this@SettingsActivity, inputBg)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            text = "\"$phrase\""
-            setTextColor(textColor)
-            textSize = 14f
-            gravity = android.view.Gravity.CENTER
+        val tvSubtitle = TextView(this).apply {
+            text = "Detail singkatan dan frasa pengganti"
+            textSize = 12f
+            setTextColor(Color.parseColor("#8E8E93"))
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(4), 0, dp(16))
         }
-        rootCard.addView(boxPhrase)
+        rootCard.addView(tvSubtitle)
 
-        // Symmetrical 2-Column Action Grid
+        // Detail Card Box
+        val detailBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_inner)
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(0, 0, 0, dp(18)) }
+        }
+
+        val shortcutRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val lblS = TextView(this).apply {
+            text = "Singkatan: "
+            textSize = 12.5f
+            setTextColor(Color.parseColor("#8E8E93"))
+        }
+        shortcutRow.addView(lblS)
+
+        val badgeS = TextView(this).apply {
+            text = shortcut
+            textSize = 13.5f
+            setTextColor(Color.parseColor("#007AFF"))
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.badge_bg_shortcut)
+            setPadding(dp(8), dp(3), dp(8), dp(3))
+        }
+        shortcutRow.addView(badgeS)
+        detailBox.addView(shortcutRow)
+
+        val lblP = TextView(this).apply {
+            text = "Frasa Lengkap:"
+            textSize = 12f
+            setTextColor(Color.parseColor("#8E8E93"))
+            setPadding(0, dp(10), 0, dp(2))
+        }
+        detailBox.addView(lblP)
+
+        val tvP = TextView(this).apply {
+            text = "\"$phrase\""
+            textSize = 15f
+            setTextColor(Color.BLACK)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        }
+        detailBox.addView(tvP)
+        rootCard.addView(detailBox)
+
+        // Symmetrical 2-Column Action Grid (MaoneArt Glassmorphism Standard)
         val btnRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(42))
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
+        }
+
+        val btnDelete = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                setMargins(0, 0, dp(6), 0)
+            }
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_red_subtle)
+            text = "🗑️ Hapus"
+            setTextColor(Color.parseColor("#FF3B30"))
+            textSize = 14f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+            isClickable = true
+            setOnClickListener {
+                dialog.dismiss()
+                showDeleteConfirmModal(manager, shortcut, phrase) {
+                    showTextReplacementDialog()
+                }
+            }
+        }
+        btnRow.addView(btnDelete)
+
+        val btnClose = TextView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
+                setMargins(dp(6), 0, 0, 0)
+            }
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_gray)
+            text = "Tutup"
+            setTextColor(Color.parseColor("#007AFF"))
+            textSize = 14f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER
+            isClickable = true
+            setOnClickListener {
+                dialog.dismiss()
+                showTextReplacementDialog()
+            }
+        }
+        btnRow.addView(btnClose)
+        rootCard.addView(btnRow)
+
+        dialog.setContentView(rootCard)
+        val dialogWidth = (resources.displayMetrics.widthPixels * 0.92f).toInt()
+        dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
+        dialog.show()
+    }
+
+    private fun showDeleteConfirmModal(
+        manager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager,
+        shortcut: String,
+        phrase: String,
+        onDeleted: () -> Unit
+    ) {
+        val dialog = android.app.Dialog(this).apply {
+            requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+            window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            window?.setDimAmount(0.45f)
+        }
+
+        val rootCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_modal)
+            val pad = dp(20)
+            setPadding(pad, pad, pad, pad)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val iconTv = TextView(this).apply {
+            text = "🗑️"
+            textSize = 30f
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+        }
+        rootCard.addView(iconTv)
+
+        val tvTitle = TextView(this).apply {
+            text = "Hapus Pintasan Teks?"
+            textSize = 17f
+            setTextColor(Color.BLACK)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(8), 0, dp(4))
+        }
+        rootCard.addView(tvTitle)
+
+        val tvMsg = TextView(this).apply {
+            text = "Apakah Anda yakin ingin menghapus pintasan '$shortcut' ➔ '$phrase'?"
+            textSize = 12.5f
+            setTextColor(Color.parseColor("#8E8E93"))
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(0, 0, 0, dp(18))
+        }
+        rootCard.addView(tvMsg)
+
+        // Symmetrical 2-Column Action Grid (MaoneArt Glassmorphism Standard)
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
         }
 
         val btnCancel = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
                 setMargins(0, 0, dp(6), 0)
             }
-            background = ContextCompat.getDrawable(this@SettingsActivity, inputBg)
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_gray)
             text = "Batal"
-            setTextColor(textColor)
-            textSize = 13.5f
+            setTextColor(Color.parseColor("#1C1C1E"))
+            textSize = 14f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
             isClickable = true
-            setOnClickListener {
-                dialog.dismiss()
-                showTextReplacementDialog()
-            }
+            setOnClickListener { dialog.dismiss() }
         }
         btnRow.addView(btnCancel)
 
-        val btnDelete = TextView(this).apply {
+        val btnConfirm = TextView(this).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f).apply {
                 setMargins(dp(6), 0, 0, 0)
             }
-            background = ContextCompat.getDrawable(this@SettingsActivity, inputBg)
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_bg_pill_red)
             text = "🗑️ Hapus"
-            setTextColor(Color.parseColor("#FF3B30"))
-            textSize = 13.5f
+            setTextColor(Color.WHITE)
+            textSize = 14f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             gravity = android.view.Gravity.CENTER
             isClickable = true
             setOnClickListener {
                 manager.remove(shortcut)
-                Toast.makeText(this@SettingsActivity, "Pintasan '$shortcut' dihapus", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@SettingsActivity, "Pintasan '$shortcut' berhasil dihapus", Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
-                showTextReplacementDialog()
+                onDeleted()
             }
         }
-        btnRow.addView(btnDelete)
+        btnRow.addView(btnConfirm)
         rootCard.addView(btnRow)
 
         dialog.setContentView(rootCard)
+        val dialogWidth = (resources.displayMetrics.widthPixels * 0.90f).toInt()
+        dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
         dialog.show()
     }
 }
