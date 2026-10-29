@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Rect
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
@@ -19,6 +20,8 @@ class QuickPathContainerLayout(
     private val themeMode: String = "auto",
     private val isDark: Boolean = false,
     private val findKeyAtCoords: (Float, Float) -> Pair<String, Rect>?,
+    private val findKeyViewAtCoords: (Float, Float) -> View? = { _, _ -> null },
+    private val onFallbackKeyAction: (String, View?) -> Unit = { _, _ -> },
     private val onSwipeCompleted: (List<Char>) -> Unit,
     private val onSwipeCharDetected: () -> Unit,
     private val onSwipeLiveUpdate: (List<Char>) -> Unit = {}
@@ -34,7 +37,7 @@ class QuickPathContainerLayout(
     }
 
     private val touchSlop = 26f * resources.displayMetrics.density
-    private val containerLoc = IntArray(2)
+    private var activeFallbackView: View? = null
 
     private val popupW = (48 * resources.displayMetrics.density).toInt()
     private val popupH = (60 * resources.displayMetrics.density).toInt()
@@ -60,6 +63,7 @@ class QuickPathContainerLayout(
     init {
         clipChildren = false
         clipToPadding = false
+        isMotionEventSplittingEnabled = true
 
         val isWoody = (themeMode == "woody")
         when {
@@ -92,6 +96,7 @@ class QuickPathContainerLayout(
         if (content is android.view.ViewGroup) {
             content.clipChildren = false
             content.clipToPadding = false
+            content.isMotionEventSplittingEnabled = true
         }
         // Keyboard keys go underneath the swipe trail and popup bubble
         addView(content, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -134,12 +139,16 @@ class QuickPathContainerLayout(
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                startX = ev.rawX
-                startY = ev.rawY
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                val pIdx = ev.actionIndex
+                startX = try { ev.getX(pIdx) } catch (_: Throwable) { ev.x }
+                startY = try { ev.getY(pIdx) } catch (_: Throwable) { ev.y }
+                val rawX = try { ev.getRawX(pIdx) } catch (_: Throwable) { ev.rawX }
+                val rawY = try { ev.getRawY(pIdx) } catch (_: Throwable) { ev.rawY }
+
                 isSwiping = false
                 swipedChars.clear()
-                val keyInfo = findKeyAtCoords(ev.rawX, ev.rawY)
+                val keyInfo = findKeyAtCoords(rawX, rawY)
                 if (keyInfo != null && keyInfo.first.isNotEmpty() && keyInfo.first[0].isLetter()) {
                     swipedChars.add(keyInfo.first[0].lowercaseChar())
                 }
@@ -170,7 +179,7 @@ class QuickPathContainerLayout(
                 }
                 return isSwiping
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                 hidePopup()
                 isSwiping = false
                 swipedChars.clear()
@@ -183,6 +192,31 @@ class QuickPathContainerLayout(
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                val pIdx = ev.actionIndex
+                val pRawX = try { ev.getRawX(pIdx) } catch (_: Throwable) { ev.rawX }
+                val pRawY = try { ev.getRawY(pIdx) } catch (_: Throwable) { ev.rawY }
+
+                // Fallback Hit-Resolver: Catches touches landing in margins, padding, or dead gaps
+                val keyInfo = findKeyAtCoords(pRawX, pRawY)
+                if (keyInfo != null && keyInfo.first.isNotEmpty()) {
+                    val targetView = findKeyViewAtCoords(pRawX, pRawY)
+                    targetView?.isPressed = true
+                    try {
+                        targetView?.performHapticFeedback(
+                            HapticFeedbackConstants.KEYBOARD_TAP,
+                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
+                    if (targetView != null) {
+                        showPopupForKey(targetView, keyInfo.first)
+                    }
+                    onFallbackKeyAction(keyInfo.first, targetView)
+                    activeFallbackView = targetView
+                    return true
+                }
+                return true
+            }
             MotionEvent.ACTION_MOVE -> {
                 if (isSwiping && isSwipeEnabled) {
                     hidePopup()
@@ -199,19 +233,14 @@ class QuickPathContainerLayout(
                     return true
                 }
             }
-            MotionEvent.ACTION_UP -> {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                 hidePopup()
+                activeFallbackView?.isPressed = false
+                activeFallbackView = null
                 swipeTrailView.clearTrail()
                 if (isSwiping && swipedChars.size >= 2) {
                     onSwipeCompleted(ArrayList(swipedChars))
                 }
-                isSwiping = false
-                swipedChars.clear()
-                return true
-            }
-            MotionEvent.ACTION_CANCEL -> {
-                hidePopup()
-                swipeTrailView.clearTrail()
                 isSwiping = false
                 swipedChars.clear()
                 return true

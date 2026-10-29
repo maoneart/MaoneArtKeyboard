@@ -183,6 +183,7 @@ class KeyboardLayout(private val context: Context) {
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
+            isMotionEventSplittingEnabled = true
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -217,16 +218,20 @@ class KeyboardLayout(private val context: Context) {
         }
 
         // Row 1
-        root.addView(createRow(row1, isShifted, keyBg, textColor, onKeyAction))
+        val r1Layout = createRow(row1, isShifted, keyBg, textColor, onKeyAction)
+        r1Layout.isMotionEventSplittingEnabled = true
+        root.addView(r1Layout)
 
         // Row 2 (Padded for iOS stagger)
         val r2Layout = createRow(row2, isShifted, keyBg, textColor, onKeyAction)
+        r2Layout.isMotionEventSplittingEnabled = true
         r2Layout.setPadding(dp(18), 0, dp(18), 0)
         root.addView(r2Layout)
 
         // Row 3 (Shift + Letters + Backspace)
         val r3Layout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
+            isMotionEventSplittingEnabled = true
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
@@ -273,6 +278,7 @@ class KeyboardLayout(private val context: Context) {
         // Row 4 (123 + iOS Flat Outline Smiley + Space + Dictation Mic + Return/Enter)
         val r4Layout = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
+            isMotionEventSplittingEnabled = true
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
@@ -359,6 +365,8 @@ class KeyboardLayout(private val context: Context) {
             themeMode = themeMode,
             isDark = isDark,
             findKeyAtCoords = { rx, ry -> findKeyAt(rx, ry) },
+            findKeyViewAtCoords = { rx, ry -> findKeyViewAt(rx, ry) },
+            onFallbackKeyAction = { keyStr, _ -> onKeyAction(keyStr) },
             onSwipeCompleted = onSwipeComplete,
             onSwipeCharDetected = onSwipeHaptic,
             onSwipeLiveUpdate = onSwipeLiveUpdate
@@ -401,10 +409,10 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        // 2. Nearest key center within snap radius (28dp) for fluid gesture sweeps
+        // 2. Nearest key center within snap radius (36dp) for fluid gesture sweeps & large thumb touches
         var closest: KeyHitBox? = null
         var closestDistSq = Float.MAX_VALUE
-        val maxSnapRadius = dp(28).toFloat()
+        val maxSnapRadius = dp(36).toFloat()
         val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
 
         for (box in boxes) {
@@ -418,6 +426,44 @@ class KeyboardLayout(private val context: Context) {
         }
 
         return closest?.let { Pair(it.tv.text.toString(), it.hitRect) }
+    }
+
+    private fun findKeyViewAt(rawX: Float, rawY: Float): View? {
+        var boxes = cachedHitBoxes
+        if (boxes.isEmpty()) {
+            rebuildHitBoxCache()
+            boxes = cachedHitBoxes
+        }
+        if (boxes.isEmpty()) return null
+
+        val rx = rawX.toInt()
+        val ry = rawY.toInt()
+        val tol = dp(4)
+
+        for (box in boxes) {
+            val r = box.hitRect
+            if (rx in (r.left - tol)..(r.right + tol) &&
+                ry in (r.top - tol)..(r.bottom + tol)) {
+                return box.tv
+            }
+        }
+
+        var closest: KeyHitBox? = null
+        var closestDistSq = Float.MAX_VALUE
+        val maxSnapRadius = dp(36).toFloat()
+        val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
+
+        for (box in boxes) {
+            val dx = rawX - box.centerX
+            val dy = rawY - box.centerY
+            val distSq = dx * dx + dy * dy
+            if (distSq < closestDistSq && distSq <= maxSnapRadiusSq) {
+                closestDistSq = distSq
+                closest = box
+            }
+        }
+
+        return closest?.tv
     }
 
     // --- 2. SYMBOLS LAYOUT (123 & #+=) ---
@@ -1430,6 +1476,7 @@ class KeyboardLayout(private val context: Context) {
     ): LinearLayout {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
+            isMotionEventSplittingEnabled = true
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
@@ -1503,7 +1550,7 @@ class KeyboardLayout(private val context: Context) {
 
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
                     startX = event.x
                     startY = event.y
@@ -1580,7 +1627,7 @@ class KeyboardLayout(private val context: Context) {
                     }
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                     v.parent?.requestDisallowInterceptTouchEvent(false)
                     handler.removeCallbacks(activateRunnable)
                     v.isPressed = false
@@ -1599,12 +1646,12 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback)
+    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback & Multi-Touch)
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         view.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
                     try {
                         v.performHapticFeedback(
@@ -1616,7 +1663,7 @@ class KeyboardLayout(private val context: Context) {
                     onTrigger()
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                     v.isPressed = false
                     popupController?.hidePopup()
                     true
@@ -1626,12 +1673,12 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // 0ms Latency Instant Touch Down Listener with Hardware Haptic Trigger
+    // 0ms Latency Instant Touch Down Listener with Hardware Haptic Trigger & Multi-Touch
     private fun setupInstantTouch(view: View, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         view.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
                     try {
                         v.performHapticFeedback(
@@ -1642,7 +1689,7 @@ class KeyboardLayout(private val context: Context) {
                     onTrigger()
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                     v.isPressed = false
                     true
                 }
@@ -1651,7 +1698,7 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // High-Speed Auto Repeat Backspace ("Hapus Ngebut")
+    // High-Speed Auto Repeat Backspace ("Hapus Ngebut" with Multi-Touch)
     private fun setupRapidBackspaceTouch(view: View, onBackspace: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         val handler = Handler(Looper.getMainLooper())
@@ -1659,8 +1706,8 @@ class KeyboardLayout(private val context: Context) {
         var deleteCount = 0
 
         view.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
                     deleteCount = 0
                     try {
@@ -1691,7 +1738,7 @@ class KeyboardLayout(private val context: Context) {
                     handler.postDelayed(repeatRunnable!!, 320L)
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                     v.isPressed = false
                     repeatRunnable?.let { handler.removeCallbacks(it) }
                     repeatRunnable = null

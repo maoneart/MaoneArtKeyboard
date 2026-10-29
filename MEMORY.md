@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.42)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.43)
 
 ---
 
@@ -204,3 +204,12 @@
        - Menghapus scaling buatan `0.35f` (8–24ms) yang sebelumnya berada di bawah ambang inersia motor vibrator HP Android.
        - Mengembalikan durasi pulsa penuh sesuai preferensi pengguna `prefs.hapticStrength` (terkalibrasi 45ms) dengan amplitude 120–255 dan sonification audio attributes.
        - Sensasi getaran kembali tegas, empuk, dan responsif di setiap tombol huruf, angka, simbol, maupun fungsi.
+  - **Dukungan Multi-Touch & Zero Dead-Zone Touch Snap Jempol Besar (Release v1.0.43)**:
+    1. **Dukungan Multi-Touch Penuh Dua Jempol (`ACTION_POINTER_DOWN`)**:
+       - Root Cause Karakter Kerap Terlewat Saat Ngetik Cepat: Handler tuts (`setupLetterKeyTouch`, `setupInstantTouch`, `setupRapidBackspaceTouch`) sebelumnya mengecek `when (event.action)` yang kaku terhadap `ACTION_DOWN`. Ketika mengetik cepat bergantian dua jempol, sentuhan jempol kedua tiba sebagai `ACTION_POINTER_DOWN` (kode aksi `0x0105`) sehingga tuts kedua diabaikan dan tidak tertekan sama sekali.
+       - Solusi: Seluruh touch listener dimigrasikan ke `event.actionMasked`, mencakup `ACTION_DOWN` dan `ACTION_POINTER_DOWN`.
+       - Mengaktifkan `isMotionEventSplittingEnabled = true` di seluruh rantai ViewGroup (`QuickPathContainerLayout`, root layout, dan baris-baris tuts) agar Android mengizinkan distribusi multi-pointer ke beberapa tuts secara independen.
+    2. **Zero Dead-Zone Touch Fallback (Snap Tuts Otomatis untuk Jempol Besar)**:
+       - Mengatasi celah sentuhan mati pada margin antar tuts (gap 4dp), padding samping baris ke-2 (18dp di kiri huruf 'A' dan kanan 'L'), serta jarak antar baris keyboard.
+       - Menambahkan fallback hit-resolver di `QuickPathContainerLayout.onTouchEvent`: Setiap kali sentuhan mendarat di celah kosong atau padding, sistem otomatis memindai tuts terdekat dalam radius hingga 36dp (`findKeyAtCoords` & `findKeyViewAtCoords`).
+       - Tuts terdekat langsung dieksekusi secara instan dengan tactile haptic feedback dan balon preview huruf, sehingga sentuhan jempol besar atau miring tidak pernah meleset atau gagal ketik lagi.
