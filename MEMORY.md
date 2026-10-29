@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.35)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.36)
 
 ---
 
@@ -131,3 +131,12 @@
        - Huruf besar otomatis aktif di awal baris baru setelah menekan tombol Enter (`\n`).
        - Deteksi cerdas `shouldAutoCapitalize()` mengevaluasi buffer dan kursor serta mem-bypass otomatis pada field password, angka, email, dan URL.
        - Tersedia toggle "Kapitalisasi Otomatis" di menu Pengaturan.
+  - Perbaikan Presisi Kapitalisasi (Hanya 1 Huruf Awal) & Kalibrasi Tinggi Tema Woody (Release v1.0.36):
+    1. **Presisi Kapitalisasi Otomatis (Hanya 1 Huruf Awal Kalimat & Setelah Titik)**:
+       - Menghilangkan query `CAP_MODE_CHARACTERS` pada Android InputConnection yang sebelumnya menyebabkan seluruh huruf menjadi kapital.
+       - Menambahkan guard `composingWord.isNotEmpty()` pada `shouldAutoCapitalize()` dan `onUpdateSelection` sehingga begitu 1 huruf kapital pertama diketik ("S"), tuts berikutnya dijamin 100% langsung kembali ke huruf kecil ("aya").
+       - Hanya 1 huruf pertama di awal dan setelah titik (`. `) yang kapital ("Saya mau makan. Saya mau minum"), selebihnya huruf kecil normal.
+    2. **Kalibrasi Tinggi Keyboard Tema Woody (Identik dengan Light dan Dark)**:
+       - Mengatasi masalah keyboard meninggi/tertarik ke atas akibat intrinsic height gambar background 1920px.
+       - Memotong `woody_bg.jpg` ke dimensi proporsional keyboard (1080x650) dan menetapkan `minimumHeight = 0` serta `android:minHeight="0dp"` pada `keyboardRoot`.
+       - Tinggi keyboard tema Woody kini 100% sama dan proporsional persis seperti tema Light dan Dark (279dp).

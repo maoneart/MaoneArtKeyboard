@@ -324,7 +324,9 @@ class IosInputMethodService : InputMethodService() {
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         updateSuggestions()
-        updateAutoCapitalization()
+        if (composingWord.isEmpty()) {
+            updateAutoCapitalization()
+        }
     }
 
     private fun isDarkMode(): Boolean {
@@ -367,12 +369,14 @@ class IosInputMethodService : InputMethodService() {
 
             if (isWoody) {
                 keyboardRoot?.setBackgroundResource(R.drawable.theme_woody_bg)
+                keyboardRoot?.minimumHeight = 0
                 topToolbar?.setBackgroundColor(Color.parseColor("#4D1A0E08"))
                 translatePanel?.setBackgroundColor(Color.parseColor("#661A0E08"))
                 tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_woody)
                 tvTranslateInputBox?.setTextColor(textColor)
             } else {
                 keyboardRoot?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_bg_dark else R.color.ios_bg_light))
+                keyboardRoot?.minimumHeight = 0
                 topToolbar?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
                 translatePanel?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
                 tvTranslateInputBox?.setBackgroundResource(if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
@@ -796,15 +800,19 @@ class IosInputMethodService : InputMethodService() {
     private fun shouldAutoCapitalize(): Boolean {
         if (!prefs.isAutoCapitalizationEnabled) return false
         if (isCapsLock) return false
-        val info = currentInputEditorInfo ?: return true
+
+        // Jika sedang aktif mengetik huruf dalam suatu kata, huruf berikutnya WAJIB huruf kecil!
+        if (composingWord.isNotEmpty()) {
+            return false
+        }
+
+        val info = currentInputEditorInfo ?: return false
         val inputType = info.inputType
 
-        // Jangan auto-kapitalisasi pada field password, angka, email, URL
+        // Jangan auto-kapitalisasi pada field password, angka, phone, email, URL
         val cls = inputType and InputType.TYPE_MASK_CLASS
         if (cls != InputType.TYPE_CLASS_TEXT) {
-            if (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE || cls == InputType.TYPE_CLASS_DATETIME) {
-                return false
-            }
+            return false
         }
         val variation = inputType and InputType.TYPE_MASK_VARIATION
         if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
@@ -822,20 +830,29 @@ class IosInputMethodService : InputMethodService() {
             if (translateCursorPosition == 0 || translatePanelBuffer.isEmpty()) return true
             val textBefore = translatePanelBuffer.substring(0, translateCursorPosition.coerceIn(0, translatePanelBuffer.length))
             if (textBefore.trim().isEmpty()) return true
-            return Regex("""[.!?]\s+$""").containsMatchIn(textBefore) || textBefore.endsWith("\n") || textBefore.endsWith("\r")
+            if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) return true
+            return Regex("""[.!?]\s+$""").containsMatchIn(textBefore)
         }
 
-        // 2. Periksa flag CursorCapsMode Android
-        val ic = currentInputConnection ?: return true
-        val capsMode = ic.getCursorCapsMode(TextUtils.CAP_MODE_SENTENCES or TextUtils.CAP_MODE_WORDS or TextUtils.CAP_MODE_CHARACTERS)
-        if (capsMode != 0) return true
+        // 2. Inspeksi teks sebelum kursor dari InputConnection
+        val ic = currentInputConnection ?: return false
+        val textBefore = ic.getTextBeforeCursor(32, 0)?.toString()
 
-        // 3. Inspeksi teks sebelum kursor (fallback untuk WhatsApp, Telegram, Notes, dll)
-        val textBefore = ic.getTextBeforeCursor(8, 0)?.toString()
-        if (textBefore.isNullOrEmpty()) return true
-        if (textBefore.trim().isEmpty()) return true
-        if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) return true
-        if (Regex("""[.!?]\s+$""").containsMatchIn(textBefore)) return true
+        // Jika benar-benar kosong atau hanya spasi awal -> awal kalimat pertama
+        if (textBefore.isNullOrEmpty() || textBefore.trim().isEmpty()) {
+            return true
+        }
+
+        // Jika berada tepat setelah baris baru (Enter)
+        if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) {
+            return true
+        }
+
+        // HANYA aktif jika teks berakhiran tanda baca (.!?) diikuti spasi (misal ". ", "? ", "! ")
+        // Bukan spasi biasa antar kata ("Saya ") dan bukan titik tanpa spasi ("Saya.")
+        if (Regex("""[.!?]\s+$""").containsMatchIn(textBefore)) {
+            return true
+        }
 
         return false
     }
