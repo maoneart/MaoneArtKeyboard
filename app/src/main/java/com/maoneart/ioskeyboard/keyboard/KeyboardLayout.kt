@@ -1955,12 +1955,15 @@ class KeyboardLayout(private val context: Context) {
         val handler = Handler(Looper.getMainLooper())
         var repeatRunnable: Runnable? = null
         var deleteCount = 0
+        var activePointerId = -1
 
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
+                    activePointerId = event.getPointerId(0)
                     deleteCount = 0
+                    repeatRunnable?.let { handler.removeCallbacks(it) }
                     try {
                         v.performHapticFeedback(
                             android.view.HapticFeedbackConstants.KEYBOARD_TAP,
@@ -1971,7 +1974,7 @@ class KeyboardLayout(private val context: Context) {
                     onBackspace()
 
                     // 2. Start repeating delete job
-                    repeatRunnable = object : Runnable {
+                    val r = object : Runnable {
                         override fun run() {
                             deleteCount++
                             try {
@@ -1986,13 +1989,29 @@ class KeyboardLayout(private val context: Context) {
                             handler.postDelayed(this, nextDelay)
                         }
                     }
-                    handler.postDelayed(repeatRunnable!!, 320L)
+                    repeatRunnable = r
+                    handler.postDelayed(r, 320L)
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    // Secondary finger touch shouldn't restart or interfere with repeating backspace
+                    true
+                }
+                MotionEvent.ACTION_POINTER_UP -> {
+                    val pIdx = event.actionIndex
+                    if (event.getPointerId(pIdx) == activePointerId) {
+                        v.isPressed = false
+                        repeatRunnable?.let { handler.removeCallbacks(it) }
+                        repeatRunnable = null
+                        activePointerId = -1
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     v.isPressed = false
                     repeatRunnable?.let { handler.removeCallbacks(it) }
                     repeatRunnable = null
+                    activePointerId = -1
                     true
                 }
                 else -> false

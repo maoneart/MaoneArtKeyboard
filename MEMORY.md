@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.51)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.52)
 
 ---
 
@@ -317,3 +317,14 @@
        - `LanguageDownloadActivity.kt`: Membatalkan `activityScope.cancel()` pada `onDestroy()` dan memvalidasi `!isFinishing && !isDestroyed` sebelum menampilkan notifikasi unduhan selesai.
     7. **Pembersihan Data Emoji**:
        - Menghapus entri duplikat emoji bola rugby (`"🏉"`) pada kategori Aktivitas di `EmojiBoardManager.kt`.
+  - **Audit Sekunder Lanjutan & Eliminasi Total Null-Safety `!!` (Release v1.0.52)**:
+    1. **Eliminasi Total Force-Unwrap Operator `!!`**:
+       - `KeyboardLayout.kt`: Menghapus satu-satunya operator `!!` pada `repeatRunnable!!` di `setupRapidBackspaceTouch`, menggantinya dengan referensi aman `val r = repeatRunnable` dan `handler.postDelayed(r, 320L)`.
+    2. **Perbaikan Multi-Touch & Anti-Race Condition pada Backspace Ngebut**:
+       - `setupRapidBackspaceTouch` kini mengisolasi `activePointerId` spesifik untuk tombol backspace.
+       - Sentuhan jari kedua (`ACTION_POINTER_DOWN` atau `ACTION_POINTER_UP`) dari jempol lain di layar tidak lagi mereset `deleteCount`, tidak memicu multiple runnable concurrent, dan tidak menghentikan pengulangan hapus sebelum jari di atas tombol backspace diangkat.
+    3. **Universal KeyCode Fallback pada Backspace & Swipe Typing**:
+       - Pada `handleBackspace()` dan `handleSwipeComplete()` di `IosInputMethodService.kt`, jika `ic.deleteSurroundingText()` gagal atau bernilai `false` (misal pada terminal Termux, custom WebView, atau Flutter), sistem otomatis mengirimkan `sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)` sebagai fallback tuntas.
+    4. **Pembersihan Singkatan Teks & Memori Gambar**:
+       - `TextReplacementManager.kt`: Membedakan singkatan ganda `"thx"` menjadi `"thx"` ("Thanks a lot") dan `"tq"` ("terima kasih").
+       - `StickerUploadActivity.kt`: Membebaskan memori bitmap `selectedBitmap?.recycle()` pada `onDestroy()`.

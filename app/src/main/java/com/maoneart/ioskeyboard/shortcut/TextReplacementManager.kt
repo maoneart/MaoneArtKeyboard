@@ -33,7 +33,7 @@ class TextReplacementManager(private val context: Context) {
         "sy" to "saya",
         "km" to "kamu",
         "mks" to "makasih",
-        "thx" to "terima kasih"
+        "tq" to "terima kasih"
     )
 
     init {

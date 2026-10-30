@@ -111,4 +111,12 @@ class StickerUploadActivity : AppCompatActivity() {
             Toast.makeText(this, "Gagal mengonversi gambar ke WebP", Toast.LENGTH_SHORT).show()
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            selectedBitmap?.recycle()
+            selectedBitmap = null
+        } catch (_: Throwable) {}
+    }
 }

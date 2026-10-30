@@ -1017,7 +1017,10 @@ class IosInputMethodService : InputMethodService() {
                         if (!textBefore.isNullOrEmpty()) {
                             val lastChar = textBefore.last()
                             val charsToDelete = if (Character.isLowSurrogate(lastChar) && textBefore.length >= 2 && Character.isHighSurrogate(textBefore[textBefore.length - 2])) 2 else 1
-                            ic.deleteSurroundingText(charsToDelete, 0)
+                            val delOk = try { ic.deleteSurroundingText(charsToDelete, 0) } catch (_: Throwable) { false }
+                            if (!delOk) {
+                                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                            }
                         } else {
                             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
                         }
@@ -1627,8 +1630,13 @@ class IosInputMethodService : InputMethodService() {
                     translateCursorPosition--
                     updateTranslateInputBoxVisual()
                 }
+            } else if (isTerminalOrRawInput()) {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             } else {
-                currentInputConnection?.deleteSurroundingText(1, 0)
+                val delOk = try { currentInputConnection?.deleteSurroundingText(1, 0) ?: false } catch (_: Throwable) { false }
+                if (!delOk) {
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                }
             }
             if (composingWord.isNotEmpty()) {
                 composingWord.deleteCharAt(composingWord.length - 1)
