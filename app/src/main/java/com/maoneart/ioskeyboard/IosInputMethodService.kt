@@ -1682,10 +1682,10 @@ class IosInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         try {
-            suggestionRunnable?.let { suggestionHandler.removeCallbacks(it) }
+            suggestionHandler.removeCallbacksAndMessages(null)
             voiceDictationManager.destroy()
             audioHaptic.destroy()
-            correctionEngine.flushUserDictionary()
+            correctionEngine.destroy()
             serviceScope.cancel()
         } catch (_: Throwable) {}
         super.onDestroy()

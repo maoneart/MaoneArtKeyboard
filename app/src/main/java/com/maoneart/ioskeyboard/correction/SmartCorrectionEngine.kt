@@ -5,6 +5,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
@@ -493,6 +494,13 @@ class SmartCorrectionEngine(private val context: Context) {
         if (isUserDictDirty) {
             persistUserDictionary()
         }
+    }
+
+    fun destroy() {
+        try {
+            flushUserDictionary()
+            engineScope.cancel()
+        } catch (_: Throwable) {}
     }
 
     fun findKbbiPrefixMatches(prefix: String, maxCount: Int = 8): List<String> {
