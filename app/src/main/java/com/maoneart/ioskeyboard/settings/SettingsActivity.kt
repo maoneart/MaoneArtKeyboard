@@ -345,6 +345,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showThemeDialog() {
+        if (isFinishing || isDestroyed) return
         val options = arrayOf(
             "Otomatis (Ikuti Sistem)",
             "iOS Light (Terang)",
@@ -358,39 +359,45 @@ class SettingsActivity : AppCompatActivity() {
             else -> 0
         }
 
-        AlertDialog.Builder(this)
-            .setTitle("Pilih Tema Keyboard")
-            .setSingleChoiceItems(options, currentSelection) { dialog, which ->
-                prefs.themeMode = when (which) {
-                    1 -> "light"
-                    2 -> "dark"
-                    3 -> "woody"
-                    else -> "auto"
+        try {
+            AlertDialog.Builder(this)
+                .setTitle("Pilih Tema Keyboard")
+                .setSingleChoiceItems(options, currentSelection) { dialog, which ->
+                    prefs.themeMode = when (which) {
+                        1 -> "light"
+                        2 -> "dark"
+                        3 -> "woody"
+                        else -> "auto"
+                    }
+                    updateThemeLabel()
+                    dialog.dismiss()
+                    Toast.makeText(this, "Tema berhasil diperbarui", Toast.LENGTH_SHORT).show()
                 }
-                updateThemeLabel()
-                dialog.dismiss()
-                Toast.makeText(this, "Tema berhasil diperbarui", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Batal", null)
-            .show()
+                .setNegativeButton("Batal", null)
+                .show()
+        } catch (_: Throwable) {}
     }
 
     private fun showLanguageDialog() {
+        if (isFinishing || isDestroyed) return
         val options = arrayOf("Bahasa Indonesia", "English")
         val currentSelection = if (prefs.activeLanguage == "en") 1 else 0
 
-        AlertDialog.Builder(this)
-            .setTitle("Pilih Bahasa Utama")
-            .setSingleChoiceItems(options, currentSelection) { dialog, which ->
-                prefs.activeLanguage = if (which == 1) "en" else "id"
-                updateLanguageLabel()
-                dialog.dismiss()
-            }
-            .setNegativeButton("Batal", null)
-            .show()
+        try {
+            AlertDialog.Builder(this)
+                .setTitle("Pilih Bahasa Utama")
+                .setSingleChoiceItems(options, currentSelection) { dialog, which ->
+                    prefs.activeLanguage = if (which == 1) "en" else "id"
+                    updateLanguageLabel()
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Batal", null)
+                .show()
+        } catch (_: Throwable) {}
     }
 
     private fun showTranslatePairDialog() {
+        if (isFinishing || isDestroyed) return
         val pairs = arrayOf(
             "Indonesia ➔ English" to Pair("id", "en"),
             "English ➔ Indonesia" to Pair("en", "id"),
@@ -401,21 +408,24 @@ class SettingsActivity : AppCompatActivity() {
         )
         val names = pairs.map { it.first }.toTypedArray()
 
-        AlertDialog.Builder(this)
-            .setTitle("Arah Bahasa Terjemahan")
-            .setItems(names) { _, which ->
-                val selected = pairs[which].second
-                prefs.translateSourceLang = selected.first
-                prefs.translateTargetLang = selected.second
-                updateTranslatePairLabel()
-            }
-            .setNegativeButton("Batal", null)
-            .show()
+        try {
+            AlertDialog.Builder(this)
+                .setTitle("Arah Bahasa Terjemahan")
+                .setItems(names) { _, which ->
+                    val selected = pairs[which].second
+                    prefs.translateSourceLang = selected.first
+                    prefs.translateTargetLang = selected.second
+                    updateTranslatePairLabel()
+                }
+                .setNegativeButton("Batal", null)
+                .show()
+        } catch (_: Throwable) {}
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     private fun showTextReplacementDialog() {
+        if (isFinishing || isDestroyed) return
         val manager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
 
         val dialog = android.app.Dialog(this).apply {
@@ -703,10 +713,13 @@ class SettingsActivity : AppCompatActivity() {
         dialog.setContentView(rootCard)
         val dialogWidth = (resources.displayMetrics.widthPixels * 0.92f).toInt()
         dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
-        dialog.show()
+        try {
+            dialog.show()
+        } catch (_: Throwable) {}
     }
 
     private fun showAddShortcutDialog(manager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager) {
+        if (isFinishing || isDestroyed) return
         val dialog = android.app.Dialog(this).apply {
             requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
             window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -879,7 +892,9 @@ class SettingsActivity : AppCompatActivity() {
         dialog.setContentView(rootCard)
         val dialogWidth = (resources.displayMetrics.widthPixels * 0.92f).toInt()
         dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
-        dialog.show()
+        try {
+            dialog.show()
+        } catch (_: Throwable) {}
     }
 
     private fun showManageShortcutDialog(
@@ -887,6 +902,7 @@ class SettingsActivity : AppCompatActivity() {
         shortcut: String,
         phrase: String
     ) {
+        if (isFinishing || isDestroyed) return
         val dialog = android.app.Dialog(this).apply {
             requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
             window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -1020,7 +1036,9 @@ class SettingsActivity : AppCompatActivity() {
         dialog.setContentView(rootCard)
         val dialogWidth = (resources.displayMetrics.widthPixels * 0.92f).toInt()
         dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
-        dialog.show()
+        try {
+            dialog.show()
+        } catch (_: Throwable) {}
     }
 
     private fun showDeleteConfirmModal(
@@ -1029,6 +1047,7 @@ class SettingsActivity : AppCompatActivity() {
         phrase: String,
         onDeleted: () -> Unit
     ) {
+        if (isFinishing || isDestroyed) return
         val dialog = android.app.Dialog(this).apply {
             requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
             window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -1117,6 +1136,8 @@ class SettingsActivity : AppCompatActivity() {
         dialog.setContentView(rootCard)
         val dialogWidth = (resources.displayMetrics.widthPixels * 0.90f).toInt()
         dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
-        dialog.show()
+        try {
+            dialog.show()
+        } catch (_: Throwable) {}
     }
 }

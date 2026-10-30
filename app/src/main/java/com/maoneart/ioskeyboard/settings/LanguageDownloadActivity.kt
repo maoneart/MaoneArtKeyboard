@@ -16,6 +16,7 @@ import com.maoneart.ioskeyboard.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -157,9 +158,16 @@ class LanguageDownloadActivity : AppCompatActivity() {
                 dictFile.writeText(content)
             }
 
-            Toast.makeText(this@LanguageDownloadActivity, "Kamus ${pack.name} berhasil diunduh!", Toast.LENGTH_SHORT).show()
-            onComplete()
+            if (!isFinishing && !isDestroyed) {
+                Toast.makeText(this@LanguageDownloadActivity, "Kamus ${pack.name} berhasil diunduh!", Toast.LENGTH_SHORT).show()
+                onComplete()
+            }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        activityScope.cancel()
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()

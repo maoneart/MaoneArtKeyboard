@@ -118,6 +118,7 @@ class QuickPathContainerLayout(
      */
     fun showPopupForKey(keyView: View, label: String) {
         if (!isKeyPopupEnabled) return
+        if (keyView.width <= 0 || !keyView.isShown) return
 
         var pos = keyPopupPositions[keyView]
         if (pos == null) {

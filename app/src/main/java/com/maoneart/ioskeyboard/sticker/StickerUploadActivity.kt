@@ -64,7 +64,9 @@ class StickerUploadActivity : AppCompatActivity() {
         }
 
         // Auto-open gallery on launch for immediate convenience
-        openGalleryPicker()
+        if (savedInstanceState == null) {
+            openGalleryPicker()
+        }
     }
 
     private fun openGalleryPicker() {

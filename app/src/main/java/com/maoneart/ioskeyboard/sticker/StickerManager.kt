@@ -43,13 +43,16 @@ class StickerManager(private val context: Context) {
      * - Compressed as WEBP format (< 500 KB)
      */
     fun convertAndSaveSticker(sourceBitmap: Bitmap): File? {
+        if (sourceBitmap.isRecycled) return null
+        val srcWidth = sourceBitmap.width.toFloat()
+        val srcHeight = sourceBitmap.height.toFloat()
+        if (srcWidth <= 0f || srcHeight <= 0f) return null
+
+        var scaledBitmap: Bitmap? = null
         return try {
             val size = 512
-            val scaledBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            scaledBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(scaledBitmap)
-
-            val srcWidth = sourceBitmap.width.toFloat()
-            val srcHeight = sourceBitmap.height.toFloat()
 
             // Scale to fit within 512x512 while keeping aspect ratio
             val scale = (size.toFloat() / max(srcWidth, srcHeight)).coerceAtMost(1.0f)
@@ -66,7 +69,6 @@ class StickerManager(private val context: Context) {
 
             val fileName = "sticker_${System.currentTimeMillis()}.webp"
             val destFile = File(stickerDir, fileName)
-            val fos = FileOutputStream(destFile)
 
             @Suppress("DEPRECATION")
             val format = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -75,13 +77,18 @@ class StickerManager(private val context: Context) {
                 Bitmap.CompressFormat.WEBP
             }
 
-            scaledBitmap.compress(format, 85, fos)
-            fos.flush()
-            fos.close()
+            FileOutputStream(destFile).use { fos ->
+                scaledBitmap.compress(format, 85, fos)
+                fos.flush()
+            }
 
             destFile
         } catch (_: Throwable) {
             null
+        } finally {
+            try {
+                scaledBitmap?.recycle()
+            } catch (_: Throwable) {}
         }
     }
 

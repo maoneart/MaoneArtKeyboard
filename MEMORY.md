@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.50)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.51)
 
 ---
 
@@ -296,3 +296,24 @@
        - **Priority 4 (Multiline Fields WhatsApp, Telegram, Notes, Pesan)**: Di seluruh kolom teks multiline, kecuali jika pengguna sengaja mengaktifkan fitur WhatsApp "Enter is send" (`imeAction == IME_ACTION_SEND` tanpa `hasNoEnterAction`), penekanan tombol Return selalu menginjeksi karakter newline `\n` (`ic.commitText("\n", 1)`). Keyboard tetap terbuka dan kursor berpindah ke baris baru dengan mulus.
        - **Priority 5 (Single-Line Editor Actions)**: Aksi `Go`, `Send`, `Next`, dan `Done` hanya aktif pada kolom input single-line (URL browser, form login, dll).
        - **Sinkronisasi Visual `updateReturnButton`**: Tampilan visual tombol aksi di baris ke-4 keyboard kini 100% selaras dengan logika eksekusi: menampilkan ikon kaca pembesar untuk Search, `"Buka"` untuk URI, `"Kirim"` untuk Send, dan teks otentik iOS `"return"` untuk WhatsApp dan multiline chat.
+  - **Audit Komprehensif: Eliminasi Vektor Force Close & Bug Fungsional (Release v1.0.51)**:
+    1. **Eliminasi Vektor Force Close `RejectedExecutionException` pada AudioHaptic**:
+       - `AudioHapticManager.kt` membungkus pemanggilan `asyncExecutor.execute` dengan pengecekan `!asyncExecutor.isShutdown && !asyncExecutor.isTerminated` dan blok `try-catch` di kedua fungsi `playClickSound` dan `triggerHapticFeedback`.
+       - Mencegah fatal crash saat suara atau getaran tuts terpicu bersamaan ketika service dihancurkan atau saat aplikasi ditutup (`onDestroy`).
+    2. **Eliminasi Vektor Force Close `BadTokenException` pada Settings & Attached Dialogs**:
+       - `SettingsActivity.kt`: Seluruh modal dialog (`showThemeDialog`, `showLanguageDialog`, `showTranslatePairDialog`, `showTextReplacementDialog`, `showAddShortcutDialog`, `showManageShortcutDialog`, `showDeleteConfirmModal`) kini memiliki pengecekan status lifecycle `if (isFinishing || isDestroyed) return` dan `try-catch` pada `dialog.show()`.
+       - `IosInputMethodService.kt`: Menambahkan verifikasi `val token = rootView?.windowToken ?: return` sebelum memunculkan dialog pemilihan bahasa terjemahan penuh, mencegah crash jika window token terlepas.
+    3. **Eliminasi Bug Titik Dobel Spasi Liar (Double-Space Period Guard)**:
+       - Pada `handleSpace()`, sistem kini memeriksa teks sebelum kursor (`getTextBeforeCursor`) sebelum mengeksekusi penghapusan spasi dan komit `". "`.
+       - Titik otomatis kini HANYA aktif jika karakter tepat sebelum kursor benar-benar spasi tunggal dan belum berakhiran tanda baca (`textBefore.endsWith(" ") && !textBefore.endsWith(". ")`), sehingga teks sebelumnya tidak akan pernah terhapus atau tertimpa titik sembarangan. Fitur ini juga diintegrasikan secara aman ke buffer panel terjemahan.
+    4. **Perbaikan Presisi Huruf Kapital pada Fallback Snap Tuts (Shift Casing Fix)**:
+       - Pada `KeyboardLayout.findKeyAt()`, pencarian tuts kini membaca teks dinamis tombol aktif (`box.tv.text.toString().ifEmpty { box.charStr }`) alih-alih karakter dasar huruf kecil statis.
+       - Pengetikan di dekat tepi tuts atau dalam radius snap toleransi saat Shift / CapsLock aktif kini 100% konsisten menghasilkan huruf besar tanpa regresi menjadi huruf kecil.
+    5. **Proteksi Koordinat Kosong Popup Balon (Zero-Width Cache Guard)**:
+       - `QuickPathContainerLayout.showPopupForKey()` memverifikasi `keyView.width > 0 && keyView.isShown` sebelum menghitung dan menyimpan koordinat balon pratinjau huruf ke cache, mencegah penyimpanan koordinat semu `(0,0)` sebelum layout diukur.
+    6. **Pencegahan Kebocoran Memori & Re-Trigger Galeri Stiker**:
+       - `StickerManager.kt`: Menambahkan validasi `isRecycled` dan dimensi `srcWidth/Height > 0`, penutupan stream otomatis via `FileOutputStream.use {}`, dan pembebasan alokasi memori instan `scaledBitmap?.recycle()` di blok `finally` guna mencegah OutOfMemoryError.
+       - `StickerUploadActivity.kt`: Membuka pemilih gambar galeri hanya pada peluncuran pertama (`savedInstanceState == null`), menghilangkan munculnya picker ganda saat layar diputar (*screen rotation*).
+       - `LanguageDownloadActivity.kt`: Membatalkan `activityScope.cancel()` pada `onDestroy()` dan memvalidasi `!isFinishing && !isDestroyed` sebelum menampilkan notifikasi unduhan selesai.
+    7. **Pembersihan Data Emoji**:
+       - Menghapus entri duplikat emoji bola rugby (`"🏉"`) pada kategori Aktivitas di `EmojiBoardManager.kt`.

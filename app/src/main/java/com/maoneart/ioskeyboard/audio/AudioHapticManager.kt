@@ -45,20 +45,24 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
         val vol = prefs.soundVolume.coerceIn(0f, 1.0f)
         if (vol <= 0.01f) return
 
-        asyncExecutor.execute {
-            try {
-                audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, vol)
-            } catch (_: Throwable) {
-                try {
-                    audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD)
-                } catch (_: Throwable) {
+        try {
+            if (!asyncExecutor.isShutdown && !asyncExecutor.isTerminated) {
+                asyncExecutor.execute {
                     try {
-                        val target = view ?: activeRootView
-                        target?.playSoundEffect(android.view.SoundEffectConstants.CLICK)
-                    } catch (_: Throwable) {}
+                        audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, vol)
+                    } catch (_: Throwable) {
+                        try {
+                            audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD)
+                        } catch (_: Throwable) {
+                            try {
+                                val target = view ?: activeRootView
+                                target?.playSoundEffect(android.view.SoundEffectConstants.CLICK)
+                            } catch (_: Throwable) {}
+                        }
+                    }
                 }
             }
-        }
+        } catch (_: Throwable) {}
     }
 
     /**
@@ -84,30 +88,34 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
         } catch (_: Throwable) {}
 
         // 2. Direct Physical Hardware Vibration: Async background offload to prevent IPC frame drops
-        asyncExecutor.execute {
-            try {
-                val vib = vibrator ?: return@execute
-                if (!vib.hasVibrator()) return@execute
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val audioAttributes = AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                        .build()
-
-                    val amplitude = ((durationMs.toFloat() / 100f) * 255).toInt().coerceIn(120, 255)
-                    val effect = VibrationEffect.createOneShot(durationMs, amplitude)
-
+        try {
+            if (!asyncExecutor.isShutdown && !asyncExecutor.isTerminated) {
+                asyncExecutor.execute {
                     try {
-                        vib.vibrate(effect, audioAttributes)
-                    } catch (_: Throwable) {
-                        vib.vibrate(effect)
-                    }
-                } else {
-                    @Suppress("DEPRECATION")
-                    vib.vibrate(durationMs)
+                        val vib = vibrator ?: return@execute
+                        if (!vib.hasVibrator()) return@execute
+
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val audioAttributes = AudioAttributes.Builder()
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                                .build()
+
+                            val amplitude = ((durationMs.toFloat() / 100f) * 255).toInt().coerceIn(120, 255)
+                            val effect = VibrationEffect.createOneShot(durationMs, amplitude)
+
+                            try {
+                                vib.vibrate(effect, audioAttributes)
+                            } catch (_: Throwable) {
+                                vib.vibrate(effect)
+                            }
+                        } else {
+                            @Suppress("DEPRECATION")
+                            vib.vibrate(durationMs)
+                        }
+                    } catch (_: Throwable) {}
                 }
-            } catch (_: Throwable) {}
-        }
+            }
+        } catch (_: Throwable) {}
     }
 }

@@ -572,11 +572,12 @@ class IosInputMethodService : InputMethodService() {
                 updateTranslatePanelUI()
             }
             builder.setNegativeButton("Batal", null)
+            val token = rootView?.windowToken ?: return
             val dialog = builder.create()
             val window = dialog.window
             if (window != null) {
                 val lp = window.attributes
-                lp.token = rootView?.windowToken
+                lp.token = token
                 lp.type = WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG
                 window.attributes = lp
                 dialog.setCanceledOnTouchOutside(true)
@@ -1103,6 +1104,18 @@ class IosInputMethodService : InputMethodService() {
 
             if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                val now = System.currentTimeMillis()
+                if (prefs.isDoubleSpacePeriodEnabled && (now - lastSpacePressTime < 500) && composingWord.isEmpty() && pos > 0 && translatePanelBuffer[pos - 1] == ' ' && (pos < 2 || translatePanelBuffer[pos - 2] != '.')) {
+                    translatePanelBuffer.delete(pos - 1, pos)
+                    translatePanelBuffer.insert(pos - 1, ". ")
+                    translateCursorPosition = pos + 1
+                    lastSpacePressTime = 0
+                    updateTranslateInputBoxVisual()
+                    updateSuggestions()
+                    updateAutoCapitalization()
+                    return
+                }
+                lastSpacePressTime = now
                 translatePanelBuffer.insert(pos, " ")
                 translateCursorPosition = pos + 1
                 updateTranslateInputBoxVisual()
@@ -1112,7 +1125,8 @@ class IosInputMethodService : InputMethodService() {
             }
 
             val now = System.currentTimeMillis()
-            if (prefs.isDoubleSpacePeriodEnabled && (now - lastSpacePressTime < 500) && composingWord.isEmpty()) {
+            val textBefore = currentInputConnection?.getTextBeforeCursor(2, 0)?.toString()
+            if (prefs.isDoubleSpacePeriodEnabled && (now - lastSpacePressTime < 500) && composingWord.isEmpty() && textBefore != null && textBefore.endsWith(" ") && !textBefore.endsWith(". ")) {
                 currentInputConnection?.deleteSurroundingText(1, 0)
                 currentInputConnection?.commitText(". ", 1)
                 lastSpacePressTime = 0

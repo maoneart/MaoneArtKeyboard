@@ -452,7 +452,8 @@ class KeyboardLayout(private val context: Context) {
             val r = box.hitRect
             if (rx in (r.left - tol)..(r.right + tol) &&
                 ry in (r.top - tol)..(r.bottom + tol)) {
-                return Pair(box.charStr, r)
+                val activeText = box.tv.text.toString().ifEmpty { box.charStr }
+                return Pair(activeText, r)
             }
         }
 
@@ -472,7 +473,10 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        return closest?.let { Pair(it.charStr, it.hitRect) }
+        return closest?.let {
+            val activeText = it.tv.text.toString().ifEmpty { it.charStr }
+            Pair(activeText, it.hitRect)
+        }
     }
 
     private fun findKeyViewAt(rawX: Float, rawY: Float): View? {
