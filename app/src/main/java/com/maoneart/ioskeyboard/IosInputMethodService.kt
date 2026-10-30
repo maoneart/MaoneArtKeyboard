@@ -1299,13 +1299,19 @@ class IosInputMethodService : InputMethodService() {
         }
     }
 
+    private fun isWordChar(c: Char): Boolean {
+        return c.isLetterOrDigit() || c == '\'' || c == '-'
+    }
+
     private fun extractWordsFromContext(textBefore: String): Pair<String, String> {
-        // If cursor directly follows a space or punctuation:
-        if (textBefore.last().isWhitespace() || textBefore.last() in ".,!?") {
-            val trimmed = textBefore.trimEnd { it.isWhitespace() || it in ".,!?" }
+        if (textBefore.isEmpty()) return Pair("", "")
+
+        // If cursor directly follows non-word character (e.g. whitespace or punctuation):
+        if (!isWordChar(textBefore.last())) {
+            val trimmed = textBefore.trimEnd { !isWordChar(it) }
             if (trimmed.isEmpty()) return Pair("", "")
             var i = trimmed.length - 1
-            while (i >= 0 && !trimmed[i].isWhitespace() && trimmed[i] !in ".,!?\n") {
+            while (i >= 0 && isWordChar(trimmed[i])) {
                 i--
             }
             val lastWord = trimmed.substring(i + 1)
@@ -1314,15 +1320,15 @@ class IosInputMethodService : InputMethodService() {
 
         // Otherwise, cursor is at the end of a word being typed or backspaced:
         var i = textBefore.length - 1
-        while (i >= 0 && !textBefore[i].isWhitespace() && textBefore[i] !in ".,!?\n") {
+        while (i >= 0 && isWordChar(textBefore[i])) {
             i--
         }
         val currentWord = textBefore.substring(i + 1)
 
         // Also find previous word before this current word
-        val priorText = textBefore.substring(0, (i + 1).coerceAtLeast(0)).trimEnd { it.isWhitespace() || it in ".,!?" }
+        val priorText = textBefore.substring(0, (i + 1).coerceAtLeast(0)).trimEnd { !isWordChar(it) }
         var j = priorText.length - 1
-        while (j >= 0 && !priorText[j].isWhitespace() && priorText[j] !in ".,!?\n") {
+        while (j >= 0 && isWordChar(priorText[j])) {
             j--
         }
         val previousWord = if (priorText.isNotEmpty()) priorText.substring(j + 1) else ""
@@ -1384,36 +1390,41 @@ class IosInputMethodService : InputMethodService() {
                 return
             }
 
-            val refWord = if (currentWord.isNotEmpty()) currentWord else previousWord
+            val refWord = if (currentWord.isNotEmpty()) currentWord else ""
+            val shouldCapNext = currentWord.isEmpty() && shouldAutoCapitalize()
 
             if (suggestions.size == 1) {
                 candidate1?.text = ""
-                candidate2?.text = formatCandidateCase(suggestions[0], refWord)
+                candidate2?.text = formatCandidateCase(suggestions[0], refWord, shouldCapNext)
                 candidate3?.text = ""
             } else if (suggestions.size == 2) {
-                candidate1?.text = formatCandidateCase(suggestions[1], refWord)
-                candidate2?.text = formatCandidateCase(suggestions[0], refWord)
+                candidate1?.text = formatCandidateCase(suggestions[1], refWord, shouldCapNext)
+                candidate2?.text = formatCandidateCase(suggestions[0], refWord, shouldCapNext)
                 candidate3?.text = ""
             } else {
-                candidate1?.text = formatCandidateCase(suggestions[1], refWord)
-                candidate2?.text = formatCandidateCase(suggestions[0], refWord)
-                candidate3?.text = formatCandidateCase(suggestions[2], refWord)
+                candidate1?.text = formatCandidateCase(suggestions[1], refWord, shouldCapNext)
+                candidate2?.text = formatCandidateCase(suggestions[0], refWord, shouldCapNext)
+                candidate3?.text = formatCandidateCase(suggestions[2], refWord, shouldCapNext)
             }
         } catch (_: Throwable) {}
     }
 
-    private fun formatCandidateCase(candidate: String, original: String): String {
-        if (original.isEmpty()) return candidate
+    private fun formatCandidateCase(candidate: String, original: String, forceCapitalizeFirst: Boolean = false): String {
+        if (candidate.isEmpty()) return candidate
         if (candidate.startsWith("⚡ ")) {
             val phrase = candidate.removePrefix("⚡ ").trim()
-            val formatted = if (original[0].isUpperCase()) phrase.replaceFirstChar { it.uppercase() } else phrase
+            val formatted = if (forceCapitalizeFirst || (original.isNotEmpty() && original[0].isUpperCase())) {
+                phrase.replaceFirstChar { it.uppercase() }
+            } else {
+                phrase
+            }
             return "⚡ $formatted"
         }
         if (candidate.startsWith("✦ ")) return candidate
-        if (original.all { it.isUpperCase() } && original.length > 1) {
+        if (original.isNotEmpty() && original.all { it.isUpperCase() } && original.length > 1) {
             return candidate.uppercase()
         }
-        if (original[0].isUpperCase()) {
+        if (forceCapitalizeFirst || (original.isNotEmpty() && original[0].isUpperCase())) {
             return candidate.replaceFirstChar { it.uppercase() }
         }
         return candidate
@@ -1439,9 +1450,24 @@ class IosInputMethodService : InputMethodService() {
             correctionEngine.recordWordUsage(cleanCandidate, 2)
 
             if (isTranslatePanelOpen) {
-                val (currentWord, _) = getTypingContext()
-                val lengthToDelete = currentWord.length
+                val (currentWord, previousWord) = getTypingContext()
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                val textBefore = if (pos > 0) translatePanelBuffer.substring(0, pos) else ""
+
+                var lengthToDelete = currentWord.length
+                if (lengthToDelete == 0 && textBefore.isNotEmpty() && textBefore.last().isWhitespace() && previousWord.isNotEmpty()) {
+                    if (cleanCandidate.startsWith(previousWord, ignoreCase = true) ||
+                        correctionEngine.isCorrectionMatch(previousWord, cleanCandidate, prefs.activeLanguage)) {
+                        var wsCount = 0
+                        var k = textBefore.length - 1
+                        while (k >= 0 && textBefore[k].isWhitespace()) {
+                            wsCount++
+                            k--
+                        }
+                        lengthToDelete = previousWord.length + wsCount
+                    }
+                }
+
                 if (lengthToDelete > 0 && pos >= lengthToDelete) {
                     translatePanelBuffer.delete(pos - lengthToDelete, pos)
                     translateCursorPosition = pos - lengthToDelete
@@ -1451,8 +1477,24 @@ class IosInputMethodService : InputMethodService() {
                 updateTranslateInputBoxVisual()
             } else if (isTerminalOrRawInput()) {
                 // In Termux PTY, deleteSurroundingText() is ignored by the terminal buffer.
-                // We MUST use KEYCODE_DEL key events, and rely on composingWord length.
-                val lengthToDelete = composingWord.length
+                // We MUST use KEYCODE_DEL key events, and rely on composingWord or cursor context.
+                val textBefore = ic?.getTextBeforeCursor(64, 0)?.toString() ?: ""
+                val (currentWord, previousWord) = extractWordsFromContext(textBefore)
+                var lengthToDelete = if (currentWord.isNotEmpty()) currentWord.length else composingWord.length
+
+                if (lengthToDelete == 0 && textBefore.isNotEmpty() && textBefore.last().isWhitespace() && previousWord.isNotEmpty()) {
+                    if (cleanCandidate.startsWith(previousWord, ignoreCase = true) ||
+                        correctionEngine.isCorrectionMatch(previousWord, cleanCandidate, prefs.activeLanguage)) {
+                        var wsCount = 0
+                        var k = textBefore.length - 1
+                        while (k >= 0 && textBefore[k].isWhitespace()) {
+                            wsCount++
+                            k--
+                        }
+                        lengthToDelete = previousWord.length + wsCount
+                    }
+                }
+
                 if (lengthToDelete > 0 && ic != null) {
                     repeat(lengthToDelete) {
                         sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
@@ -1460,17 +1502,54 @@ class IosInputMethodService : InputMethodService() {
                 }
                 ic?.commitText("$cleanCandidate ", 1)
             } else {
-                // In normal apps (WhatsApp, Chrome, Notes, etc.):
-                // Query real text before cursor to find the exact token touching the cursor!
+                // In normal apps (WhatsApp, Chrome, Notes, Instagram, WebViews, etc.):
                 val textBefore = ic?.getTextBeforeCursor(64, 0)?.toString() ?: ""
-                val wordAtCursor = if (textBefore.isNotEmpty()) extractWordsFromContext(textBefore).first else ""
-                val lengthToDelete = if (wordAtCursor.isNotEmpty()) wordAtCursor.length else composingWord.length
+                val (currentWord, previousWord) = extractWordsFromContext(textBefore)
+
+                var lengthToDelete = currentWord.length
+                if (lengthToDelete == 0 && textBefore.isNotEmpty() && textBefore.last().isWhitespace() && previousWord.isNotEmpty()) {
+                    if (cleanCandidate.startsWith(previousWord, ignoreCase = true) ||
+                        correctionEngine.isCorrectionMatch(previousWord, cleanCandidate, prefs.activeLanguage)) {
+                        var wsCount = 0
+                        var k = textBefore.length - 1
+                        while (k >= 0 && textBefore[k].isWhitespace()) {
+                            wsCount++
+                            k--
+                        }
+                        lengthToDelete = previousWord.length + wsCount
+                    }
+                }
+
+                if (lengthToDelete == 0 && composingWord.isNotEmpty()) {
+                    lengthToDelete = composingWord.length
+                }
 
                 if (ic != null) {
-                    if (lengthToDelete > 0) {
-                        ic.deleteSurroundingText(lengthToDelete, 0)
+                    ic.beginBatchEdit()
+                    try {
+                        if (lengthToDelete > 0) {
+                            var deleted = false
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                try {
+                                    deleted = ic.deleteSurroundingTextInCodePoints(lengthToDelete, 0)
+                                } catch (_: Throwable) {}
+                            }
+                            if (!deleted) {
+                                try {
+                                    deleted = ic.deleteSurroundingText(lengthToDelete, 0)
+                                } catch (_: Throwable) {}
+                            }
+                            // Fallback for apps/custom text views that silently ignore deleteSurroundingText:
+                            if (!deleted) {
+                                repeat(lengthToDelete) {
+                                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                                }
+                            }
+                        }
+                        ic.commitText("$cleanCandidate ", 1)
+                    } finally {
+                        ic.endBatchEdit()
                     }
-                    ic.commitText("$cleanCandidate ", 1)
                 }
             }
 

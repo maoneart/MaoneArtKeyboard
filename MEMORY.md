@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.48)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.49)
 
 ---
 
@@ -268,3 +268,18 @@
        - **Eliminasi Binder IPC pada `onUpdateSelection`**: Pengetikan karakter maju sekuensial (`newSelStart == oldSelStart + 1`) kini diproses 100% in-memory tanpa memanggil `getTextBeforeCursor` secara synchronous ke proses aplikasi target.
        - **In-Memory Cache Balon Preview Huruf**: Menghilangkan 2x pemanggilan native JNI `getLocationOnScreen()` dan alokasi array pada setiap tuts huruf. Koordinat pop-up dicatat ke memori (`keyPopupPositions`) sekali per tuts.
        - **Async Background Audio & Haptic Execution**: Pemanggilan `AudioManager.playSoundEffect` dan `Vibrator.vibrate` dialihkan ke dedicated single-threaded executor (`asyncExecutor`), membebaskan UI thread dari antrean Binder IPC sistem sehingga pengetikan terasa sangat mulus, responsif, dan enteng di refresh rate 120Hz.
+  - **Eliminasi Teks Dobel Rekomendasi, Perbaikan QuickPath Touch-Slop & Spacebar Multi-Touch (Release v1.0.49)**:
+    1. **Eliminasi Total Masalah Teks Dobel & Tidak Terhapus pada Rekomendasi Kata**:
+       - **Atomic Batch Editing**: Membungkus seluruh operasi penghapusan dan komit kata di `selectCandidate` dengan `InputConnection.beginBatchEdit()` dan `endBatchEdit()`, menghentikan balapan asynchronous dengan `TextWatcher` di WhatsApp, Chrome, dll.
+       - **Universal Multi-Layer Deletion Fallback**: Mencoba `deleteSurroundingTextInCodePoints`, fallback ke `deleteSurroundingText`, dan jika keduanya diabaikan atau gagal (`!deleted`), mengirimkan fallback `repeat(lengthToDelete) { sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL) }` di semua aplikasi tanpa terkecuali.
+       - **Resolusi Spasi di Akhir Suku Kata (`"Mak "` -> "Makan ")**: Jika pengguna mengetik kata lalu sempat menekan spasi sebelum mengklik rekomendasi, sistem mendeteksi kecocokan kata sebelum spasi (`previousWord`), menghitung spasi di belakangnya, dan menghapus keduanya sekaligus sebelum meng-commit kata rekomendasi. Tidak ada lagi kata dobel berjarak spasi (`"Mak Makan "`).
+       - **Boundary Delimiter Punctuation Presisi (`isWordChar`)**: Punctuation seperti `(`, `"`, `@`, `#`, `/` tidak lagi dianggap bagian dari kata, memastikan panjang karakter yang dibuang selalu 100% presisi.
+    2. **Perbaikan Fatal QuickPath Touch-Slop (`hypot(rawX - startX)`)**:
+       - Root Cause Masalah Tuts Suka Terpotong / Ngaco: `startX` dan `startY` sebelumnya disimpan dalam koordinat lokal View (~50px), sedangkan `dist` dihitung dengan `ev.rawX` layar penuh (~500px), menghasilkan jarak semu ~2000px pada setiap gerakan sekecil apa pun dan memicu swipe tak sengaja yang menghapus huruf pertama.
+       - Solusi: `startX` dan `startY` kini disimpan menggunakan koordinat raw screen yang identik, dan `ACTION_POINTER_DOWN` membatalkan swipe secara instan untuk dua jempol.
+    3. **Perbaikan Spacebar Multi-Touch & Anti-Spasi Liar**:
+       - `setupSpacebarTrackpadTouch` kini mencatat `activePointerId` spesifik untuk tuts spasi.
+       - Mengabaikan `ACTION_CANCEL` dan `ACTION_POINTER_UP` dari tuts lain, melenyapkan spasi ganda liar dan kemunculan titik/kapital tak disengaja saat mengetik cepat dengan dua jempol.
+    4. **Penyesuaian Casing Rekomendasi & Prediksi Lanjutan**:
+       - Prediksi kata lanjutan di tengah kalimat tidak lagi dipaksa kapital akibat pengaruh kata sebelumnya (`previousWord`).
+       - Huruf kapital pada rekomendasi kata hanya aktif jika kata yang sedang diketik memang berawalan huruf besar atau berada tepat di awal kalimat baru (`shouldAutoCapitalize() == true`).

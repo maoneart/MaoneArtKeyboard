@@ -151,12 +151,12 @@ class QuickPathContainerLayout(
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (!isSwipeEnabled) return false
         when (ev.actionMasked) {
-            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+            MotionEvent.ACTION_DOWN -> {
                 val pIdx = ev.actionIndex
-                startX = try { ev.getX(pIdx) } catch (_: Throwable) { ev.x }
-                startY = try { ev.getY(pIdx) } catch (_: Throwable) { ev.y }
                 val rawX = try { ev.getRawX(pIdx) } catch (_: Throwable) { ev.rawX }
                 val rawY = try { ev.getRawY(pIdx) } catch (_: Throwable) { ev.rawY }
+                startX = rawX
+                startY = rawY
 
                 isSwiping = false
                 swipedChars.clear()
@@ -164,6 +164,14 @@ class QuickPathContainerLayout(
                 if (keyInfo != null && keyInfo.first.isNotEmpty() && keyInfo.first[0].isLetter()) {
                     swipedChars.add(keyInfo.first[0].lowercaseChar())
                 }
+                return false
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                // Multi-touch means user is typing with two thumbs -> cancel swipe detection!
+                isSwiping = false
+                swipedChars.clear()
+                hidePopup()
+                swipeTrailView.clearTrail()
                 return false
             }
             MotionEvent.ACTION_MOVE -> {

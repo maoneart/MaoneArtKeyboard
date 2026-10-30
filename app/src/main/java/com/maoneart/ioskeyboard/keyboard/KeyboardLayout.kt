@@ -1645,6 +1645,7 @@ class KeyboardLayout(private val context: Context) {
         view.isHapticFeedbackEnabled = true
         val handler = Handler(Looper.getMainLooper())
         var isTrackpadActive = false
+        var activePointerId = -1
         var startX = 0f
         var startY = 0f
         var lastStepX = 0f
@@ -1669,8 +1670,9 @@ class KeyboardLayout(private val context: Context) {
 
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
+                    activePointerId = event.getPointerId(0)
                     startX = event.x
                     startY = event.y
                     lastStepX = event.x
@@ -1685,12 +1687,22 @@ class KeyboardLayout(private val context: Context) {
                     handler.postDelayed(activateRunnable, 260L)
                     true
                 }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    if (!isTrackpadActive) {
+                        handler.removeCallbacks(activateRunnable)
+                    }
+                    true
+                }
                 MotionEvent.ACTION_MOVE -> {
                     if (isTrackpadActive) {
                         v.parent?.requestDisallowInterceptTouchEvent(true)
 
+                        val pIdx = if (activePointerId != -1) event.findPointerIndex(activePointerId) else 0
+                        val currentX = if (pIdx >= 0 && pIdx < event.pointerCount) event.getX(pIdx) else event.x
+                        val currentY = if (pIdx >= 0 && pIdx < event.pointerCount) event.getY(pIdx) else event.y
+
                         // 1. Sumbu Horisontal (Kiri / Kanan)
-                        val deltaX = event.x - lastStepX
+                        val deltaX = currentX - lastStepX
                         if (deltaX > stepDistanceX) {
                             val steps = (deltaX / stepDistanceX).toInt()
                             onCursorMove(steps, 0)
@@ -1714,7 +1726,7 @@ class KeyboardLayout(private val context: Context) {
                         }
 
                         // 2. Sumbu Vertikal (Atas / Bawah baris teks)
-                        val deltaY = event.y - lastStepY
+                        val deltaY = currentY - lastStepY
                         if (deltaY < -stepDistanceY) {
                             // Jari digeser ke ATAS
                             val steps = (kotlin.math.abs(deltaY) / stepDistanceY).toInt()
@@ -1746,10 +1758,29 @@ class KeyboardLayout(private val context: Context) {
                     }
                     true
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_POINTER_UP -> {
+                    val pIdx = event.actionIndex
+                    if (event.getPointerId(pIdx) == activePointerId) {
+                        v.parent?.requestDisallowInterceptTouchEvent(false)
+                        handler.removeCallbacks(activateRunnable)
+                        v.isPressed = false
+                        activePointerId = -1
+                        if (isTrackpadActive) {
+                            isTrackpadActive = false
+                            view.text = defaultText
+                            view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+                            view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
+                        } else {
+                            onSpaceAction()
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
                     v.parent?.requestDisallowInterceptTouchEvent(false)
                     handler.removeCallbacks(activateRunnable)
                     v.isPressed = false
+                    activePointerId = -1
                     if (isTrackpadActive) {
                         isTrackpadActive = false
                         view.text = defaultText
@@ -1757,6 +1788,19 @@ class KeyboardLayout(private val context: Context) {
                         view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
                     } else {
                         onSpaceAction()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+                    handler.removeCallbacks(activateRunnable)
+                    v.isPressed = false
+                    activePointerId = -1
+                    if (isTrackpadActive) {
+                        isTrackpadActive = false
+                        view.text = defaultText
+                        view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+                        view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
                     }
                     true
                 }
