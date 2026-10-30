@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.49)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.50)
 
 ---
 
@@ -283,3 +283,16 @@
     4. **Penyesuaian Casing Rekomendasi & Prediksi Lanjutan**:
        - Prediksi kata lanjutan di tengah kalimat tidak lagi dipaksa kapital akibat pengaruh kata sebelumnya (`previousWord`).
        - Huruf kapital pada rekomendasi kata hanya aktif jika kata yang sedang diketik memang berawalan huruf besar atau berada tepat di awal kalimat baru (`shouldAutoCapitalize() == true`).
+  - **Perbaikan Fatal Tombol Return / Enter WhatsApp & Multiline Text Fields (Release v1.0.50)**:
+    1. **Root Cause Masalah Tombol Return di WhatsApp Malah Menutup Keyboard**:
+       - Pada versi sebelumnya di `handleReturn()`, percabangan aksi editor mengevaluasi `targetAction` (`info.actionId`, `imeAction == IME_ACTION_DONE`, dll) sebelum memeriksa apakah text field berstatus multiline atau memiliki flag `IME_FLAG_NO_ENTER_ACTION`.
+       - Kolom chat WhatsApp membawa flag `TYPE_TEXT_FLAG_MULTI_LINE` dan secara internal menetapkan flag Android `IME_FLAG_NO_ENTER_ACTION` saat pengaturan "Enter is send" tidak aktif.
+       - Karena `targetAction` mendeteksi action non-zero atau `IME_ACTION_DONE`, keyboard mengeksekusi `ic.performEditorAction(targetAction)`.
+       - Sesuai standar Android `TextView` dan WhatsApp, pemanggilan `performEditorAction` pada kolom chat dianggap sebagai sinyal selesai mengedit teks (`actionDone`), sehingga sistem langsung memanggil `imm.hideSoftInputFromWindow()`, menyebabkan keyboard seketika tertutup alih-alih membuat baris baru.
+    2. **Solusi Isolasi Multiline & Resolusi Aksi Berjenjang**:
+       - **Priority 1 (Terminal Raw PTY)**: Aplikasi terminal (Termux) langsung mengirim `sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)`.
+       - **Priority 2 (Search Action)**: Kolom pencarian (Play Store Jetpack Compose, Web search) tetap mengeksekusi `performEditorAction(IME_ACTION_SEARCH)` tanpa membocorkan `\n`.
+       - **Priority 3 (`IME_FLAG_NO_ENTER_ACTION` Guard)**: Jika aplikasi secara eksplisit menyematkan flag `IME_FLAG_NO_ENTER_ACTION` (seperti WhatsApp default), keyboard DILARANG mengeksekusi aksi editor apa pun dan WAJIB menginjeksi baris baru `\n` via `ic.commitText("\n", 1)` (atau raw keycode enter jika single-line).
+       - **Priority 4 (Multiline Fields WhatsApp, Telegram, Notes, Pesan)**: Di seluruh kolom teks multiline, kecuali jika pengguna sengaja mengaktifkan fitur WhatsApp "Enter is send" (`imeAction == IME_ACTION_SEND` tanpa `hasNoEnterAction`), penekanan tombol Return selalu menginjeksi karakter newline `\n` (`ic.commitText("\n", 1)`). Keyboard tetap terbuka dan kursor berpindah ke baris baru dengan mulus.
+       - **Priority 5 (Single-Line Editor Actions)**: Aksi `Go`, `Send`, `Next`, dan `Done` hanya aktif pada kolom input single-line (URL browser, form login, dll).
+       - **Sinkronisasi Visual `updateReturnButton`**: Tampilan visual tombol aksi di baris ke-4 keyboard kini 100% selaras dengan logika eksekusi: menampilkan ikon kaca pembesar untuk Search, `"Buka"` untuk URI, `"Kirim"` untuk Send, dan teks otentik iOS `"return"` untuk WhatsApp dan multiline chat.

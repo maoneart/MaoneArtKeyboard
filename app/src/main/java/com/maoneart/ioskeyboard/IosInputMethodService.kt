@@ -1156,44 +1156,70 @@ class IosInputMethodService : InputMethodService() {
                 return
             }
 
+            if (isTerminalOrRawInput()) {
+                // Termux / Terminal PTY: Always send standard hardware enter key
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+                updateSuggestions()
+                updateAutoCapitalization()
+                return
+            }
+
             val imeAction = info.imeOptions and EditorInfo.IME_MASK_ACTION
             val variation = info.inputType and InputType.TYPE_MASK_VARIATION
             val isMultiLine = (info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+            val hasNoEnterAction = (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
 
             val isSearchAction = (imeAction == EditorInfo.IME_ACTION_SEARCH) ||
                     (variation == InputType.TYPE_TEXT_VARIATION_FILTER) ||
                     (info.actionId == EditorInfo.IME_ACTION_SEARCH)
 
-            // 1. Resolve specific action (Search in Play Store, Go in Browser, Send, Done, Next, etc.)
-            val targetAction = when {
-                info.actionId != 0 -> info.actionId
-                isSearchAction -> EditorInfo.IME_ACTION_SEARCH
-                imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI -> EditorInfo.IME_ACTION_GO
-                imeAction == EditorInfo.IME_ACTION_SEND -> EditorInfo.IME_ACTION_SEND
-                imeAction == EditorInfo.IME_ACTION_DONE -> EditorInfo.IME_ACTION_DONE
-                imeAction == EditorInfo.IME_ACTION_NEXT -> EditorInfo.IME_ACTION_NEXT
-                imeAction != EditorInfo.IME_ACTION_NONE && imeAction != EditorInfo.IME_ACTION_UNSPECIFIED -> imeAction
-                else -> EditorInfo.IME_ACTION_NONE
-            }
-
-            if (targetAction != EditorInfo.IME_ACTION_NONE) {
-                // Execute editor action (e.g. Play Store Search / Chrome Go / Form Send)
-                val handled = ic.performEditorAction(targetAction)
+            if (isSearchAction) {
+                // Play Store search or filter search field: Execute Search Action
+                val handled = ic.performEditorAction(EditorInfo.IME_ACTION_SEARCH)
                 if (!handled) {
                     if (!sendDefaultEditorAction(false)) {
                         sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
                     }
                 }
-            } else {
-                // 2. Standard Enter / Return key (No explicit action)
+            } else if (hasNoEnterAction) {
+                // App explicitly requested NO action on enter key (e.g. WhatsApp with Enter is send OFF)
                 if (isMultiLine) {
-                    // Multiline chat fields (WhatsApp, Telegram, Notes): Always insert a clean newline!
                     ic.commitText("\n", 1)
-                } else if (isTerminalOrRawInput()) {
-                    // Termux / Terminal PTY: Send standard hardware enter key
-                    sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
                 } else {
-                    // Standard single-line enter fallback
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+                }
+            } else if (isMultiLine) {
+                // Multiline chat fields (WhatsApp, Telegram, Notes, Messages):
+                // If user enabled "Enter is send" in WhatsApp:
+                if (imeAction == EditorInfo.IME_ACTION_SEND) {
+                    val handled = ic.performEditorAction(EditorInfo.IME_ACTION_SEND)
+                    if (!handled) {
+                        ic.commitText("\n", 1)
+                    }
+                } else {
+                    // Always insert a clean newline in multiline fields!
+                    ic.commitText("\n", 1)
+                }
+            } else {
+                // Single-line inputs: execute editor actions
+                val targetAction = when {
+                    imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI -> EditorInfo.IME_ACTION_GO
+                    imeAction == EditorInfo.IME_ACTION_SEND -> EditorInfo.IME_ACTION_SEND
+                    imeAction == EditorInfo.IME_ACTION_NEXT -> EditorInfo.IME_ACTION_NEXT
+                    imeAction == EditorInfo.IME_ACTION_DONE -> EditorInfo.IME_ACTION_DONE
+                    info.actionId != 0 -> info.actionId
+                    imeAction != EditorInfo.IME_ACTION_NONE && imeAction != EditorInfo.IME_ACTION_UNSPECIFIED -> imeAction
+                    else -> EditorInfo.IME_ACTION_NONE
+                }
+
+                if (targetAction != EditorInfo.IME_ACTION_NONE) {
+                    val handled = ic.performEditorAction(targetAction)
+                    if (!handled) {
+                        if (!sendDefaultEditorAction(false)) {
+                            sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
+                        }
+                    }
+                } else {
                     if (!sendDefaultEditorAction(true)) {
                         sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
                     }

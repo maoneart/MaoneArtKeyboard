@@ -155,28 +155,52 @@ class KeyboardLayout(private val context: Context) {
 
         val imeAction = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
         val variation = editorInfo.inputType and InputType.TYPE_MASK_VARIATION
+        val isMultiLine = (editorInfo.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+        val hasNoEnterAction = (editorInfo.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
+
+        val isSearchAction = (imeAction == EditorInfo.IME_ACTION_SEARCH) ||
+                (variation == InputType.TYPE_TEXT_VARIATION_FILTER) ||
+                (editorInfo.actionId == EditorInfo.IME_ACTION_SEARCH)
 
         // 1. Web Search or Filter: Show Flat White Search Icon with Action BG (100% Dead Center)
-        if (imeAction == EditorInfo.IME_ACTION_SEARCH ||
-            variation == InputType.TYPE_TEXT_VARIATION_FILTER ||
-            editorInfo.actionId == EditorInfo.IME_ACTION_SEARCH) {
+        if (isSearchAction) {
             btn.showIcon(R.drawable.ic_search_white, actionKeyBg)
             return
         }
 
-        // 2. Browser URL or Web Address: Show "Buka" (Action BG)
+        // 2. Multiline or No Enter Action (WhatsApp, Telegram, Notes): Always show authentic iOS "return"
+        if (hasNoEnterAction || isMultiLine) {
+            if (isMultiLine && imeAction == EditorInfo.IME_ACTION_SEND && !hasNoEnterAction) {
+                btn.showText("Kirim", 14f, Color.WHITE, actionKeyBg)
+            } else {
+                btn.showText("return", 15f, textColor, specialKeyBg)
+            }
+            return
+        }
+
+        // 3. Browser URL or Web Address: Show "Buka" (Action BG)
         if (imeAction == EditorInfo.IME_ACTION_GO || variation == InputType.TYPE_TEXT_VARIATION_URI) {
             btn.showText("Buka", 14f, Color.WHITE, actionKeyBg)
             return
         }
 
-        // 3. Form Send Action: Show "Kirim" (Action BG)
+        // 4. Form Send Action: Show "Kirim" (Action BG)
         if (imeAction == EditorInfo.IME_ACTION_SEND) {
             btn.showText("Kirim", 14f, Color.WHITE, actionKeyBg)
             return
         }
 
-        // 4. WhatsApp, Telegram, Notes & all multiline / standard newline:
+        // 5. Form Next / Done:
+        if (imeAction == EditorInfo.IME_ACTION_NEXT) {
+            btn.showText("Lanjut", 14f, Color.WHITE, actionKeyBg)
+            return
+        }
+        if (imeAction == EditorInfo.IME_ACTION_DONE) {
+            btn.showText("Selesai", 14f, Color.WHITE, actionKeyBg)
+            return
+        }
+
+        // Default: authentic iOS "return"
         btn.showText("return", 15f, textColor, specialKeyBg)
     }
 
