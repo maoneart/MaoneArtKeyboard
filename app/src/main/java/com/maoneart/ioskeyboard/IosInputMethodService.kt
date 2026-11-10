@@ -79,6 +79,10 @@ class IosInputMethodService : InputMethodService() {
     private val suggestionHandler = Handler(Looper.getMainLooper())
     private var suggestionRunnable: Runnable? = null
 
+    // 0.2ms View-Cache for QWERTY Layout to eliminate view inflation overhead when toggling 123 ⇄ ABC
+    private var cachedQwertyView: View? = null
+    private var cachedQwertyKeySignature: String = ""
+
     // View References
     private var rootView: View? = null
     private var keyboardContainer: FrameLayout? = null
@@ -107,7 +111,11 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic = AudioHapticManager(this, prefs)
             correctionEngine = SmartCorrectionEngine(this)
             translateManager = LiveTranslateManager()
-            clipboardManager = ClipboardHistoryManager(this)
+            clipboardManager = ClipboardHistoryManager(this).apply {
+                onNewClipCopied = {
+                    suggestionHandler.post { updateSuggestions(immediate = true) }
+                }
+            }
             stickerManager = com.maoneart.ioskeyboard.sticker.StickerManager(this)
             layoutEngine = KeyboardLayout(this)
             textReplacementManager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
@@ -291,6 +299,16 @@ class IosInputMethodService : InputMethodService() {
                 closeTranslatePanel()
             }
 
+            // Android 10-15 Clipboard Focus Sync: fetch immediately + after window focus settles (120ms & 350ms)
+            clipboardManager.fetchCurrentClip()
+            suggestionHandler.postDelayed({
+                clipboardManager.fetchCurrentClip()
+                updateSuggestions(immediate = true)
+            }, 120L)
+            suggestionHandler.postDelayed({
+                clipboardManager.fetchCurrentClip()
+            }, 350L)
+
             updateSuggestions()
             updateLanguageBadge()
             updateTranslatePanelUI()
@@ -321,6 +339,18 @@ class IosInputMethodService : InputMethodService() {
                 voiceDictationManager.stopListening()
                 layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
             }
+        } catch (_: Throwable) {}
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        try {
+            // Ensure Android 10+ clipboard is captured the exact moment IME window is shown & focused
+            clipboardManager.fetchCurrentClip()
+            suggestionHandler.postDelayed({
+                clipboardManager.fetchCurrentClip()
+                updateSuggestions(immediate = true)
+            }, 150L)
         } catch (_: Throwable) {}
     }
 
@@ -650,20 +680,34 @@ class IosInputMethodService : InputMethodService() {
             val isDark = isDarkMode()
 
             val contentView = when (currentMode) {
-                Mode.QWERTY -> layoutEngine.createQwertyView(
-                    isShifted = isShifted || isCapsLock,
-                    isDark = isDark,
-                    themeMode = prefs.themeMode,
-                    activeLanguage = prefs.activeLanguage,
-                    isSwipeEnabled = prefs.isSwipeTypingEnabled,
-                    isKeyPopupEnabled = prefs.isKeyPopupEnabled,
-                    isDictationEnabled = prefs.isDictationEnabled,
-                    onKeyAction = { handleKeyAction(it) },
-                    onCursorMove = { dx, dy -> moveCursor2D(dx, dy) },
-                    onSwipeComplete = { handleSwipeComplete(it) },
-                    onSwipeHaptic = { audioHaptic.triggerHapticFeedback() },
-                    onSwipeLiveUpdate = { handleSwipeLiveUpdate(it) }
-                )
+                Mode.QWERTY -> {
+                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|${prefs.isDictationEnabled}"
+                    val existing = cachedQwertyView
+                    if (existing != null && cachedQwertyKeySignature == sig) {
+                        (existing.parent as? android.view.ViewGroup)?.removeView(existing)
+                        layoutEngine.updateShiftState(isShifted || isCapsLock)
+                        existing.post { layoutEngine.rebuildHitBoxCache() }
+                        existing
+                    } else {
+                        val created = layoutEngine.createQwertyView(
+                            isShifted = isShifted || isCapsLock,
+                            isDark = isDark,
+                            themeMode = prefs.themeMode,
+                            activeLanguage = prefs.activeLanguage,
+                            isSwipeEnabled = prefs.isSwipeTypingEnabled,
+                            isKeyPopupEnabled = prefs.isKeyPopupEnabled,
+                            isDictationEnabled = prefs.isDictationEnabled,
+                            onKeyAction = { handleKeyAction(it) },
+                            onCursorMove = { dx, dy -> moveCursor2D(dx, dy) },
+                            onSwipeComplete = { handleSwipeComplete(it) },
+                            onSwipeHaptic = { audioHaptic.triggerHapticFeedback() },
+                            onSwipeLiveUpdate = { handleSwipeLiveUpdate(it) }
+                        )
+                        cachedQwertyView = created
+                        cachedQwertyKeySignature = sig
+                        created
+                    }
+                }
                 Mode.SYMBOLS_123 -> layoutEngine.createSymbolsView(
                     isMoreSymbols = false,
                     isDark = isDark,
@@ -835,7 +879,13 @@ class IosInputMethodService : InputMethodService() {
                     handleSpace()
                 }
                 else -> {
-                    handleCharacterInput(action)
+                    if (action.startsWith("ACTION_REPLACE_WITH_DIGIT:")) {
+                        val digit = action.removePrefix("ACTION_REPLACE_WITH_DIGIT:")
+                        handleBackspace()
+                        handleCharacterInput(digit)
+                    } else {
+                        handleCharacterInput(action)
+                    }
                 }
             }
         } catch (_: Throwable) {}
@@ -1407,6 +1457,40 @@ class IosInputMethodService : InputMethodService() {
 
             val (currentWord, previousWord) = getTypingContext()
 
+            // 0A. Instant In-Keyboard Math Calculator (e.g. "25000*4" -> "🧮 = 100.000")
+            val mathExprCandidate = try {
+                val rawContext = if (isTranslatePanelOpen) {
+                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                    translatePanelBuffer.substring(0, pos)
+                } else {
+                    currentInputConnection?.getTextBeforeCursor(40, 0)?.toString() ?: currentWord
+                }
+                evaluateInlineMath(rawContext)
+            } catch (_: Throwable) { null }
+
+            if (mathExprCandidate != null) {
+                candidate1?.text = "🧮 = ${mathExprCandidate.second}"
+                candidate2?.text = "🧮 = ${mathExprCandidate.first}"
+                candidate3?.text = currentWord
+                return
+            }
+
+            // 0B. iOS 18 Smart Paste / OTP Autofill Pill when input is empty or at word boundary & fresh clip exists
+            val freshClip = if (currentWord.isEmpty()) clipboardManager.getRecentFreshClip() else null
+            if (!freshClip.isNullOrEmpty()) {
+                val cleanSingleLine = freshClip.replace("\n", " ").trim()
+                val shortLabel = if (cleanSingleLine.length > 18) cleanSingleLine.take(18) + "…" else cleanSingleLine
+                val nextSuggs = if (previousWord.isNotEmpty()) {
+                    correctionEngine.getNextWordPredictions(previousWord, prefs.activeLanguage)
+                } else {
+                    correctionEngine.getSuggestions("", prefs.activeLanguage)
+                }
+                candidate1?.text = nextSuggs.getOrNull(0) ?: ""
+                candidate2?.text = "📋 $shortLabel"
+                candidate3?.text = nextSuggs.getOrNull(1) ?: ""
+                return
+            }
+
             val suggestions = if (currentWord.isNotEmpty()) {
                 // Periksa apakah kata yang sedang diketik cocok dengan singkatan Text Replacement
                 val shortcutMatch = textReplacementManager.getReplacement(currentWord)
@@ -1480,6 +1564,39 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.triggerHapticFeedback()
 
             var cleanCandidate = candidate.trim()
+
+            // Handle iOS 18 Smart Paste Pill ("📋 ...")
+            if (cleanCandidate.startsWith("📋 ")) {
+                val fullClip = clipboardManager.getRecentFreshClip()
+                    ?: clipboardManager.getItems().firstOrNull()?.text
+                    ?: cleanCandidate.removePrefix("📋 ").trim()
+                clipboardManager.consumeFreshClip()
+                commitDirectText(fullClip)
+                return
+            }
+
+            // Handle Instant Math Calculator Result ("🧮 = ...")
+            if (cleanCandidate.startsWith("🧮 = ")) {
+                val resultValue = cleanCandidate.removePrefix("🧮 = ").trim()
+                val ic = currentInputConnection
+                if (isTranslatePanelOpen) {
+                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                    val before = translatePanelBuffer.substring(0, pos)
+                    val eqSuffix = if (before.trimEnd().endsWith("=")) "" else " = "
+                    val insertStr = if (before.trimEnd().endsWith("=")) " $resultValue" else "$eqSuffix$resultValue"
+                    translatePanelBuffer.insert(pos, insertStr)
+                    translateCursorPosition = pos + insertStr.length
+                    updateTranslateInputBoxVisual()
+                } else if (ic != null) {
+                    val before = ic.getTextBeforeCursor(40, 0)?.toString() ?: ""
+                    val insertStr = if (before.trimEnd().endsWith("=")) " $resultValue " else " = $resultValue "
+                    ic.commitText(insertStr, 1)
+                }
+                composingWord.clear()
+                updateSuggestions()
+                return
+            }
+
             if (cleanCandidate.startsWith("⚡ ")) {
                 cleanCandidate = cleanCandidate.removePrefix("⚡ ").trim()
             }
@@ -1680,9 +1797,74 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    /**
+     * Evaluates simple inline math expressions at the end of the text before cursor
+     * (e.g., "25000*4", "150000/3=", "12500+7500") and returns Pair(formattedIdr, rawString).
+     */
+    private fun evaluateInlineMath(textBefore: String): Pair<String, String>? {
+        if (textBefore.isBlank()) return null
+        val trimmed = textBefore.trimEnd()
+        val match = Regex("""([0-9]+(?:\.[0-9]+)?(?:\s*[\+\-\*\/xX×÷]\s*[0-9]+(?:\.[0-9]+)?)+)\s*=?\s*$""").find(trimmed)
+            ?: return null
+        val expr = match.groupValues[1]
+            .replace(" ", "")
+            .replace("x", "*")
+            .replace("X", "*")
+            .replace("×", "*")
+            .replace("÷", "/")
+
+        val tokens = Regex("""([0-9]+(?:\.[0-9]+)?|[\+\-\*\/])""").findAll(expr).map { it.value }.toList()
+        if (tokens.size < 3 || tokens.size % 2 == 0) return null
+
+        // First pass: * and /
+        val nums = mutableListOf<Double>()
+        val ops = mutableListOf<String>()
+        var current = tokens[0].toDoubleOrNull() ?: return null
+        var i = 1
+        while (i < tokens.size) {
+            val op = tokens[i]
+            val next = tokens[i + 1].toDoubleOrNull() ?: return null
+            when (op) {
+                "*" -> current *= next
+                "/" -> {
+                    if (next == 0.0) return null
+                    current /= next
+                }
+                "+", "-" -> {
+                    nums.add(current)
+                    ops.add(op)
+                    current = next
+                }
+                else -> return null
+            }
+            i += 2
+        }
+        nums.add(current)
+
+        // Second pass: + and -
+        var total = nums[0]
+        for (j in ops.indices) {
+            when (ops[j]) {
+                "+" -> total += nums[j + 1]
+                "-" -> total -= nums[j + 1]
+            }
+        }
+        if (total.isNaN() || total.isInfinite()) return null
+
+        val isWhole = (total % 1.0 == 0.0)
+        val rawStr = if (isWhole) total.toLong().toString() else String.format(java.util.Locale.US, "%.2f", total).trimEnd('0').trimEnd('.')
+        val formattedStr = if (isWhole) {
+            java.text.NumberFormat.getNumberInstance(java.util.Locale("id", "ID")).format(total.toLong())
+        } else {
+            rawStr
+        }
+        return Pair(formattedStr, rawStr)
+    }
+
     override fun onDestroy() {
         try {
             suggestionHandler.removeCallbacksAndMessages(null)
+            clipboardManager.destroy()
             voiceDictationManager.destroy()
             audioHaptic.destroy()
             correctionEngine.destroy()

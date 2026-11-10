@@ -62,6 +62,7 @@ class KeyboardLayout(private val context: Context) {
     private var shiftButtonRef: ImageButton? = null
     private var returnButtonRef: ReturnButtonLayout? = null
     private var popupController: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathContainerLayout? = null
+    private var onKeyActionCallback: ((String) -> Unit)? = null
 
     data class KeyHitBox(
         val tv: TextView,
@@ -221,6 +222,7 @@ class KeyboardLayout(private val context: Context) {
     ): View {
         letterKeyViews.clear()
         cachedHitBoxes = emptyList()
+        onKeyActionCallback = onKeyAction
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -1837,12 +1839,58 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback & Multi-Touch)
+    private val topRowNumberMap = mapOf(
+        "q" to "1", "w" to "2", "e" to "3", "r" to "4", "t" to "5",
+        "y" to "6", "u" to "7", "i" to "8", "o" to "9", "p" to "0"
+    )
+
+    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback, Multi-Touch & Top-Row Long-Press Number 1-0)
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
+        val handler = Handler(Looper.getMainLooper())
+        var longPressTriggered = false
+        var downX = 0f
+        var downY = 0f
+        val longPressRunnable = Runnable {
+            val baseKey = view.text.toString().lowercase()
+            val digit = topRowNumberMap[baseKey]
+            if (digit != null && view.isPressed) {
+                longPressTriggered = true
+                try {
+                    view.performHapticFeedback(
+                        android.view.HapticFeedbackConstants.LONG_PRESS,
+                        android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                    )
+                } catch (_: Throwable) {}
+                popupController?.showPopupForKey(view, digit)
+                onKeyActionCallback?.invoke("ACTION_REPLACE_WITH_DIGIT:$digit")
+            }
+        }
+
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    longPressTriggered = false
+                    downX = event.x
+                    downY = event.y
+                    try {
+                        v.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
+                    popupController?.showPopupForKey(v, view.text.toString())
+                    onTrigger()
+                    val baseKey = view.text.toString().lowercase()
+                    if (topRowNumberMap.containsKey(baseKey)) {
+                        handler.removeCallbacks(longPressRunnable)
+                        handler.postDelayed(longPressRunnable, 310L)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    handler.removeCallbacks(longPressRunnable)
                     v.isPressed = true
                     try {
                         v.performHapticFeedback(
@@ -1854,7 +1902,17 @@ class KeyboardLayout(private val context: Context) {
                     onTrigger()
                     true
                 }
+                MotionEvent.ACTION_MOVE -> {
+                    if (!longPressTriggered) {
+                        val dist = kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble())
+                        if (dist > dp(14)) {
+                            handler.removeCallbacks(longPressRunnable)
+                        }
+                    }
+                    true
+                }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(longPressRunnable)
                     v.isPressed = false
                     popupController?.hidePopup()
                     true
