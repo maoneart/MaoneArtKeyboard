@@ -17,7 +17,12 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
+import android.os.Build
 import com.maoneart.ioskeyboard.R
+import com.maoneart.ioskeyboard.emoji.AnimatedEmojiManager
 import com.maoneart.ioskeyboard.emoji.EmojiBoardManager
 
 class KeyboardLayout(private val context: Context) {
@@ -1030,6 +1035,7 @@ class KeyboardLayout(private val context: Context) {
 
         // Top Category Bar (Smileys, Hands, Hearts, Animals, Food, Activities, Symbols, Stickers, + Add)
         val tabCategories = listOf(
+            Pair("ANIMATED", "⚡ Gerak"),
             Pair("Smileys", "😀"),
             Pair("Hands", "👋"),
             Pair("Hearts", "❤️"),
@@ -1041,7 +1047,7 @@ class KeyboardLayout(private val context: Context) {
             Pair("ADD_STICKER", "➕")
         )
 
-        var activeCat = "Smileys"
+        var activeCat = "ANIMATED"
         val tabViews = mutableMapOf<String, TextView>()
 
         val tabsScroll = android.widget.HorizontalScrollView(context).apply {
@@ -1070,7 +1076,145 @@ class KeyboardLayout(private val context: Context) {
         fun renderContent(selectedCategory: String) {
             contentContainer.removeAllViews()
 
-            if (selectedCategory == "STICKERS") {
+            if (selectedCategory == "ANIMATED") {
+                // Render Live Animated Apple Emojis Grid (Hardware Animated WebP at 60 FPS)
+                val scroll = ScrollView(context).apply {
+                    layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    isVerticalScrollBarEnabled = true
+                    isFillViewport = true
+                }
+
+                val layout = LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(6), dp(4), dp(6), dp(4))
+                }
+
+                val items = AnimatedEmojiManager.items
+                val columns = 6
+                var row = LinearLayout(context).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48))
+                }
+                var count = 0
+                var rowIndex = 0
+
+                for (item in items) {
+                    val itemContainer = FrameLayout(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+                        isClickable = true
+                        isFocusable = false
+
+                        val delay = (rowIndex * 20L).coerceAtMost(200L)
+                        alpha = 0f
+                        scaleX = 0.5f
+                        scaleY = 0.5f
+                        animate()
+                            .alpha(1.0f)
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .setStartDelay(delay)
+                            .setDuration(220L)
+                            .setInterpolator(OvershootInterpolator(2.0f))
+                            .start()
+
+                        setOnClickListener { v ->
+                            v.animate().cancel()
+                            v.scaleX = 1.0f
+                            v.scaleY = 1.0f
+                            v.rotation = 0f
+
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+
+                            val wobbleAngle = if (item.unicode.hashCode() % 2 == 0) 16f else -16f
+
+                            v.animate()
+                                .scaleX(1.5f)
+                                .scaleY(1.5f)
+                                .rotation(wobbleAngle)
+                                .setDuration(120L)
+                                .setInterpolator(OvershootInterpolator(3.5f))
+                                .withEndAction {
+                                    v.animate()
+                                        .scaleX(1.0f)
+                                        .scaleY(1.0f)
+                                        .rotation(0f)
+                                        .setDuration(180L)
+                                        .setInterpolator(DecelerateInterpolator())
+                                        .start()
+                                }
+                                .start()
+
+                            onEmojiAction(item.unicode)
+                        }
+                    }
+
+                    val ivEmoji = android.widget.ImageView(context).apply {
+                        layoutParams = FrameLayout.LayoutParams(dp(38), dp(38), Gravity.CENTER)
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    }
+
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                            val source = ImageDecoder.createSource(context.assets, "animated_emojis/${item.fileName}")
+                            val drawable = ImageDecoder.decodeDrawable(source)
+                            ivEmoji.setImageDrawable(drawable)
+                            if (drawable is AnimatedImageDrawable) {
+                                drawable.repeatCount = AnimatedImageDrawable.REPEAT_INFINITE
+                                drawable.start()
+                            }
+                        } else {
+                            context.assets.open("animated_emojis/${item.fileName}").use { stream ->
+                                val bmp = BitmapFactory.decodeStream(stream)
+                                ivEmoji.setImageBitmap(bmp)
+                            }
+                        }
+                        itemContainer.addView(ivEmoji)
+                    } catch (_: Throwable) {
+                        val fallbackTv = TextView(context).apply {
+                            text = item.unicode
+                            textSize = 25f
+                            gravity = Gravity.CENTER
+                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                        }
+                        itemContainer.addView(fallbackTv)
+                    }
+
+                    row.addView(itemContainer)
+                    count++
+
+                    if (count == columns) {
+                        layout.addView(row)
+                        rowIndex++
+                        row = LinearLayout(context).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48))
+                        }
+                        count = 0
+                    }
+                }
+
+                if (count > 0) {
+                    while (count < columns) {
+                        val spacer = View(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+                        }
+                        row.addView(spacer)
+                        count++
+                    }
+                    layout.addView(row)
+                }
+
+                scroll.addView(layout)
+                contentContainer.addView(scroll)
+            } else if (selectedCategory == "STICKERS") {
                 // Render WhatsApp Stickers Grid
                 val stickerManager = com.maoneart.ioskeyboard.sticker.StickerManager(context)
                 val stickers = stickerManager.getStickers()

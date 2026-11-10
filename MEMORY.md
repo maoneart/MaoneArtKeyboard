@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.53)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.65)
 
 ---
 
@@ -364,3 +364,13 @@
        - Saat kategori emoji dibuka, deretan emoji muncul bertahap mengalir (cascade wave pop-in `0.5x ➔ 1.0x` dengan delay 25ms per baris).
     3. **Animasi Pegas pada Tab Kategori & Kartu Stiker**:
        - Tab navigasi kategori dan kartu stiker WhatsApp kini memiliki animasi membal pegas saat disentuh sebelum dikirim.
+  - **Live Animated Apple Emojis: 36 Looping Animated WebP Emojis at 60 FPS (Release v1.0.65)**:
+    1. **Tab "⚡ Gerak" Aktif Default**:
+       - Laci emoji langsung menampilkan tab "⚡ Gerak" berisi 36 emoji Apple 3D otentik yang bergerak aktif tanpa henti (ketawa air mata 😂, ngakak guling 🤣, nangis tersedu 😭, hati berdetak ❤️, api berkobar 🔥, mata melas 🥺, histeris 😱, seratus 💯, pesta 🎉, dll).
+    2. **Render Hardware Animated WebP Tanpa Lag**:
+       - Memanfaatkan `android.graphics.ImageDecoder` dan `AnimatedImageDrawable` di Android 9+ (API 28-35+) dengan `repeatCount = REPEAT_INFINITE`.
+       - 36 berkas Animated WebP lokal (~2.3 MB total) di-decode langsung di GPU tanpa latensi jaringan (100% offline).
+       - Fallback graceful ke `BitmapFactory` atau Unicode `TextView` jika hardware tidak mendukung.
+    3. **Taptic Engine Tap & Juicy Spring Bounce**:
+       - Setiap ketukan memicu getaran Taptic `KEYBOARD_TAP` dan animasi pegas kenyal `1.5x` plus goyang miring 16°.
+       - Karakter teks Unicode standar langsung dikirimkan ke kolom chat aktif (WhatsApp, Instagram, Telegram) sehingga pesan tetap terbaca universal oleh semua penerima.
