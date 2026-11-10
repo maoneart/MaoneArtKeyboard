@@ -334,3 +334,28 @@
        - `IosInputMethodService.kt`: Menghapus seluruh antrean pesan handler via `suggestionHandler.removeCallbacksAndMessages(null)` dan memanggil `correctionEngine.destroy()` saat `onDestroy()`.
     2. **Verifikasi Kestabilan Menyeluruh (100% Zero-Crash Boundary)**:
        - Seluruh modul latar belakang (suara, haptik, translate, clipboard, dikte, dan gestur) telah memiliki batasan isolasi error tuntas (`try-catch` & `Lifecycle Guard`). Basis kode kini 100% aman, stabil, dan terbebas dari potensi regresi.
+  - **Sinkronisasi Clipboard Modern, Smart Paste Pill & In-Line Math (Release v1.0.54)**:
+    1. **Sinkronisasi Clipboard Android 10-15**:
+       - Integrasi event window focus untuk pembaruan riwayat klip secara realtime.
+    2. **0.2ms QWERTY View Cache**:
+       - Cache layout QWERTY berbasis tanda tangan preferensi (`cachedQwertyKeySignature`) untuk mereduksi waktu buka IME.
+    3. **iOS 18 Smart Paste Pill & Kalkulator Matematika**:
+       - Pill tempel otomatis pada suggestion bar dan perhitungan instan ekspresi matematika (misal `25*4000 = 100000`).
+  - **Auto-Switch iOS Numpad & Tombol 000 Transfer Bank (Release v1.0.55)**:
+    1. **Deteksi Otomatis Kolom Angka / Telepon / Perbankan**:
+       - Evaluasi `InputType.TYPE_CLASS_NUMBER`, `TYPE_CLASS_PHONE`, dan petunjuk kata kunci (nominal, pin, rekening, otp) untuk langsung membuka mode Numpad besar otentik iOS.
+    2. **Tombol Cepat `000` & Tombol Transisi `ABC`**:
+       - Penyisipan instan tiga nol untuk kemudahan transaksi m-Banking dan peralihan halus kembali ke QWERTY via tombol `ABC`.
+  - **Full QWERTY Long-Press Secondary Symbols & KeyCap Canvas (Release v1.0.56)**:
+    1. **Pemetaan Simbol Sekunder Lengkap 3 Baris**:
+       - Baris 1 (Q-P): Angka `1` sampai `0`.
+       - Baris 2 (A-L): Simbol esensial `@`, `#`, `$`, `%`, `&`, `-`, `+`, `(`, `)`.
+       - Baris 3 (Z-M): Tanda baca & kutip `*`, `"`, `'`, `:`, `;`, `!`, `?`.
+    2. **KeyCap Canvas Overlay Super Ringan (`KeyCapTextView`)**:
+       - Teks petunjuk sudut kanan-atas digambar langsung via hardware-accelerated Canvas `drawText` tanpa overhead hierarki View ekstra atau modifikasi `TextView.text`.
+       - Warna label petunjuk adaptif (`secondaryTextColor`) untuk tema Light, Dark/OLED, dan Woody.
+    3. **Multi-Touch & Swipe Isolation**:
+       - Debounce tahan 280ms dengan getaran taktil Taptic Engine `LONG_PRESS`.
+       - Pergerakan jari > 14dp membatalkan runnable seketika agar tidak mengganggu kecepatan 120 FPS swipe typing (QuickPath).
+    4. **Pengaturan Mandiri di Cupertino Settings**:
+       - Toggle switch baru "Angka & Simbol Tekan-Tahan" di Preferences dan `activity_settings.xml` dengan pembaruan cache instan.

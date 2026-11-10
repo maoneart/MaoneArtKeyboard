@@ -77,4 +77,8 @@ class KeyboardPreferences(context: Context) {
     var isAutoCapitalizationEnabled: Boolean
         get() = prefs.getBoolean("auto_capitalization_enabled", true)
         set(value) = prefs.edit().putBoolean("auto_capitalization_enabled", value).apply()
+
+    var isLongPressSymbolsEnabled: Boolean
+        get() = prefs.getBoolean("long_press_symbols_enabled", true)
+        set(value) = prefs.edit().putBoolean("long_press_symbols_enabled", value).apply()
 }
