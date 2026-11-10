@@ -601,6 +601,21 @@ class KeyboardLayout(private val context: Context) {
         }
         r3.addView(btnToggleMore)
 
+        // Quick Big Numpad ("1234") Switch Button for Bank Transfer / Numeric Entry
+        val btnNumpad = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.3f)
+                .apply { setMargins(dp(2), 0, dp(2), 0) }
+            background = ContextCompat.getDrawable(context, specialKeyBg)
+            text = "🔢"
+            setTextColor(textColor)
+            textSize = 15f
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = false
+            setupInstantTouch(this) { onKeyAction("ACTION_NUMPAD") }
+        }
+        r3.addView(btnNumpad)
+
         for (sym in row3) {
             r3.addView(createKeyButton(sym, 1.2f, keyBg, textColor, onKeyAction))
         }
@@ -692,6 +707,177 @@ class KeyboardLayout(private val context: Context) {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             showText("return", 15f, textColor, specialKeyBg)
+            isClickable = true
+            isFocusable = false
+            setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
+        }
+        returnButtonRef = btnReturn
+        r4.addView(btnReturn)
+        root.addView(r4)
+
+        return root
+    }
+
+    // --- 2B. DEDICATED iOS NUMERIC KEYPAD (BANK TRANSFER, NOMINAL, REKENING, PIN, PHONE) ---
+    fun createNumpadView(
+        isDark: Boolean,
+        themeMode: String = "auto",
+        isPhoneInput: Boolean = false,
+        onKeyAction: (String) -> Unit
+    ): View {
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            isMotionEventSplittingEnabled = true
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(2), dp(4), dp(2))
+        }
+
+        val isWoody = (themeMode == "woody")
+        val keyBg = when {
+            isWoody -> R.drawable.key_bg_woody
+            isDark -> R.drawable.key_bg_ios_dark
+            else -> R.drawable.key_bg_ios_light
+        }
+        val specialKeyBg = when {
+            isWoody -> R.drawable.key_bg_woody_special
+            isDark -> R.drawable.key_bg_special_dark
+            else -> R.drawable.key_bg_special_light
+        }
+        val actionKeyBg = when {
+            isWoody -> R.drawable.key_bg_woody_action
+            else -> R.drawable.key_bg_blue
+        }
+        val textColor = when {
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+        val subColor = when {
+            isWoody -> Color.parseColor("#C4A587")
+            isDark -> Color.parseColor("#98989D")
+            else -> Color.parseColor("#8E8E93")
+        }
+
+        fun createNumpadDigitButton(digit: String, subLabel: String, weight: Float = 1.0f): View {
+            return LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
+                    .apply { setMargins(dp(3), 0, dp(3), 0) }
+                background = ContextCompat.getDrawable(context, keyBg)
+                isClickable = true
+                isFocusable = false
+
+                val tvDigit = TextView(context).apply {
+                    text = digit
+                    setTextColor(textColor)
+                    textSize = 23f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                }
+                addView(tvDigit)
+
+                if (subLabel.isNotEmpty()) {
+                    val tvSub = TextView(context).apply {
+                        text = subLabel
+                        setTextColor(subColor)
+                        textSize = 9f
+                        setTypeface(typeface, android.graphics.Typeface.BOLD)
+                        gravity = Gravity.CENTER
+                        includeFontPadding = false
+                    }
+                    addView(tvSub)
+                }
+
+                setupInstantTouch(this) { onKeyAction(digit) }
+            }
+        }
+
+        fun createNumpadSpecialButton(label: String, output: String, bgRes: Int = specialKeyBg, txtColor: Int = textColor, weight: Float = 0.85f): TextView {
+            return TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
+                    .apply { setMargins(dp(3), 0, dp(3), 0) }
+                background = ContextCompat.getDrawable(context, bgRes)
+                text = label
+                setTextColor(txtColor)
+                textSize = 16f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                gravity = Gravity.CENTER
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) { onKeyAction(output) }
+            }
+        }
+
+        // Row 1: 1 | 2 ABC | 3 DEF | - (or +)
+        val r1 = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            isMotionEventSplittingEnabled = true
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f)
+                .apply { setMargins(0, dp(2), 0, dp(2)) }
+        }
+        r1.addView(createNumpadDigitButton("1", " "))
+        r1.addView(createNumpadDigitButton("2", "ABC"))
+        r1.addView(createNumpadDigitButton("3", "DEF"))
+        r1.addView(createNumpadSpecialButton(if (isPhoneInput) "+" else "-", if (isPhoneInput) "+" else "-"))
+        root.addView(r1)
+
+        // Row 2: 4 GHI | 5 JKL | 6 MNO | 000 (Ribuan Cepat Transfer Bank!)
+        val r2 = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            isMotionEventSplittingEnabled = true
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f)
+                .apply { setMargins(0, dp(2), 0, dp(2)) }
+        }
+        r2.addView(createNumpadDigitButton("4", "GHI"))
+        r2.addView(createNumpadDigitButton("5", "JKL"))
+        r2.addView(createNumpadDigitButton("6", "MNO"))
+        r2.addView(createNumpadSpecialButton("000", "000"))
+        root.addView(r2)
+
+        // Row 3: 7 PQRS | 8 TUV | 9 WXYZ | Backspace
+        val r3 = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            isMotionEventSplittingEnabled = true
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f)
+                .apply { setMargins(0, dp(2), 0, dp(2)) }
+        }
+        r3.addView(createNumpadDigitButton("7", "PQRS"))
+        r3.addView(createNumpadDigitButton("8", "TUV"))
+        r3.addView(createNumpadDigitButton("9", "WXYZ"))
+        val btnBackspace = ImageButton(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.85f)
+                .apply { setMargins(dp(3), 0, dp(3), 0) }
+            background = ContextCompat.getDrawable(context, specialKeyBg)
+            setImageResource(R.drawable.ic_backspace)
+            setColorFilter(textColor)
+            isClickable = true
+            isFocusable = false
+            setupRapidBackspaceTouch(this) { onKeyAction("ACTION_BACKSPACE") }
+        }
+        r3.addView(btnBackspace)
+        root.addView(r3)
+
+        // Row 4: ABC | 0 | . , | Return / Selesai
+        val r4 = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            isMotionEventSplittingEnabled = true
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.0f)
+                .apply { setMargins(0, dp(2), 0, dp(2)) }
+        }
+        r4.addView(createNumpadSpecialButton("ABC", "ACTION_ABC", weight = 1.0f))
+        r4.addView(createNumpadDigitButton("0", "", weight = 1.0f))
+        r4.addView(createNumpadSpecialButton(".", ".", bgRes = keyBg, weight = 1.0f))
+
+        val btnReturn = ReturnButtonLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.85f)
+                .apply { setMargins(dp(3), 0, dp(3), 0) }
+            showText("✓", 18f, Color.WHITE, actionKeyBg)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
@@ -1171,6 +1357,7 @@ class KeyboardLayout(private val context: Context) {
         return root
     }
 
+
     // --- 4. CLIPBOARD HISTORY VIEW (Card & List Mode + Pin/Delete Glassmorphic Action Modal) ---
     fun createClipboardView(
         isDark: Boolean,
@@ -1614,6 +1801,7 @@ class KeyboardLayout(private val context: Context) {
         root.addView(mainLayout)
         return root
     }
+
 
     // Helper functions
     private fun createRow(

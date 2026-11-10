@@ -46,6 +46,7 @@ class IosInputMethodService : InputMethodService() {
 
     private enum class Mode {
         QWERTY,
+        NUMPAD,
         SYMBOLS_123,
         SYMBOLS_MORE,
         EMOJI,
@@ -291,8 +292,12 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.activeRootView = rootView
             composingWord.clear()
 
-            // Always reset to standard QWERTY keyboard mode whenever keyboard appears
-            currentMode = Mode.QWERTY
+            // Auto-detect Numeric / Phone / Bank Transfer / PIN input fields vs standard Text fields
+            currentMode = if (isNumericOrPhoneField(info)) {
+                Mode.NUMPAD
+            } else {
+                Mode.QWERTY
+            }
 
             // Auto-Close translate panel when opening a new chat/input session
             if (isTranslatePanelOpen) {
@@ -708,6 +713,12 @@ class IosInputMethodService : InputMethodService() {
                         created
                     }
                 }
+                Mode.NUMPAD -> layoutEngine.createNumpadView(
+                    isDark = isDark,
+                    themeMode = prefs.themeMode,
+                    isPhoneInput = ((currentInputEditorInfo?.inputType ?: 0) and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_PHONE,
+                    onKeyAction = { handleKeyAction(it) }
+                )
                 Mode.SYMBOLS_123 -> layoutEngine.createSymbolsView(
                     isMoreSymbols = false,
                     isDark = isDark,
@@ -860,6 +871,9 @@ class IosInputMethodService : InputMethodService() {
                 "ACTION_SYMBOLS" -> {
                     switchMode(Mode.SYMBOLS_123)
                 }
+                "ACTION_NUMPAD" -> {
+                    switchMode(Mode.NUMPAD)
+                }
                 "ACTION_MORE_SYMBOLS" -> {
                     switchMode(Mode.SYMBOLS_MORE)
                 }
@@ -1001,6 +1015,35 @@ class IosInputMethodService : InputMethodService() {
                 layoutEngine.updateShiftButtonVisual(false, false, isDarkMode(), prefs.themeMode)
             }
         } catch (_: Throwable) {}
+    }
+
+    private fun isNumericOrPhoneField(info: EditorInfo?): Boolean {
+        if (info == null) return false
+        val inputType = info.inputType
+        val cls = inputType and InputType.TYPE_MASK_CLASS
+        if (cls == InputType.TYPE_CLASS_NUMBER ||
+            cls == InputType.TYPE_CLASS_PHONE ||
+            cls == InputType.TYPE_CLASS_DATETIME
+        ) {
+            return true
+        }
+        // Also check common bank/amount/PIN hint or field name when app uses custom text inputType
+        val hint = (info.hintText?.toString() ?: "").lowercase()
+        val label = (info.label?.toString() ?: "").lowercase()
+        val fieldName = (info.fieldName ?: "").lowercase()
+        val combined = "$hint $label $fieldName"
+        if (combined.contains("nominal") ||
+            combined.contains("jumlah transfer") ||
+            combined.contains("nomor rekening") ||
+            combined.contains("no. rek") ||
+            combined.contains("kode otp") ||
+            combined.contains("masukkan pin") ||
+            combined.contains("nomor hp") ||
+            combined.contains("nomor telepon")
+        ) {
+            return true
+        }
+        return false
     }
 
     private fun isTerminalOrRawInput(): Boolean {
