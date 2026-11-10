@@ -2401,11 +2401,6 @@ class KeyboardLayout(private val context: Context) {
             onTrackpadStateChanged?.invoke(false)
         }
 
-        cancelCurrentTrackpad = {
-            handler.removeCallbacks(activateRunnable)
-            endTrackpadSession()
-        }
-
         val activateRunnable = Runnable {
             isTrackpadActive = true
             isSpaceTrackpadActive = true
@@ -2428,6 +2423,11 @@ class KeyboardLayout(private val context: Context) {
             } catch (_: Throwable) {}
 
             onTrackpadStateChanged?.invoke(true)
+        }
+
+        cancelCurrentTrackpad = {
+            handler.removeCallbacks(activateRunnable)
+            endTrackpadSession()
         }
 
         onTrackpadSelectionToggle = {
