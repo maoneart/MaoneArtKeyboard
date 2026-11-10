@@ -119,6 +119,13 @@ class IosInputMethodService : InputMethodService() {
             }
             stickerManager = com.maoneart.ioskeyboard.sticker.StickerManager(this)
             layoutEngine = KeyboardLayout(this)
+            layoutEngine.onTrackpadStateChanged = { isActive ->
+                if (isActive) {
+                    initTrackpadSession()
+                } else {
+                    finishTrackpadSession()
+                }
+            }
             textReplacementManager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
             quickPathEngine = com.maoneart.ioskeyboard.keyboard.swipe.QuickPathEngine(correctionEngine)
             voiceDictationManager = com.maoneart.ioskeyboard.dictation.VoiceDictationManager(
@@ -793,6 +800,53 @@ class IosInputMethodService : InputMethodService() {
         }
     }
 
+    // Spacebar Trackpad Session State (Zero focus-escape, 100% confined to text box)
+    private var trackpadSessionActive = false
+    private var trackpadCursorPos = 0
+    private var trackpadAnchorPos = -1
+    private var trackpadTextLength = 0
+    private var trackpadFullText = ""
+
+    private fun initTrackpadSession() {
+        val ic = currentInputConnection ?: return
+        trackpadSessionActive = true
+        trackpadAnchorPos = -1
+
+        var text = ""
+        var cursorPos = 0
+
+        try {
+            val req = android.view.inputmethod.ExtractedTextRequest().apply {
+                token = 0
+                flags = 0
+                hintMaxLines = 1000
+                hintMaxChars = 100000
+            }
+            val ext = ic.getExtractedText(req, 0)
+            if (ext != null && ext.text != null) {
+                text = ext.text.toString()
+                cursorPos = ext.selectionEnd
+            }
+        } catch (_: Throwable) {}
+
+        if (text.isEmpty()) {
+            val before = ic.getTextBeforeCursor(10000, 0)?.toString() ?: ""
+            val after = ic.getTextAfterCursor(10000, 0)?.toString() ?: ""
+            text = before + after
+            cursorPos = before.length
+        }
+
+        trackpadFullText = text
+        trackpadTextLength = text.length
+        trackpadCursorPos = cursorPos.coerceIn(0, trackpadTextLength)
+    }
+
+    private fun finishTrackpadSession() {
+        trackpadSessionActive = false
+        trackpadAnchorPos = -1
+        // Selection remains untouched so user can copy, cut or delete selected block!
+    }
+
     private fun moveCursor2D(dx: Int, dy: Int, isSelecting: Boolean = false) {
         try {
             if (!prefs.isSpaceTrackpadEnabled) return
@@ -809,32 +863,54 @@ class IosInputMethodService : InputMethodService() {
             }
 
             val ic = currentInputConnection ?: return
-            val meta = if (isSelecting) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
 
-            // 1. Horizontal Cursor Navigation (Left / Right with Text Selection support)
-            if (dx > 0) {
-                for (i in 0 until dx) {
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 0, meta))
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT, 0, meta))
+            if (!trackpadSessionActive) {
+                initTrackpadSession()
+            }
+
+            // 1. Horizontal Cursor Navigation (strictly within text bounds)
+            if (dx != 0) {
+                trackpadCursorPos = (trackpadCursorPos + dx).coerceIn(0, trackpadTextLength)
+            }
+
+            // 2. Vertical Multiline Navigation (within message lines only, NEVER escapes to WhatsApp chat list!)
+            if (dy < 0 && trackpadFullText.isNotEmpty()) {
+                val currentLineStart = trackpadFullText.lastIndexOf('\n', (trackpadCursorPos - 1).coerceAtLeast(0))
+                if (currentLineStart >= 0) {
+                    val prevLineStart = trackpadFullText.lastIndexOf('\n', (currentLineStart - 1).coerceAtLeast(0))
+                    val lineStart = if (prevLineStart >= 0) prevLineStart + 1 else 0
+                    val col = trackpadCursorPos - (currentLineStart + 1)
+                    val prevLineLen = currentLineStart - lineStart
+                    trackpadCursorPos = (lineStart + col.coerceIn(0, prevLineLen)).coerceIn(0, trackpadTextLength)
+                } else {
+                    // Top line reached: clamp to index 0, DO NOT ESCAPE VIEW!
+                    trackpadCursorPos = 0
                 }
-            } else if (dx < 0) {
-                for (i in 0 until kotlin.math.abs(dx)) {
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, 0, meta))
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT, 0, meta))
+            } else if (dy > 0 && trackpadFullText.isNotEmpty()) {
+                val nextNewline = trackpadFullText.indexOf('\n', trackpadCursorPos)
+                if (nextNewline >= 0) {
+                    val currentLineStart = trackpadFullText.lastIndexOf('\n', (trackpadCursorPos - 1).coerceAtLeast(0))
+                    val col = trackpadCursorPos - if (currentLineStart >= 0) currentLineStart + 1 else 0
+                    val nextLineEnd = trackpadFullText.indexOf('\n', nextNewline + 1).let { if (it >= 0) it else trackpadTextLength }
+                    val nextLineLen = nextLineEnd - (nextNewline + 1)
+                    trackpadCursorPos = (nextNewline + 1 + col.coerceIn(0, nextLineLen)).coerceIn(0, trackpadTextLength)
+                } else {
+                    // Bottom line reached: clamp to end, DO NOT ESCAPE VIEW!
+                    trackpadCursorPos = trackpadTextLength
                 }
             }
 
-            // 2. Vertical Multiline Navigation (Up / Down across paragraphs & line breaks)
-            if (dy < 0) {
-                for (i in 0 until kotlin.math.abs(dy)) {
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 0, meta))
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP, 0, meta))
+            // 3. Selection Anchor or Single Cursor Positioning (Direct Editable selection, zero focus leak)
+            if (isSelecting) {
+                if (trackpadAnchorPos < 0) {
+                    trackpadAnchorPos = (trackpadCursorPos - dx).coerceIn(0, trackpadTextLength)
                 }
-            } else if (dy > 0) {
-                for (i in 0 until dy) {
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 0, meta))
-                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN, 0, meta))
-                }
+                val selStart = minOf(trackpadAnchorPos, trackpadCursorPos)
+                val selEnd = maxOf(trackpadAnchorPos, trackpadCursorPos)
+                ic.setSelection(selStart, selEnd)
+            } else {
+                trackpadAnchorPos = -1
+                ic.setSelection(trackpadCursorPos, trackpadCursorPos)
             }
 
             audioHaptic.triggerHapticFeedback()

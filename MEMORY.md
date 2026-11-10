@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.71)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.72)
 
 ---
 
@@ -433,3 +433,11 @@
        - Memisahkan penanganan sentuhan tombol simbol dan angka (`setupSymbolKeyTouch`) dari algoritma predictive hit-testing alfabet QWERTY. Mengetik angka atau simbol (`1, 2, 3`, `@, #, $`) 100% menghasilkan simbol yang ditekan tanpa pernah terkonversi ke huruf QWERTY.
     4. **Redesign Mode Terjemahan Kekinian (Apple Intelligence / iOS 18 Glassmorphism)**:
        - Panel terjemahan dirombak dengan desain modern: frosted glassmorphic card 16dp, rounded capsule input box dengan inner background bersih, pill chips bahasa beraksen Apple Blue / Indigo gradient, dan tombol Kirim modern `✦ Kirim ➔`.
+  - **Zero WhatsApp Chat Scrolling & Touch-Anywhere Text Selection Gesture (Release v1.0.72)**:
+    1. **Eliminasi DPAD Focus Leak (Anti-Scroll Riwayat Chat WA)**:
+       - *Root Cause*: Mengirim `KEYCODE_DPAD_UP/DOWN` pada kolom chat single-line atau saat kursor berada di baris paling atas menyebabkan Android focus search memindahkan fokus keluar dari input teks ke `RecyclerView` riwayat chat WhatsApp, sehingga riwayat obrolan bergulir (scrolling) naik-turun.
+       - *Solusi*: Seluruh pergerakan kursor kini 100% menggunakan native Android `InputConnection.setSelection(pos, pos)` yang beroperasi langsung pada buffer `Editable` teks pesan tanpa menyentuh sistem View Focus Android. Batas kursor dikunci ketat (`coerceIn(0, trackpadTextLength)`), sehingga kursor hanya bergerak di dalam kolom teks dan tidak akan pernah menggulir riwayat chat WhatsApp.
+    2. **Touch-Anywhere Text Selection Gesture ("Blok Teks Ketuk Sembarang")**:
+       - *Root Cause*: Sebelumnya gesture seleksi teks hanya mendengarkan `ACTION_POINTER_DOWN` pada tombol spasi fisik (`btnSpace`). Jika jempol pengguna menahan spasi lalu jari kedua mengetuk tuts huruf lain di keyboard, tuts lain tersebut mengonsumsi event dan malah mengetik huruf alih-alih mengaktifkan seleksi teks.
+       - *Solusi*: Menambahkan flag global `isSpaceTrackpadActive`. Saat trackpad spasi aktif, seluruh tuts di keyboard (A–Z, angka, simbol, 123, emoji, delete, return, mic, hingga margin background) bertindak sebagai pemicu seleksi teks (`onTrackpadSelectionToggle`).
+       - *Alur Kerja*: Jempol tahan spasi -> ketuk tuts apa saja di keyboard -> indikator berubah menjadi `"│ blok teks │"` (hijau iOS `#34C759`) dengan getaran haptic mantap -> geser jempol pertama untuk memblok/menyeleksi teks secara real-time via `ic.setSelection(anchor, pos)` -> lepas spasi dan teks tetap terblok di WhatsApp siap untuk disalin/dihapus/diganti.

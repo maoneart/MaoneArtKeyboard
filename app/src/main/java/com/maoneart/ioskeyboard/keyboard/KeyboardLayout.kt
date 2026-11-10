@@ -140,6 +140,12 @@ class KeyboardLayout(private val context: Context) {
     private var onKeyActionCallback: ((String) -> Unit)? = null
     private var predictedNextChars: Set<Char> = emptySet()
 
+    // Global Spacebar Trackpad Coordination (Touch-anywhere text selection)
+    var isSpaceTrackpadActive = false
+        private set
+    var onTrackpadSelectionToggle: (() -> Unit)? = null
+    var onTrackpadStateChanged: ((isActive: Boolean) -> Unit)? = null
+
     fun updatePredictedNextChars(chars: Set<Char>) {
         predictedNextChars = chars
     }
@@ -312,6 +318,15 @@ class KeyboardLayout(private val context: Context) {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
             gravity = Gravity.CENTER
+            setOnTouchListener { _, event ->
+                if (isSpaceTrackpadActive) {
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                        onTrackpadSelectionToggle?.invoke()
+                    }
+                    return@setOnTouchListener true
+                }
+                false
+            }
         }
 
         val row1 = listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p")
@@ -637,6 +652,15 @@ class KeyboardLayout(private val context: Context) {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
             gravity = Gravity.CENTER
+            setOnTouchListener { _, event ->
+                if (isSpaceTrackpadActive) {
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                        onTrackpadSelectionToggle?.invoke()
+                    }
+                    return@setOnTouchListener true
+                }
+                false
+            }
         }
 
         val row1 = if (!isMoreSymbols)
@@ -2349,8 +2373,20 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
+        fun endTrackpadSession() {
+            isTrackpadActive = false
+            isSpaceTrackpadActive = false
+            isSelectingText = false
+            view.text = defaultText
+            view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+            view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
+            restoreLetterKeyText()
+            onTrackpadStateChanged?.invoke(false)
+        }
+
         val activateRunnable = Runnable {
             isTrackpadActive = true
+            isSpaceTrackpadActive = true
             isSelectingText = false
             view.text = "│   geser kursor   │"
             view.setTextColor(if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
@@ -2368,6 +2404,34 @@ class KeyboardLayout(private val context: Context) {
                     android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
                 )
             } catch (_: Throwable) {}
+
+            onTrackpadStateChanged?.invoke(true)
+        }
+
+        onTrackpadSelectionToggle = {
+            if (isTrackpadActive) {
+                isSelectingText = !isSelectingText
+                if (isSelectingText) {
+                    view.text = "│   blok teks   │"
+                    view.setTextColor(Color.parseColor("#34C759"))
+                    try {
+                        view.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.LONG_PRESS,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
+                } else {
+                    view.text = "│   geser kursor   │"
+                    view.setTextColor(if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
+                    try {
+                        view.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
+                }
+                onCursorMove(0, 0, isSelectingText)
+            }
         }
 
         view.setOnTouchListener { v, event ->
@@ -2392,16 +2456,7 @@ class KeyboardLayout(private val context: Context) {
                 }
                 MotionEvent.ACTION_POINTER_DOWN -> {
                     if (isTrackpadActive) {
-                        // Second thumb/finger tap triggers Apple Text Selection mode!
-                        isSelectingText = !isSelectingText
-                        view.text = if (isSelectingText) "│   seleksi teks   │" else "│   geser kursor   │"
-                        view.setTextColor(if (isSelectingText) Color.parseColor("#34C759") else if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
-                        try {
-                            v.performHapticFeedback(
-                                android.view.HapticFeedbackConstants.LONG_PRESS,
-                                android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-                            )
-                        } catch (_: Throwable) {}
+                        onTrackpadSelectionToggle?.invoke()
                     } else {
                         handler.removeCallbacks(activateRunnable)
                     }
@@ -2478,12 +2533,7 @@ class KeyboardLayout(private val context: Context) {
                         v.isPressed = false
                         activePointerId = -1
                         if (isTrackpadActive) {
-                            isTrackpadActive = false
-                            isSelectingText = false
-                            view.text = defaultText
-                            view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
-                            view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
-                            restoreLetterKeyText()
+                            endTrackpadSession()
                         } else {
                             onSpaceAction()
                         }
@@ -2496,12 +2546,7 @@ class KeyboardLayout(private val context: Context) {
                     v.isPressed = false
                     activePointerId = -1
                     if (isTrackpadActive) {
-                        isTrackpadActive = false
-                        isSelectingText = false
-                        view.text = defaultText
-                        view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
-                        view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
-                        restoreLetterKeyText()
+                        endTrackpadSession()
                     } else {
                         onSpaceAction()
                     }
@@ -2535,6 +2580,12 @@ class KeyboardLayout(private val context: Context) {
         var currentTargetView: View? = null
 
         view.setOnTouchListener { v, event ->
+            if (isSpaceTrackpadActive) {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                    onTrackpadSelectionToggle?.invoke()
+                }
+                return@setOnTouchListener true
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     val pIdx = event.actionIndex
@@ -2591,6 +2642,12 @@ class KeyboardLayout(private val context: Context) {
     private fun setupSymbolKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         view.setOnTouchListener { v, event ->
+            if (isSpaceTrackpadActive) {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                    onTrackpadSelectionToggle?.invoke()
+                }
+                return@setOnTouchListener true
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
@@ -2622,6 +2679,12 @@ class KeyboardLayout(private val context: Context) {
     private fun setupInstantTouch(view: View, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         view.setOnTouchListener { v, event ->
+            if (isSpaceTrackpadActive) {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                    onTrackpadSelectionToggle?.invoke()
+                }
+                return@setOnTouchListener true
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
@@ -2652,6 +2715,12 @@ class KeyboardLayout(private val context: Context) {
         var downTime = 0L
 
         view.setOnTouchListener { v, event ->
+            if (isSpaceTrackpadActive) {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                    onTrackpadSelectionToggle?.invoke()
+                }
+                return@setOnTouchListener true
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     isEligibleDown = true
@@ -2712,6 +2781,12 @@ class KeyboardLayout(private val context: Context) {
         var activePointerId = -1
 
         view.setOnTouchListener { v, event ->
+            if (isSpaceTrackpadActive) {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                    onTrackpadSelectionToggle?.invoke()
+                }
+                return@setOnTouchListener true
+            }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
