@@ -340,8 +340,6 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
-    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
-
     private fun createFallbackKeyboard(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
