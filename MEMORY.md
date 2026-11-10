@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.68)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.69)
 
 ---
 
@@ -399,3 +399,14 @@
        - Mengganti tombol default yang tertimpa tint background MaterialButton menjadi `AppCompatButton` dengan kontras tinggi.
        - Tombol "📁 Pilih Gambar dari Galeri" kini tampil tegas berlatar iOS Blue (`btn_apple_action`) dengan teks putih solid (`#FFFFFF`).
        - Tombol "✓ Simpan Jadi Stiker WebP" menggunakan latar Apple Green segar (`btn_apple_action_green`) dengan teks putih solid.
+  - **100% Glossy 3D Apple WebP Emojis across All Categories & Long-Press Skin Tone Picker (Release v1.0.69)**:
+    1. **Render 100% 3D Glossy Apple Asli (Mengatasi Minikin Android Interception)**:
+       - Android Minikin layout engine selalu mencegat custom TTF font emoji pada `TextView` dan memaksanya ke `NotoColorEmoji.ttf` milik Android sistem.
+       - Seluruh 1.930 emoji di semua kategori (`Smileys`, `People`, `Animals`, `Food`, `Activity`, `Travel`, `Objects`, `Symbols`, `Flags`) kini dirender menggunakan `ImageView` dengan aset WebP Apple 3D resmi beresolusi tajam (64x64).
+       - Font berat `AppleColorEmoji.ttf` (34 MB) dihapus sepenuhnya, digantikan oleh `apple_emojis/` (~11 MB) yang membuat rendering jauh lebih cepat dan tidak membebani RAM/GPU.
+    2. **Long-Press Skin Tone Picker Popup (Otentik iPhone iOS)**:
+       - Emoji gestur tangan dan orang (`👍`, `👋`, `👧`, `🧑`, `🙏`, dll. pada 161 emoji dasar) dapat ditekan tahan (*long-press*) untuk memunculkan bilah popup horisontal dengan animasi pegas pop-up (`OvershootInterpolator`) berisi 5 variasi warna kulit asli Apple 3D (`🏻`, `🏼`, `🏽`, `🏾`, `🏿`).
+       - Dikelola oleh `SkinToneManager` dengan 805 variasi warna kulit lengkap 100% matched.
+    3. **AppleEmojiAssetManager dengan 120 FPS LRU Cache**:
+       - Dilengkapi in-memory `LruCache<String, Bitmap>(600)` untuk rendering super instan tanpa lag scrolling atau garbage collector thrashing.
+       - Penanganan cerdas Unicode variation selector `fe0f` fallback untuk kompatibilitas nama file WebP hex 100%.

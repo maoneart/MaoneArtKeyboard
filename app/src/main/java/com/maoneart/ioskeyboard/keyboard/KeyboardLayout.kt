@@ -23,8 +23,9 @@ import android.graphics.drawable.AnimatedImageDrawable
 import android.os.Build
 import com.maoneart.ioskeyboard.R
 import com.maoneart.ioskeyboard.emoji.AnimatedEmojiManager
-import com.maoneart.ioskeyboard.emoji.AppleEmojiFontManager
+import com.maoneart.ioskeyboard.emoji.AppleEmojiAssetManager
 import com.maoneart.ioskeyboard.emoji.EmojiBoardManager
+import com.maoneart.ioskeyboard.emoji.SkinToneManager
 
 class KeyboardLayout(private val context: Context) {
 
@@ -1101,6 +1102,100 @@ class KeyboardLayout(private val context: Context) {
             root.addView(overlay)
         }
 
+        var skinTonePopupOverlay: FrameLayout? = null
+
+        fun hideSkinTonePopup() {
+            skinTonePopupOverlay?.let { root.removeView(it) }
+            skinTonePopupOverlay = null
+        }
+
+        fun showSkinTonePopup(baseEmoji: String, variants: List<String>, anchorView: View) {
+            hideSkinTonePopup()
+            val overlay = FrameLayout(context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setBackgroundColor(Color.TRANSPARENT)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { hideSkinTonePopup() }
+            }
+
+            val popupCard = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.card_bg_ios)
+                elevation = dp(8).toFloat()
+                setPadding(dp(6), dp(4), dp(6), dp(4))
+                isClickable = true
+            }
+
+            val allOptions = listOf(baseEmoji) + variants
+            for (opt in allOptions) {
+                val optFrame = FrameLayout(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                        setMargins(dp(2), 0, dp(2), 0)
+                    }
+                    isClickable = true
+                    setOnClickListener {
+                        hideSkinTonePopup()
+                        onEmojiAction(opt)
+                    }
+                }
+
+                val optBmp = AppleEmojiAssetManager.getEmojiBitmap(context, opt)
+                if (optBmp != null) {
+                    val ivOpt = android.widget.ImageView(context).apply {
+                        layoutParams = FrameLayout.LayoutParams(dp(26), dp(26), Gravity.CENTER)
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                        setImageBitmap(optBmp)
+                    }
+                    optFrame.addView(ivOpt)
+                } else {
+                    val tvOpt = TextView(context).apply {
+                        layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                        text = opt
+                        textSize = 20f
+                        gravity = Gravity.CENTER
+                    }
+                    optFrame.addView(tvOpt)
+                }
+                popupCard.addView(optFrame)
+            }
+
+            val loc = IntArray(2)
+            anchorView.getLocationInWindow(loc)
+            val rootLoc = IntArray(2)
+            root.getLocationInWindow(rootLoc)
+
+            val relX = (loc[0] - rootLoc[0]) - dp(60)
+            val relY = (loc[1] - rootLoc[1]) - dp(46)
+
+            val lp = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                leftMargin = relX.coerceIn(dp(8), (root.width - dp(240)).coerceAtLeast(dp(8)))
+                topMargin = relY.coerceAtLeast(dp(8))
+            }
+
+            overlay.addView(popupCard, lp)
+            skinTonePopupOverlay = overlay
+            root.addView(overlay)
+
+            popupCard.scaleX = 0.5f
+            popupCard.scaleY = 0.5f
+            popupCard.alpha = 0f
+            popupCard.animate()
+                .scaleX(1.0f)
+                .scaleY(1.0f)
+                .alpha(1.0f)
+                .setDuration(130L)
+                .setInterpolator(OvershootInterpolator(2.0f))
+                .start()
+        }
+
         // Top Category Bar (Full iOS Emoji Library from iphoneemoji.com)
         val tabCategories = listOf(
             Pair("ANIMATED", "⚡ Gerak"),
@@ -1282,17 +1377,23 @@ class KeyboardLayout(private val context: Context) {
                         }
                         itemContainer.addView(ivEmoji)
                     } catch (_: Throwable) {
-                        val fallbackTv = TextView(context).apply {
-                            text = item.unicode
-                            textSize = 25f
-                            val appleFont = AppleEmojiFontManager.getAppleEmojiTypeface(context)
-                            if (appleFont != null) {
-                                typeface = appleFont
+                        val bmp = AppleEmojiAssetManager.getEmojiBitmap(context, item.unicode)
+                        if (bmp != null) {
+                            val ivFallback = android.widget.ImageView(context).apply {
+                                layoutParams = FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER)
+                                scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                                setImageBitmap(bmp)
                             }
-                            gravity = Gravity.CENTER
-                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            itemContainer.addView(ivFallback)
+                        } else {
+                            val fallbackTv = TextView(context).apply {
+                                text = item.unicode
+                                textSize = 25f
+                                gravity = Gravity.CENTER
+                                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            }
+                            itemContainer.addView(fallbackTv)
                         }
-                        itemContainer.addView(fallbackTv)
                     }
 
                     row.addView(itemContainer)
@@ -1470,7 +1571,6 @@ class KeyboardLayout(private val context: Context) {
                 }
 
                 val emojiList = EmojiBoardManager.emojis[selectedCategory] ?: emptyList()
-                val appleFont = AppleEmojiFontManager.getAppleEmojiTypeface(context)
 
                 var row = LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -1480,14 +1580,8 @@ class KeyboardLayout(private val context: Context) {
                 var rowIndex = 0
 
                 for (emo in emojiList) {
-                    val btn = TextView(context).apply {
+                    val itemContainer = FrameLayout(context).apply {
                         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
-                        text = emo
-                        textSize = 25f
-                        if (appleFont != null) {
-                            typeface = appleFont
-                        }
-                        gravity = Gravity.CENTER
                         isClickable = true
                         isFocusable = false
 
@@ -1505,6 +1599,21 @@ class KeyboardLayout(private val context: Context) {
                                 .setDuration(180L)
                                 .setInterpolator(OvershootInterpolator(2.0f))
                                 .start()
+                        }
+
+                        // Long Press for Skin Tone Variants
+                        val variants = SkinToneManager.skinToneMap[emo]
+                        if (variants != null) {
+                            setOnLongClickListener { v ->
+                                try {
+                                    v.performHapticFeedback(
+                                        android.view.HapticFeedbackConstants.LONG_PRESS,
+                                        android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                    )
+                                } catch (_: Throwable) {}
+                                showSkinTonePopup(emo, variants, v)
+                                true
+                            }
                         }
 
                         // Interactive iOS Spring Bounce & Playful Wobble with Taptic feedback
@@ -1546,7 +1655,27 @@ class KeyboardLayout(private val context: Context) {
                             onEmojiAction(emo)
                         }
                     }
-                    row.addView(btn)
+
+                    // Render as Authentic 3D Glossy Apple WebP Image
+                    val bmp = AppleEmojiAssetManager.getEmojiBitmap(context, emo)
+                    if (bmp != null) {
+                        val ivEmoji = android.widget.ImageView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(dp(29), dp(29), Gravity.CENTER)
+                            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                            setImageBitmap(bmp)
+                        }
+                        itemContainer.addView(ivEmoji)
+                    } else {
+                        val fallbackTv = TextView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            text = emo
+                            textSize = 24f
+                            gravity = Gravity.CENTER
+                        }
+                        itemContainer.addView(fallbackTv)
+                    }
+
+                    row.addView(itemContainer)
                     count++
 
                     if (count == 8) {
@@ -1577,7 +1706,6 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        val appleFont = AppleEmojiFontManager.getAppleEmojiTypeface(context)
         fun updateTabStyles() {
             for ((key, btn) in tabViews) {
                 if (key == activeCat) {
@@ -1587,11 +1715,7 @@ class KeyboardLayout(private val context: Context) {
                     btn.setBackgroundColor(Color.TRANSPARENT)
                     btn.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
                 }
-                if (key != "ANIMATED" && key != "STICKERS" && key != "ADD_STICKER" && appleFont != null) {
-                    btn.typeface = appleFont
-                } else {
-                    btn.setTypeface(btn.typeface, if (key == activeCat) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
-                }
+                btn.setTypeface(btn.typeface, if (key == activeCat) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
             }
         }
 
