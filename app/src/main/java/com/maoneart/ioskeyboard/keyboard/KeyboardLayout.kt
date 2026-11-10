@@ -23,6 +23,7 @@ import android.graphics.drawable.AnimatedImageDrawable
 import android.os.Build
 import com.maoneart.ioskeyboard.R
 import com.maoneart.ioskeyboard.emoji.AnimatedEmojiManager
+import com.maoneart.ioskeyboard.emoji.AppleEmojiFontManager
 import com.maoneart.ioskeyboard.emoji.EmojiBoardManager
 
 class KeyboardLayout(private val context: Context) {
@@ -1181,6 +1182,10 @@ class KeyboardLayout(private val context: Context) {
                         val fallbackTv = TextView(context).apply {
                             text = item.unicode
                             textSize = 25f
+                            val appleFont = AppleEmojiFontManager.getAppleEmojiTypeface(context)
+                            if (appleFont != null) {
+                                typeface = appleFont
+                            }
                             gravity = Gravity.CENTER
                             layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
                         }
@@ -1360,6 +1365,7 @@ class KeyboardLayout(private val context: Context) {
                 }
 
                 val emojiList = EmojiBoardManager.emojis[selectedCategory] ?: emptyList()
+                val appleFont = AppleEmojiFontManager.getAppleEmojiTypeface(context)
 
                 var row = LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
@@ -1373,6 +1379,9 @@ class KeyboardLayout(private val context: Context) {
                         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
                         text = emo
                         textSize = 25f
+                        if (appleFont != null) {
+                            typeface = appleFont
+                        }
                         gravity = Gravity.CENTER
                         isClickable = true
                         isFocusable = false
@@ -1460,16 +1469,20 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
+        val appleFont = AppleEmojiFontManager.getAppleEmojiTypeface(context)
         fun updateTabStyles() {
             for ((key, btn) in tabViews) {
                 if (key == activeCat) {
                     btn.setBackgroundResource(R.drawable.key_bg_blue)
                     btn.setTextColor(Color.WHITE)
-                    btn.setTypeface(btn.typeface, android.graphics.Typeface.BOLD)
                 } else {
                     btn.setBackgroundColor(Color.TRANSPARENT)
                     btn.setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
-                    btn.setTypeface(btn.typeface, android.graphics.Typeface.NORMAL)
+                }
+                if (key != "ANIMATED" && key != "STICKERS" && key != "ADD_STICKER" && appleFont != null) {
+                    btn.typeface = appleFont
+                } else {
+                    btn.setTypeface(btn.typeface, if (key == activeCat) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
                 }
             }
         }

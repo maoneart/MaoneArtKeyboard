@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.65)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.66)
 
 ---
 
@@ -374,3 +374,11 @@
     3. **Taptic Engine Tap & Juicy Spring Bounce**:
        - Setiap ketukan memicu getaran Taptic `KEYBOARD_TAP` dan animasi pegas kenyal `1.5x` plus goyang miring 16°.
        - Karakter teks Unicode standar langsung dikirimkan ke kolom chat aktif (WhatsApp, Instagram, Telegram) sehingga pesan tetap terbaca universal oleh semua penerima.
+  - **Authentic Apple Color Emoji Font Integration (Release v1.0.66)**:
+    1. **Bundled Android-Compatible `AppleColorEmoji.ttf` (34 MB)**:
+       - Menyematkan font lengkap resmi Apple Color Emoji versi Android (CBDT/CBLC bitmap table) langsung ke dalam aset keyboard (`app/src/main/assets/AppleColorEmoji.ttf`).
+    2. **AppleEmojiFontManager Singleton**:
+       - Menginisialisasi `Typeface` secara thread-safe via singleton agar hanya di-load 1x ke memori tanpa garbage collection overhead.
+    3. **100% Glossy 3D Apple Emojis di Seluruh Tab Statis**:
+       - Seluruh kategori emoji statis (`Smileys`, `Hands`, `Hearts`, `Animals`, `Food`, `Activities`, `Symbols`) dan ikon tab kategori kini dirender langsung dengan font Apple asli 3D.
+       - Tampilan laci emoji kini 100% identik dengan keyboard iPhone asli baik pada mode bergerak maupun mode statis.
