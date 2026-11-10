@@ -1136,15 +1136,15 @@ class KeyboardLayout(private val context: Context) {
                             isClickable = true
                             isFocusable = false
 
-                            setOnClickListener {
-                                itemFrame.animate().cancel()
-                                itemFrame.animate()
+                            setOnClickListener { v ->
+                                v.animate().cancel()
+                                v.animate()
                                     .scaleX(1.22f)
                                     .scaleY(1.22f)
                                     .setDuration(100L)
                                     .setInterpolator(OvershootInterpolator(2.5f))
                                     .withEndAction {
-                                        itemFrame.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120L).start()
+                                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120L).start()
                                     }
                                     .start()
                                 onStickerAction(stickerFile)
@@ -1344,15 +1344,15 @@ class KeyboardLayout(private val context: Context) {
                 isClickable = true
                 isFocusable = false
 
-                setOnClickListener {
-                    tabBtn.animate().cancel()
-                    tabBtn.animate()
+                setOnClickListener { v ->
+                    v.animate().cancel()
+                    v.animate()
                         .scaleX(1.18f)
                         .scaleY(1.18f)
                         .setDuration(90L)
                         .setInterpolator(OvershootInterpolator(2.5f))
                         .withEndAction {
-                            tabBtn.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100L).start()
+                            v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100L).start()
                         }
                         .start()
 
