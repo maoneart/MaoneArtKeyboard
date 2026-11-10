@@ -140,11 +140,28 @@ class KeyboardLayout(private val context: Context) {
     private var onKeyActionCallback: ((String) -> Unit)? = null
     private var predictedNextChars: Set<Char> = emptySet()
 
+    private val isLandscape: Boolean
+        get() = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
     // Global Spacebar Trackpad Coordination (Touch-anywhere text selection)
     var isSpaceTrackpadActive = false
         private set
     var onTrackpadSelectionToggle: (() -> Unit)? = null
     var onTrackpadStateChanged: ((isActive: Boolean) -> Unit)? = null
+    private var cancelCurrentTrackpad: (() -> Unit)? = null
+
+    fun resetTrackpadState() {
+        isSpaceTrackpadActive = false
+        cancelCurrentTrackpad?.invoke()
+        cancelCurrentTrackpad = null
+        onTrackpadSelectionToggle = null
+        onTrackpadStateChanged?.invoke(false)
+    }
+
+    fun clearHitBoxCache() {
+        cachedHitBoxes = emptyList()
+        popupController?.clearPopupPositionCache()
+    }
 
     fun updatePredictedNextChars(chars: Set<Char>) {
         predictedNextChars = chars
@@ -1614,7 +1631,7 @@ class KeyboardLayout(private val context: Context) {
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT
                     )
-                    layoutManager = androidx.recyclerview.widget.GridLayoutManager(context, 8)
+                    layoutManager = androidx.recyclerview.widget.GridLayoutManager(context, if (isLandscape) 14 else 8)
                     setPadding(dp(4), dp(4), dp(4), dp(4))
                     clipToPadding = false
                     isVerticalScrollBarEnabled = true
@@ -2329,7 +2346,7 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, keyBg)
             text = label
             setTextColor(textColor)
-            textSize = 22f
+            textSize = if (isLandscape) 18.5f else 22f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
@@ -2382,6 +2399,11 @@ class KeyboardLayout(private val context: Context) {
             view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
             restoreLetterKeyText()
             onTrackpadStateChanged?.invoke(false)
+        }
+
+        cancelCurrentTrackpad = {
+            handler.removeCallbacks(activateRunnable)
+            endTrackpadSession()
         }
 
         val activateRunnable = Runnable {
@@ -2557,14 +2579,7 @@ class KeyboardLayout(private val context: Context) {
                     handler.removeCallbacks(activateRunnable)
                     v.isPressed = false
                     activePointerId = -1
-                    if (isTrackpadActive) {
-                        isTrackpadActive = false
-                        isSelectingText = false
-                        view.text = defaultText
-                        view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
-                        view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
-                        restoreLetterKeyText()
-                    }
+                    endTrackpadSession()
                     true
                 }
                 else -> false
@@ -2578,6 +2593,7 @@ class KeyboardLayout(private val context: Context) {
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         var currentTargetView: View? = null
+        var watchdogRunnable: Runnable? = null
 
         view.setOnTouchListener { v, event ->
             if (isSpaceTrackpadActive) {
@@ -2589,12 +2605,24 @@ class KeyboardLayout(private val context: Context) {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     val pIdx = event.actionIndex
-                    val rx = try { event.getRawX(pIdx) } catch (_: Throwable) { event.rawX }
-                    val ry = try { event.getRawY(pIdx) } catch (_: Throwable) { event.rawY }
+                    val loc = IntArray(2)
+                    v.getLocationOnScreen(loc)
+                    val px = try { event.getX(pIdx) } catch (_: Throwable) { event.x }
+                    val py = try { event.getY(pIdx) } catch (_: Throwable) { event.y }
+                    val rx = loc[0] + px
+                    val ry = loc[1] + py
 
-                    val resolvedKey = findKeyAt(rx, ry)
+                    // Core boundary check: if firmly inside key bounds, keep exact key; only snap on outer border gaps
+                    val isInsideDirectly = px >= dp(3) && px <= (v.width - dp(3)) && py >= dp(2) && py <= (v.height - dp(2))
+                    val resolvedKey = if (isInsideDirectly) null else findKeyAt(rx, ry)
                     val targetView = (if (resolvedKey != null) findKeyViewAt(rx, ry) else null) ?: v
                     val charToSend = resolvedKey?.first ?: view.text.toString()
+
+                    // Cancel previous watchdog if rapid typing
+                    watchdogRunnable?.let {
+                        targetView.removeCallbacks(it)
+                        v.removeCallbacks(it)
+                    }
 
                     // Release previously stuck view if any
                     currentTargetView?.isPressed = false
@@ -2618,15 +2646,22 @@ class KeyboardLayout(private val context: Context) {
                     }
 
                     // Anti-mendem watchdog: auto-release pressed state after 280ms if Android drops ACTION_UP
-                    targetView.postDelayed({
+                    val r = Runnable {
                         targetView.isPressed = false
                         v.isPressed = false
                         popupController?.hidePopup()
-                    }, 280L)
+                    }
+                    watchdogRunnable = r
+                    targetView.postDelayed(r, 280L)
 
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    watchdogRunnable?.let {
+                        v.removeCallbacks(it)
+                        currentTargetView?.removeCallbacks(it)
+                    }
+                    watchdogRunnable = null
                     v.isPressed = false
                     currentTargetView?.isPressed = false
                     currentTargetView = null
@@ -2641,6 +2676,7 @@ class KeyboardLayout(private val context: Context) {
     // Symbol / Number Key Touch Handler (Zero predictive redirection: always sends exact symbol typed!)
     private fun setupSymbolKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
+        var watchdogRunnable: Runnable? = null
         view.setOnTouchListener { v, event ->
             if (isSpaceTrackpadActive) {
                 if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
@@ -2650,6 +2686,7 @@ class KeyboardLayout(private val context: Context) {
             }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     v.isPressed = true
                     try {
                         v.performHapticFeedback(
@@ -2659,13 +2696,17 @@ class KeyboardLayout(private val context: Context) {
                     } catch (_: Throwable) {}
                     popupController?.showPopupForKey(v, view.text.toString())
                     onTrigger()
-                    v.postDelayed({
+                    val r = Runnable {
                         v.isPressed = false
                         popupController?.hidePopup()
-                    }, 280L)
+                    }
+                    watchdogRunnable = r
+                    v.postDelayed(r, 280L)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
+                    watchdogRunnable = null
                     v.isPressed = false
                     popupController?.hidePopup()
                     true

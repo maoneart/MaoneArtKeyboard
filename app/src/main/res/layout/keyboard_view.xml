@@ -116,6 +116,15 @@
             android:background="@drawable/btn_icon_ripple"
             android:src="@drawable/ic_settings"
             android:contentDescription="Settings" />
+
+        <!-- Hide Keyboard Quick Button (Mode Numpet) -->
+        <ImageButton
+            android:id="@+id/btnHideKeyboard"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/btn_icon_ripple"
+            android:src="@drawable/ic_keyboard_hide"
+            android:contentDescription="Hide Keyboard" />
     </LinearLayout>
 
     <!-- Apple Intelligence / iOS 18 Style Modern Glassmorphic Live Translate Panel -->

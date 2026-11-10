@@ -198,6 +198,13 @@ class IosInputMethodService : InputMethodService() {
             val btnQuickTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnQuickClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnQuickSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
+            val btnHideKeyboard = view.findViewById<ImageButton>(R.id.btnHideKeyboard)
+
+            btnHideKeyboard?.setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                requestHideSelf(0)
+            }
 
             btnQuickTranslate?.setOnClickListener {
                 audioHaptic.playClickSound(it)
@@ -270,6 +277,7 @@ class IosInputMethodService : InputMethodService() {
             updateLanguageBadge()
             updateTranslatePanelUI()
             applyThemeStyling(view)
+            adjustLayoutForOrientation(resources.configuration.orientation)
             renderCurrentLayout()
 
             view
@@ -278,6 +286,61 @@ class IosInputMethodService : InputMethodService() {
             createFallbackKeyboard()
         }
     }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        try {
+            cachedQwertyView = null
+            cachedQwertyKeySignature = ""
+            layoutEngine.resetTrackpadState()
+            layoutEngine.clearHitBoxCache()
+            adjustLayoutForOrientation(newConfig.orientation)
+            renderCurrentLayout()
+            updateSuggestions()
+        } catch (t: Throwable) {
+            Log.e("IosInputMethodService", "Error in onConfigurationChanged", t)
+        }
+    }
+
+    private fun adjustLayoutForOrientation(orientation: Int) {
+        try {
+            val isLandscape = (orientation == Configuration.ORIENTATION_LANDSCAPE)
+            val toolbar = rootView?.findViewById<LinearLayout>(R.id.topToolbar)
+            val container = keyboardContainer
+
+            if (toolbar != null) {
+                val tbLp = toolbar.layoutParams
+                tbLp.height = dp(if (isLandscape) 34 else 44)
+                toolbar.layoutParams = tbLp
+
+                val btnSize = dp(if (isLandscape) 30 else 36)
+                listOf(
+                    R.id.btnQuickTranslate,
+                    R.id.btnQuickClipboard,
+                    R.id.btnQuickSettings,
+                    R.id.btnHideKeyboard
+                ).forEach { id ->
+                    val btn = toolbar.findViewById<ImageButton>(id)
+                    btn?.layoutParams?.let { lp ->
+                        lp.width = btnSize
+                        lp.height = btnSize
+                        btn.layoutParams = lp
+                    }
+                }
+            }
+
+            if (container != null) {
+                val cLp = container.layoutParams
+                cLp.height = dp(if (isLandscape) 140 else 235)
+                container.layoutParams = cLp
+                val padH = dp(if (isLandscape) 24 else 3)
+                val padV = dp(if (isLandscape) 2 else 3)
+                container.setPadding(padH, padV, padH, padV)
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
 
     private fun createFallbackKeyboard(): View {
         return LinearLayout(this).apply {
@@ -298,6 +361,7 @@ class IosInputMethodService : InputMethodService() {
         try {
             audioHaptic.activeRootView = rootView
             composingWord.clear()
+            layoutEngine.resetTrackpadState()
 
             // Auto-detect Numeric / Phone / Bank Transfer / PIN input fields vs standard Text fields
             currentMode = if (isNumericOrPhoneField(info)) {
@@ -321,6 +385,7 @@ class IosInputMethodService : InputMethodService() {
                 clipboardManager.fetchCurrentClip()
             }, 350L)
 
+            adjustLayoutForOrientation(resources.configuration.orientation)
             updateSuggestions()
             updateLanguageBadge()
             updateTranslatePanelUI()
@@ -344,6 +409,7 @@ class IosInputMethodService : InputMethodService() {
         try {
             // Always reset mode to QWERTY when keyboard is closed
             currentMode = Mode.QWERTY
+            layoutEngine.resetTrackpadState()
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
@@ -371,6 +437,7 @@ class IosInputMethodService : InputMethodService() {
         try {
             // Always reset mode to QWERTY when keyboard window is hidden
             currentMode = Mode.QWERTY
+            layoutEngine.resetTrackpadState()
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
@@ -456,10 +523,12 @@ class IosInputMethodService : InputMethodService() {
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
+            val btnHide = view.findViewById<ImageButton>(R.id.btnHideKeyboard)
 
             btnTranslate?.setColorFilter(iconTint)
             btnClipboard?.setColorFilter(iconTint)
             btnSettings?.setColorFilter(iconTint)
+            btnHide?.setColorFilter(iconTint)
             badgeLanguage?.setTextColor(iconTint)
         } catch (_: Throwable) {}
     }
@@ -704,7 +773,8 @@ class IosInputMethodService : InputMethodService() {
 
             val contentView = when (currentMode) {
                 Mode.QWERTY -> {
-                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|${prefs.isDictationEnabled}"
+                    val orientation = resources.configuration.orientation
+                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|${prefs.isDictationEnabled}|$orientation"
                     val existing = cachedQwertyView
                     if (existing != null && cachedQwertyKeySignature == sig) {
                         (existing.parent as? android.view.ViewGroup)?.removeView(existing)

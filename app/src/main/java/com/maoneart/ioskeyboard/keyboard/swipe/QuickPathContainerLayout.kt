@@ -151,6 +151,15 @@ class QuickPathContainerLayout(
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (!isSwipeEnabled) return false
+        if (ev.pointerCount > 1) {
+            if (isSwiping) {
+                isSwiping = false
+                swipedChars.clear()
+                swipeTrailView.clearTrail()
+                hidePopup()
+            }
+            return false
+        }
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val pIdx = ev.actionIndex
@@ -176,7 +185,7 @@ class QuickPathContainerLayout(
                 return false
             }
             MotionEvent.ACTION_MOVE -> {
-                if (!isSwiping) {
+                if (!isSwiping && ev.pointerCount == 1) {
                     val dist = hypot((ev.rawX - startX).toDouble(), (ev.rawY - startY).toDouble()).toFloat()
                     // Swipe only triggers when finger moves beyond touchSlop AND visits another distinct letter key
                     if (isSwipeEnabled && dist > touchSlop) {
