@@ -1034,16 +1034,18 @@ class KeyboardLayout(private val context: Context) {
             root.addView(overlay)
         }
 
-        // Top Category Bar (Smileys, Hands, Hearts, Animals, Food, Activities, Symbols, Stickers, + Add)
+        // Top Category Bar (Full iOS Emoji Library from iphoneemoji.com)
         val tabCategories = listOf(
             Pair("ANIMATED", "⚡ Gerak"),
             Pair("Smileys", "😀"),
-            Pair("Hands", "👋"),
-            Pair("Hearts", "❤️"),
+            Pair("People", "👋"),
             Pair("Animals", "🐶"),
             Pair("Food", "🍔"),
-            Pair("Activities", "⚽"),
+            Pair("Activity", "⚽"),
+            Pair("Travel", "✈️"),
+            Pair("Objects", "💡"),
             Pair("Symbols", "💯"),
+            Pair("Flags", "🚩"),
             Pair("STICKERS", "🖼️ Stiker"),
             Pair("ADD_STICKER", "➕")
         )
@@ -1386,19 +1388,21 @@ class KeyboardLayout(private val context: Context) {
                         isClickable = true
                         isFocusable = false
 
-                        // Subtle iOS staggered entrance pop
-                        val delay = (rowIndex * 25L).coerceAtMost(250L)
-                        alpha = 0f
-                        scaleX = 0.5f
-                        scaleY = 0.5f
-                        animate()
-                            .alpha(1.0f)
-                            .scaleX(1.0f)
-                            .scaleY(1.0f)
-                            .setStartDelay(delay)
-                            .setDuration(220L)
-                            .setInterpolator(OvershootInterpolator(2.0f))
-                            .start()
+                        // Subtle iOS staggered entrance pop for visible top rows (60 FPS smooth)
+                        if (rowIndex < 6) {
+                            val delay = (rowIndex * 20L).coerceAtMost(120L)
+                            alpha = 0f
+                            scaleX = 0.6f
+                            scaleY = 0.6f
+                            animate()
+                                .alpha(1.0f)
+                                .scaleX(1.0f)
+                                .scaleY(1.0f)
+                                .setStartDelay(delay)
+                                .setDuration(180L)
+                                .setInterpolator(OvershootInterpolator(2.0f))
+                                .start()
+                        }
 
                         // Interactive iOS Spring Bounce & Playful Wobble with Taptic feedback
                         setOnClickListener { v ->

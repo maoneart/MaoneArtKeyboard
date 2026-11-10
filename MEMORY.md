@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.66)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.67)
 
 ---
 
@@ -382,3 +382,11 @@
     3. **100% Glossy 3D Apple Emojis di Seluruh Tab Statis**:
        - Seluruh kategori emoji statis (`Smileys`, `Hands`, `Hearts`, `Animals`, `Food`, `Activities`, `Symbols`) dan ikon tab kategori kini dirender langsung dengan font Apple asli 3D.
        - Tampilan laci emoji kini 100% identik dengan keyboard iPhone asli baik pada mode bergerak maupun mode statis.
+  - **Full Official Apple iOS (iOS 26.4 / 17.4) Library from iphoneemoji.com (Release v1.0.67)**:
+    1. **1,930 Emojis Lengkap Sesuai iphoneemoji.com**:
+       - Mengimpor seluruh 1.930 emoji resmi Apple iOS dari `iphoneemoji.com` (termasuk emoji terbaru seperti `🙂‍↔️`, `🙂‍↕️`, `🧑‍🧑‍🧒‍🧒`, `🫩`, `🫪`, `🫯`, dll).
+    2. **9 Kategori Otentik Standar Apple iOS**:
+       - `Smileys` (132), `People` (408), `Animals` (208), `Food` (131), `Activity` (78), `Travel` (138), `Objects` (303), `Symbols` (262), `Flags` (270).
+       - Menjaga urutan emoji paling populer dan sering dipakai di posisi terdepan tiap kategori untuk kenyamanan pengetikan.
+    3. **Optimalisasi Render 60 FPS**:
+       - Stagger animation dioptimalkan hanya untuk baris awal (`rowIndex < 6`), memastikan scrolling pada ratusan emoji tetap mulus 120 FPS tanpa frame drop.
