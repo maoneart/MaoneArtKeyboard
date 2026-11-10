@@ -355,3 +355,12 @@
     3. **Pembersihan Pengaturan & Basis Kode**:
        - Menghapus switch dan preferensi `isLongPressSymbolsEnabled` dari Pengaturan, XML layout, dan service.
        - Kode kembali ramping, terisolasi, dan sepenuhnya selaras dengan pedoman desain Apple iOS.
+  - **Animasi Gerak Emoji iOS 18: Juicy Spring Bounce, Playful Wobble & Stagger Wave (Release v1.0.58)**:
+    1. **Animasi Ketukan 2-Fase Kenyal & Bergoyang (Spring Bounce & Wobble)**:
+       - **Fase 1 (Pop-Up & Tilt)**: Emoji melompat membesar instan hingga 1.6x dan miring goyang ±16° dengan akselerasi `OvershootInterpolator(3.5f)`.
+       - **Fase 2 (Damped Elastic Recovery)**: Emoji membal kenyal kembali ke ukuran normal 1.0x dan posisi tegak 0° via `DecelerateInterpolator()`.
+       - Terintegrasi langsung dengan getaran taktil Taptic Engine `KEYBOARD_TAP` pada setiap ketukan.
+    2. **Animasi Gelombang Masuk Bergantian (Stagger Cascade Pop-In)**:
+       - Saat kategori emoji dibuka, deretan emoji muncul bertahap mengalir (cascade wave pop-in `0.5x ➔ 1.0x` dengan delay 25ms per baris).
+    3. **Animasi Pegas pada Tab Kategori & Kartu Stiker**:
+       - Tab navigasi kategori dan kartu stiker WhatsApp kini memiliki animasi membal pegas saat disentuh sebelum dikirim.

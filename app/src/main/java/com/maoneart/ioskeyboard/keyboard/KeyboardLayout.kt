@@ -8,6 +8,7 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
@@ -1136,6 +1137,16 @@ class KeyboardLayout(private val context: Context) {
                             isFocusable = false
 
                             setOnClickListener {
+                                itemFrame.animate().cancel()
+                                itemFrame.animate()
+                                    .scaleX(1.22f)
+                                    .scaleY(1.22f)
+                                    .setDuration(100L)
+                                    .setInterpolator(OvershootInterpolator(2.5f))
+                                    .withEndAction {
+                                        itemFrame.animate().scaleX(1.0f).scaleY(1.0f).setDuration(120L).start()
+                                    }
+                                    .start()
                                 onStickerAction(stickerFile)
                             }
 
@@ -1211,6 +1222,7 @@ class KeyboardLayout(private val context: Context) {
                     layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
                 }
                 var count = 0
+                var rowIndex = 0
 
                 for (emo in emojiList) {
                     val btn = TextView(context).apply {
@@ -1221,16 +1233,56 @@ class KeyboardLayout(private val context: Context) {
                         isClickable = true
                         isFocusable = false
 
-                        // Use setOnClickListener so user can freely scroll without accidental emoji taps!
+                        // Subtle iOS staggered entrance pop
+                        val delay = (rowIndex * 25L).coerceAtMost(250L)
+                        alpha = 0f
+                        scaleX = 0.5f
+                        scaleY = 0.5f
+                        animate()
+                            .alpha(1.0f)
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .setStartDelay(delay)
+                            .setDuration(220L)
+                            .setInterpolator(OvershootInterpolator(2.0f))
+                            .start()
+
+                        // Interactive iOS Spring Bounce & Playful Wobble with Taptic feedback
                         setOnClickListener { v ->
+                            v.animate().cancel()
+                            v.scaleX = 1.0f
+                            v.scaleY = 1.0f
+                            v.rotation = 0f
+
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+
+                            // Alternating playful tilt based on emoji code
+                            val wobbleAngle = if (emo.hashCode() % 2 == 0) 16f else -16f
+
+                            // Phase 1: Explosive Spring Pop-up & Tilt (Juicy iOS Spring Physics)
                             v.animate()
-                                .scaleX(1.35f)
-                                .scaleY(1.35f)
-                                .setDuration(90)
+                                .scaleX(1.6f)
+                                .scaleY(1.6f)
+                                .rotation(wobbleAngle)
+                                .setDuration(120L)
+                                .setInterpolator(OvershootInterpolator(3.5f))
                                 .withEndAction {
-                                    v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(90).start()
+                                    // Phase 2: Elastic Counter-Wobble & Damped Recovery
+                                    v.animate()
+                                        .scaleX(1.0f)
+                                        .scaleY(1.0f)
+                                        .rotation(0f)
+                                        .setDuration(180L)
+                                        .setInterpolator(DecelerateInterpolator())
+                                        .start()
                                 }
                                 .start()
+
                             onEmojiAction(emo)
                         }
                     }
@@ -1239,6 +1291,7 @@ class KeyboardLayout(private val context: Context) {
 
                     if (count == 8) {
                         layout.addView(row)
+                        rowIndex++
                         row = LinearLayout(context).apply {
                             orientation = LinearLayout.HORIZONTAL
                             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
@@ -1292,6 +1345,17 @@ class KeyboardLayout(private val context: Context) {
                 isFocusable = false
 
                 setOnClickListener {
+                    tabBtn.animate().cancel()
+                    tabBtn.animate()
+                        .scaleX(1.18f)
+                        .scaleY(1.18f)
+                        .setDuration(90L)
+                        .setInterpolator(OvershootInterpolator(2.5f))
+                        .withEndAction {
+                            tabBtn.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100L).start()
+                        }
+                        .start()
+
                     if (catKey == "ADD_STICKER") {
                         onAddStickerAction()
                     } else {
