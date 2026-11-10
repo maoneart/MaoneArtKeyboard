@@ -254,6 +254,11 @@ class KeyboardLayout(private val context: Context) {
             isDark -> Color.WHITE
             else -> Color.BLACK
         }
+        val secondaryTextColor = when {
+            isWoody -> Color.parseColor("#C4A587")
+            isDark -> Color.parseColor("#98989D")
+            else -> Color.parseColor("#8E8E93")
+        }
 
         // Row 1
         val r1Layout = createRow(row1, isShifted, keyBg, textColor, onKeyAction)
@@ -2044,10 +2049,6 @@ class KeyboardLayout(private val context: Context) {
                     popupController?.hidePopup()
                     true
                 }
-                else -> false
-            }
-        }
-    }
                 else -> false
             }
         }
