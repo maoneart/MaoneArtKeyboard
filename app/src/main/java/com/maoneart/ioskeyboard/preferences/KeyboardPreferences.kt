@@ -46,6 +46,10 @@ class KeyboardPreferences(context: Context) {
         get() = prefs.getBoolean("live_translate_enabled", false)
         set(value) = prefs.edit().putBoolean("live_translate_enabled", value).apply()
 
+    var isCalculatorEnabled: Boolean
+        get() = prefs.getBoolean("calculator_enabled", true)
+        set(value) = prefs.edit().putBoolean("calculator_enabled", value).apply()
+
     var translateSourceLang: String
         get() = prefs.getString("translate_source_lang", "id") ?: "id"
         set(value) = prefs.edit().putString("translate_source_lang", value).apply()

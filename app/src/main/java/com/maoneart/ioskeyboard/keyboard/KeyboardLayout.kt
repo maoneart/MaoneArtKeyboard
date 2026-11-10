@@ -138,6 +138,11 @@ class KeyboardLayout(private val context: Context) {
     private var returnButtonRef: ReturnButtonLayout? = null
     private var popupController: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathContainerLayout? = null
     private var onKeyActionCallback: ((String) -> Unit)? = null
+    private var predictedNextChars: Set<Char> = emptySet()
+
+    fun updatePredictedNextChars(chars: Set<Char>) {
+        predictedNextChars = chars
+    }
 
     data class KeyHitBox(
         val tv: TextView,
@@ -290,7 +295,7 @@ class KeyboardLayout(private val context: Context) {
         isKeyPopupEnabled: Boolean = true,
         isDictationEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
-        onCursorMove: (Int, Int) -> Unit = { _, _ -> },
+        onCursorMove: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
         onSwipeComplete: (List<Char>) -> Unit = {},
         onSwipeHaptic: () -> Unit = {},
         onSwipeLiveUpdate: (List<Char>) -> Unit = {}
@@ -520,11 +525,41 @@ class KeyboardLayout(private val context: Context) {
         }
         if (boxes.isEmpty()) return null
 
+        val maxSnapRadius = dp(38).toFloat()
+        val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
+
+        // 1. Ken Kocienda's Apple Dynamic Predictive Hit-Testing:
+        // Evaluates touch candidate against predicted next characters.
+        // If touch lands near the boundary between two keys, the key that matches
+        // the predicted next character has its effective hit zone expanded by 40%.
+        var bestBox: KeyHitBox? = null
+        var bestScore = Float.MAX_VALUE
+
+        for (box in boxes) {
+            val dx = rawX - box.centerX
+            val dy = rawY - box.centerY
+            val distSq = dx * dx + dy * dy
+            if (distSq <= maxSnapRadiusSq) {
+                val charC = box.charStr.firstOrNull()?.lowercaseChar() ?: ' '
+                val isPredicted = predictedNextChars.contains(charC)
+                val weight = if (isPredicted) 0.65f else 1.25f
+                val weightedDist = distSq * weight
+                if (weightedDist < bestScore) {
+                    bestScore = weightedDist
+                    bestBox = box
+                }
+            }
+        }
+
+        if (bestBox != null) {
+            val activeText = bestBox.tv.text.toString().ifEmpty { bestBox.charStr }
+            return Pair(activeText, bestBox.hitRect)
+        }
+
         val rx = rawX.toInt()
         val ry = rawY.toInt()
         val tol = dp(4)
 
-        // 1. Direct hit on key bounding box (In-Memory, Zero JNI)
         for (box in boxes) {
             val r = box.hitRect
             if (rx in (r.left - tol)..(r.right + tol) &&
@@ -534,26 +569,7 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        // 2. Nearest key center within snap radius (36dp) for fluid gesture sweeps & large thumb touches
-        var closest: KeyHitBox? = null
-        var closestDistSq = Float.MAX_VALUE
-        val maxSnapRadius = dp(36).toFloat()
-        val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
-
-        for (box in boxes) {
-            val dx = rawX - box.centerX
-            val dy = rawY - box.centerY
-            val distSq = dx * dx + dy * dy
-            if (distSq < closestDistSq && distSq <= maxSnapRadiusSq) {
-                closestDistSq = distSq
-                closest = box
-            }
-        }
-
-        return closest?.let {
-            val activeText = it.tv.text.toString().ifEmpty { it.charStr }
-            Pair(activeText, it.hitRect)
-        }
+        return null
     }
 
     private fun findKeyViewAt(rawX: Float, rawY: Float): View? {
@@ -563,6 +579,32 @@ class KeyboardLayout(private val context: Context) {
             boxes = cachedHitBoxes
         }
         if (boxes.isEmpty()) return null
+
+        val maxSnapRadius = dp(38).toFloat()
+        val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
+
+        var bestBox: KeyHitBox? = null
+        var bestScore = Float.MAX_VALUE
+
+        for (box in boxes) {
+            val dx = rawX - box.centerX
+            val dy = rawY - box.centerY
+            val distSq = dx * dx + dy * dy
+            if (distSq <= maxSnapRadiusSq) {
+                val charC = box.charStr.firstOrNull()?.lowercaseChar() ?: ' '
+                val isPredicted = predictedNextChars.contains(charC)
+                val weight = if (isPredicted) 0.65f else 1.25f
+                val weightedDist = distSq * weight
+                if (weightedDist < bestScore) {
+                    bestScore = weightedDist
+                    bestBox = box
+                }
+            }
+        }
+
+        if (bestBox != null) {
+            return bestBox.tv
+        }
 
         val rx = rawX.toInt()
         val ry = rawY.toInt()
@@ -576,22 +618,7 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        var closest: KeyHitBox? = null
-        var closestDistSq = Float.MAX_VALUE
-        val maxSnapRadius = dp(36).toFloat()
-        val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
-
-        for (box in boxes) {
-            val dx = rawX - box.centerX
-            val dy = rawY - box.centerY
-            val distSq = dx * dx + dy * dy
-            if (distSq < closestDistSq && distSq <= maxSnapRadiusSq) {
-                closestDistSq = distSq
-                closest = box
-            }
-        }
-
-        return closest?.tv
+        return null
     }
 
     // --- 2. SYMBOLS LAYOUT (123 & #+=) ---
@@ -601,7 +628,7 @@ class KeyboardLayout(private val context: Context) {
         themeMode: String = "auto",
         isDictationEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
-        onCursorMove: (Int, Int) -> Unit = { _, _ -> }
+        onCursorMove: (Int, Int, Boolean) -> Unit = { _, _, _ -> }
     ): View {
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -1555,56 +1582,68 @@ class KeyboardLayout(private val context: Context) {
                 contentContainer.addView(scroll)
                 applySlideTransition(scroll, direction)
             } else {
-                // Render Emojis for selected category
-                val scroll = ScrollView(context).apply {
+                // Render Emojis for selected category using 120 FPS Hardware-Recycled Grid (Butter-smooth transitions)
+                val emojiList = EmojiBoardManager.emojis[selectedCategory] ?: emptyList()
+
+                val recyclerView = androidx.recyclerview.widget.RecyclerView(context).apply {
                     layoutParams = FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT
                     )
+                    layoutManager = androidx.recyclerview.widget.GridLayoutManager(context, 8)
+                    setPadding(dp(4), dp(4), dp(4), dp(4))
+                    clipToPadding = false
                     isVerticalScrollBarEnabled = true
-                    isFillViewport = true
+                    setItemViewCacheSize(32)
                 }
 
-                val layout = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(8), dp(4), dp(8), dp(4))
-                }
+                val adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
+                    override fun getItemCount(): Int = emojiList.size
 
-                val emojiList = EmojiBoardManager.emojis[selectedCategory] ?: emptyList()
+                    override fun onCreateViewHolder(parent: android.view.ViewGroup, viewType: Int): androidx.recyclerview.widget.RecyclerView.ViewHolder {
+                        val itemContainer = FrameLayout(context).apply {
+                            layoutParams = android.view.ViewGroup.LayoutParams(
+                                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                dp(44)
+                            )
+                            isClickable = true
+                            isFocusable = false
+                        }
+                        val ivEmoji = android.widget.ImageView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(dp(29), dp(29), Gravity.CENTER)
+                            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                        }
+                        val tvFallback = TextView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                            textSize = 24f
+                            gravity = Gravity.CENTER
+                            visibility = View.GONE
+                        }
+                        itemContainer.addView(ivEmoji)
+                        itemContainer.addView(tvFallback)
+                        return object : androidx.recyclerview.widget.RecyclerView.ViewHolder(itemContainer) {}
+                    }
 
-                var row = LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
-                }
-                var count = 0
-                var rowIndex = 0
+                    override fun onBindViewHolder(holder: androidx.recyclerview.widget.RecyclerView.ViewHolder, position: Int) {
+                        val emo = emojiList[position]
+                        val container = holder.itemView as FrameLayout
+                        val iv = container.getChildAt(0) as android.widget.ImageView
+                        val tv = container.getChildAt(1) as TextView
 
-                for (emo in emojiList) {
-                    val itemContainer = FrameLayout(context).apply {
-                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
-                        isClickable = true
-                        isFocusable = false
-
-                        // Subtle iOS staggered entrance pop for visible top rows (60 FPS smooth)
-                        if (rowIndex < 6) {
-                            val delay = (rowIndex * 20L).coerceAtMost(120L)
-                            alpha = 0f
-                            scaleX = 0.6f
-                            scaleY = 0.6f
-                            animate()
-                                .alpha(1.0f)
-                                .scaleX(1.0f)
-                                .scaleY(1.0f)
-                                .setStartDelay(delay)
-                                .setDuration(180L)
-                                .setInterpolator(OvershootInterpolator(2.0f))
-                                .start()
+                        val bmp = AppleEmojiAssetManager.getEmojiBitmap(context, emo)
+                        if (bmp != null) {
+                            iv.setImageBitmap(bmp)
+                            iv.visibility = View.VISIBLE
+                            tv.visibility = View.GONE
+                        } else {
+                            tv.text = emo
+                            tv.visibility = View.VISIBLE
+                            iv.visibility = View.GONE
                         }
 
-                        // Long Press for Skin Tone Variants
                         val variants = SkinToneManager.skinToneMap[emo]
                         if (variants != null) {
-                            setOnLongClickListener { v ->
+                            container.setOnLongClickListener { v ->
                                 try {
                                     v.performHapticFeedback(
                                         android.view.HapticFeedbackConstants.LONG_PRESS,
@@ -1614,10 +1653,11 @@ class KeyboardLayout(private val context: Context) {
                                 showSkinTonePopup(emo, variants, v)
                                 true
                             }
+                        } else {
+                            container.setOnLongClickListener(null)
                         }
 
-                        // Interactive iOS Spring Bounce & Playful Wobble with Taptic feedback
-                        setOnClickListener { v ->
+                        container.setOnClickListener { v ->
                             v.animate().cancel()
                             v.scaleX = 1.0f
                             v.scaleY = 1.0f
@@ -1630,10 +1670,8 @@ class KeyboardLayout(private val context: Context) {
                                 )
                             } catch (_: Throwable) {}
 
-                            // Alternating playful tilt based on emoji code
                             val wobbleAngle = if (emo.hashCode() % 2 == 0) 16f else -16f
 
-                            // Phase 1: Explosive Spring Pop-up & Tilt (Juicy iOS Spring Physics)
                             v.animate()
                                 .scaleX(1.6f)
                                 .scaleY(1.6f)
@@ -1641,7 +1679,6 @@ class KeyboardLayout(private val context: Context) {
                                 .setDuration(120L)
                                 .setInterpolator(OvershootInterpolator(3.5f))
                                 .withEndAction {
-                                    // Phase 2: Elastic Counter-Wobble & Damped Recovery
                                     v.animate()
                                         .scaleX(1.0f)
                                         .scaleY(1.0f)
@@ -1655,54 +1692,11 @@ class KeyboardLayout(private val context: Context) {
                             onEmojiAction(emo)
                         }
                     }
-
-                    // Render as Authentic 3D Glossy Apple WebP Image
-                    val bmp = AppleEmojiAssetManager.getEmojiBitmap(context, emo)
-                    if (bmp != null) {
-                        val ivEmoji = android.widget.ImageView(context).apply {
-                            layoutParams = FrameLayout.LayoutParams(dp(29), dp(29), Gravity.CENTER)
-                            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                            setImageBitmap(bmp)
-                        }
-                        itemContainer.addView(ivEmoji)
-                    } else {
-                        val fallbackTv = TextView(context).apply {
-                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-                            text = emo
-                            textSize = 24f
-                            gravity = Gravity.CENTER
-                        }
-                        itemContainer.addView(fallbackTv)
-                    }
-
-                    row.addView(itemContainer)
-                    count++
-
-                    if (count == 8) {
-                        layout.addView(row)
-                        rowIndex++
-                        row = LinearLayout(context).apply {
-                            orientation = LinearLayout.HORIZONTAL
-                            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44))
-                        }
-                        count = 0
-                    }
                 }
 
-                if (count > 0) {
-                    while (count < 8) {
-                        val spacer = View(context).apply {
-                            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
-                        }
-                        row.addView(spacer)
-                        count++
-                    }
-                    layout.addView(row)
-                }
-
-                scroll.addView(layout)
-                contentContainer.addView(scroll)
-                applySlideTransition(scroll, direction)
+                recyclerView.adapter = adapter
+                contentContainer.addView(recyclerView)
+                applySlideTransition(recyclerView, direction)
             }
         }
 
@@ -2320,18 +2314,19 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // Apple iOS 2D Spacebar Trackpad Cursor Mover (Left, Right, Up, Down)
+    // Apple iOS 2D Spacebar Trackpad Cursor Mover (Left, Right, Up, Down & Text Selection)
     private fun setupSpacebarTrackpadTouch(
         view: TextView,
         defaultText: String,
         isDark: Boolean,
         themeMode: String = "auto",
         onSpaceAction: () -> Unit,
-        onCursorMove: (Int, Int) -> Unit
+        onCursorMove: (Int, Int, Boolean) -> Unit
     ) {
         view.isHapticFeedbackEnabled = true
         val handler = Handler(Looper.getMainLooper())
         var isTrackpadActive = false
+        var isSelectingText = false
         var activePointerId = -1
         var startX = 0f
         var startY = 0f
@@ -2343,10 +2338,17 @@ class KeyboardLayout(private val context: Context) {
 
         val activateRunnable = Runnable {
             isTrackpadActive = true
+            isSelectingText = false
             view.text = "│   geser kursor   │"
             view.setTextColor(if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
             view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
             view.parent?.requestDisallowInterceptTouchEvent(true)
+
+            // Hide/fade out entire letter keys A-Z (authentic Apple blank trackpad)
+            for ((tv, _) in letterKeyViews) {
+                tv.animate().alpha(0f).setDuration(120L).start()
+            }
+
             try {
                 view.performHapticFeedback(
                     android.view.HapticFeedbackConstants.LONG_PRESS,
@@ -2365,6 +2367,7 @@ class KeyboardLayout(private val context: Context) {
                     lastStepX = event.x
                     lastStepY = event.y
                     isTrackpadActive = false
+                    isSelectingText = false
                     try {
                         v.performHapticFeedback(
                             android.view.HapticFeedbackConstants.KEYBOARD_TAP,
@@ -2375,7 +2378,18 @@ class KeyboardLayout(private val context: Context) {
                     true
                 }
                 MotionEvent.ACTION_POINTER_DOWN -> {
-                    if (!isTrackpadActive) {
+                    if (isTrackpadActive) {
+                        // Second thumb/finger tap triggers Apple Text Selection mode!
+                        isSelectingText = !isSelectingText
+                        view.text = if (isSelectingText) "│   seleksi teks   │" else "│   geser kursor   │"
+                        view.setTextColor(if (isSelectingText) Color.parseColor("#34C759") else if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
+                        try {
+                            v.performHapticFeedback(
+                                android.view.HapticFeedbackConstants.LONG_PRESS,
+                                android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                            )
+                        } catch (_: Throwable) {}
+                    } else {
                         handler.removeCallbacks(activateRunnable)
                     }
                     true
@@ -2392,7 +2406,7 @@ class KeyboardLayout(private val context: Context) {
                         val deltaX = currentX - lastStepX
                         if (deltaX > stepDistanceX) {
                             val steps = (deltaX / stepDistanceX).toInt()
-                            onCursorMove(steps, 0)
+                            onCursorMove(steps, 0, isSelectingText)
                             lastStepX += steps * stepDistanceX
                             try {
                                 v.performHapticFeedback(
@@ -2402,7 +2416,7 @@ class KeyboardLayout(private val context: Context) {
                             } catch (_: Throwable) {}
                         } else if (deltaX < -stepDistanceX) {
                             val steps = (kotlin.math.abs(deltaX) / stepDistanceX).toInt()
-                            onCursorMove(-steps, 0)
+                            onCursorMove(-steps, 0, isSelectingText)
                             lastStepX -= steps * stepDistanceX
                             try {
                                 v.performHapticFeedback(
@@ -2415,9 +2429,8 @@ class KeyboardLayout(private val context: Context) {
                         // 2. Sumbu Vertikal (Atas / Bawah baris teks)
                         val deltaY = currentY - lastStepY
                         if (deltaY < -stepDistanceY) {
-                            // Jari digeser ke ATAS
                             val steps = (kotlin.math.abs(deltaY) / stepDistanceY).toInt()
-                            onCursorMove(0, -steps)
+                            onCursorMove(0, -steps, isSelectingText)
                             lastStepY -= steps * stepDistanceY
                             try {
                                 v.performHapticFeedback(
@@ -2426,9 +2439,8 @@ class KeyboardLayout(private val context: Context) {
                                 )
                             } catch (_: Throwable) {}
                         } else if (deltaY > stepDistanceY) {
-                            // Jari digeser ke BAWAH
                             val steps = (deltaY / stepDistanceY).toInt()
-                            onCursorMove(0, steps)
+                            onCursorMove(0, steps, isSelectingText)
                             lastStepY += steps * stepDistanceY
                             try {
                                 v.performHapticFeedback(
@@ -2454,9 +2466,14 @@ class KeyboardLayout(private val context: Context) {
                         activePointerId = -1
                         if (isTrackpadActive) {
                             isTrackpadActive = false
+                            isSelectingText = false
                             view.text = defaultText
                             view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
                             view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
+                            // Restore A-Z letter keys visibility
+                            for ((tv, _) in letterKeyViews) {
+                                tv.animate().alpha(1f).setDuration(120L).start()
+                            }
                         } else {
                             onSpaceAction()
                         }
@@ -2470,9 +2487,14 @@ class KeyboardLayout(private val context: Context) {
                     activePointerId = -1
                     if (isTrackpadActive) {
                         isTrackpadActive = false
+                        isSelectingText = false
                         view.text = defaultText
                         view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
                         view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
+                        // Restore A-Z letter keys visibility
+                        for ((tv, _) in letterKeyViews) {
+                            tv.animate().alpha(1f).setDuration(120L).start()
+                        }
                     } else {
                         onSpaceAction()
                     }
@@ -2485,9 +2507,14 @@ class KeyboardLayout(private val context: Context) {
                     activePointerId = -1
                     if (isTrackpadActive) {
                         isTrackpadActive = false
+                        isSelectingText = false
                         view.text = defaultText
                         view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
                         view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
+                        // Restore A-Z letter keys visibility
+                        for ((tv, _) in letterKeyViews) {
+                            tv.animate().alpha(1f).setDuration(120L).start()
+                        }
                     }
                     true
                 }
@@ -2497,20 +2524,34 @@ class KeyboardLayout(private val context: Context) {
     }
 
     // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback & Multi-Touch)
+    // Augmented with Ken Kocienda's Apple Dynamic Predictive Hit-Testing for boundary touches
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                    v.isPressed = true
+                    val pIdx = event.actionIndex
+                    val rx = try { event.getRawX(pIdx) } catch (_: Throwable) { event.rawX }
+                    val ry = try { event.getRawY(pIdx) } catch (_: Throwable) { event.rawY }
+
+                    val resolvedKey = findKeyAt(rx, ry)
+                    val targetView = (if (resolvedKey != null) findKeyViewAt(rx, ry) else null) ?: v
+                    val charToSend = resolvedKey?.first ?: view.text.toString()
+
+                    targetView.isPressed = true
                     try {
-                        v.performHapticFeedback(
+                        targetView.performHapticFeedback(
                             android.view.HapticFeedbackConstants.KEYBOARD_TAP,
                             android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
                         )
                     } catch (_: Throwable) {}
-                    popupController?.showPopupForKey(v, view.text.toString())
-                    onTrigger()
+                    popupController?.showPopupForKey(targetView, charToSend)
+
+                    if (resolvedKey != null && onKeyActionCallback != null) {
+                        onKeyActionCallback?.invoke(charToSend)
+                    } else {
+                        onTrigger()
+                    }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {

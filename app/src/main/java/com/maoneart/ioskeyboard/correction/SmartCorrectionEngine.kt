@@ -528,6 +528,54 @@ class SmartCorrectionEngine(private val context: Context) {
     }
 
     /**
+     * Ken Kocienda's Apple iOS Predictive Hit-Target Engine:
+     * Predicts probable next characters based on the currently typed word prefix.
+     * Used by KeyboardLayout to dynamically expand the touch hit-zone of likely keys
+     * and shrink unlikely keys, dramatically cutting typing typos.
+     */
+    fun predictNextCharacters(prefix: String, lang: String): Set<Char> {
+        val p = prefix.trim().lowercase()
+        if (p.isEmpty()) return emptySet()
+
+        val nextChars = HashSet<Char>(26)
+
+        // 1. High priority: User's dynamic learned dictionary
+        for (w in userDictionary.keys) {
+            if (w.length > p.length && w.startsWith(p)) {
+                nextChars.add(w[p.length])
+            }
+        }
+
+        // 2. Comprehensive 74,500+ KBBI Vocabulary (Instant O(log N) Binary Search)
+        val list = kbbiSnapshot
+        if (list.isNotEmpty()) {
+            var idx = Collections.binarySearch(list, p)
+            if (idx < 0) idx = -(idx + 1)
+            var count = 0
+            while (idx < list.size && count < 60) {
+                val candidate = list[idx]
+                if (candidate.startsWith(p)) {
+                    if (candidate.length > p.length) {
+                        nextChars.add(candidate[p.length])
+                    }
+                    count++
+                    idx++
+                } else break
+            }
+        }
+
+        // 3. Fallback / English dictionary
+        val baseDict = if (lang == "en") englishWords else indonesianWords
+        for (w in baseDict) {
+            if (w.length > p.length && w.startsWith(p)) {
+                nextChars.add(w[p.length])
+            }
+        }
+
+        return nextChars
+    }
+
+    /**
      * Checks if a word belongs to the high-frequency common Indonesian words or user's dictionary
      */
     fun isCommonWord(word: String): Boolean {

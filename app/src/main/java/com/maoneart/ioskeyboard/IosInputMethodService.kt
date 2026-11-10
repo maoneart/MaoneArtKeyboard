@@ -703,7 +703,7 @@ class IosInputMethodService : InputMethodService() {
                             isKeyPopupEnabled = prefs.isKeyPopupEnabled,
                             isDictationEnabled = prefs.isDictationEnabled,
                             onKeyAction = { handleKeyAction(it) },
-                            onCursorMove = { dx, dy -> moveCursor2D(dx, dy) },
+                            onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) },
                             onSwipeComplete = { handleSwipeComplete(it) },
                             onSwipeHaptic = { audioHaptic.triggerHapticFeedback() },
                             onSwipeLiveUpdate = { handleSwipeLiveUpdate(it) }
@@ -725,7 +725,7 @@ class IosInputMethodService : InputMethodService() {
                     themeMode = prefs.themeMode,
                     isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
-                    onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
+                    onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) }
                 )
                 Mode.SYMBOLS_MORE -> layoutEngine.createSymbolsView(
                     isMoreSymbols = true,
@@ -733,7 +733,7 @@ class IosInputMethodService : InputMethodService() {
                     themeMode = prefs.themeMode,
                     isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
-                    onCursorMove = { dx, dy -> moveCursor2D(dx, dy) }
+                    onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) }
                 )
                 Mode.EMOJI -> layoutEngine.createEmojiView(
                     isDark = isDark,
@@ -782,7 +782,7 @@ class IosInputMethodService : InputMethodService() {
         }
     }
 
-    private fun moveCursor2D(dx: Int, dy: Int) {
+    private fun moveCursor2D(dx: Int, dy: Int, isSelecting: Boolean = false) {
         try {
             if (!prefs.isSpaceTrackpadEnabled) return
 
@@ -798,30 +798,31 @@ class IosInputMethodService : InputMethodService() {
             }
 
             val ic = currentInputConnection ?: return
+            val meta = if (isSelecting) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
 
-            // 1. Horizontal Cursor Navigation (Left / Right)
+            // 1. Horizontal Cursor Navigation (Left / Right with Text Selection support)
             if (dx > 0) {
                 for (i in 0 until dx) {
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT, 0, meta))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT, 0, meta))
                 }
             } else if (dx < 0) {
                 for (i in 0 until kotlin.math.abs(dx)) {
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, 0, meta))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT, 0, meta))
                 }
             }
 
             // 2. Vertical Multiline Navigation (Up / Down across paragraphs & line breaks)
             if (dy < 0) {
                 for (i in 0 until kotlin.math.abs(dy)) {
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP))
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP, 0, meta))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP, 0, meta))
                 }
             } else if (dy > 0) {
                 for (i in 0 until dy) {
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN))
-                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN, 0, meta))
+                    ic.sendKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN, 0, meta))
                 }
             }
 
@@ -1494,16 +1495,23 @@ class IosInputMethodService : InputMethodService() {
 
             val (currentWord, previousWord) = getTypingContext()
 
+            val nextChars = if (currentWord.isNotEmpty()) {
+                correctionEngine.predictNextCharacters(currentWord, prefs.activeLanguage)
+            } else emptySet()
+            layoutEngine.updatePredictedNextChars(nextChars)
+
             // 0A. Instant In-Keyboard Math Calculator (e.g. "25000*4" -> "🧮 = 100.000")
-            val mathExprCandidate = try {
-                val rawContext = if (isTranslatePanelOpen) {
-                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
-                    translatePanelBuffer.substring(0, pos)
-                } else {
-                    currentInputConnection?.getTextBeforeCursor(40, 0)?.toString() ?: currentWord
-                }
-                evaluateInlineMath(rawContext)
-            } catch (_: Throwable) { null }
+            val mathExprCandidate = if (prefs.isCalculatorEnabled) {
+                try {
+                    val rawContext = if (isTranslatePanelOpen) {
+                        val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                        translatePanelBuffer.substring(0, pos)
+                    } else {
+                        currentInputConnection?.getTextBeforeCursor(40, 0)?.toString() ?: currentWord
+                    }
+                    evaluateInlineMath(rawContext)
+                } catch (_: Throwable) { null }
+            } else null
 
             if (mathExprCandidate != null) {
                 candidate1?.text = "🧮 = ${mathExprCandidate.second}"

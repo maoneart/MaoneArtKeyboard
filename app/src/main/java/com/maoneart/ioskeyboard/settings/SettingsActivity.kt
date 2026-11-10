@@ -97,6 +97,7 @@ class SettingsActivity : AppCompatActivity() {
         val rowDownloadLanguages = findViewById<LinearLayout>(R.id.rowDownloadLanguages)
 
         val switchLiveTranslate = findViewById<SwitchMaterial>(R.id.switchLiveTranslate)
+        val switchCalculator = findViewById<SwitchMaterial>(R.id.switchCalculator)
         val rowTranslatePair = findViewById<LinearLayout>(R.id.rowTranslatePair)
         tvTranslatePair = findViewById(R.id.tvTranslatePair)
 
@@ -214,6 +215,10 @@ class SettingsActivity : AppCompatActivity() {
             prefs.isLiveTranslateEnabled = isChecked
         }
 
+        switchCalculator?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isCalculatorEnabled = isChecked
+        }
+
         rowTranslatePair.setOnClickListener {
             showTranslatePairDialog()
         }
@@ -246,6 +251,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<SwitchMaterial>(R.id.switchSpaceTrackpad)?.isChecked = prefs.isSpaceTrackpadEnabled
         findViewById<SwitchMaterial>(R.id.switchDictation)?.isChecked = prefs.isDictationEnabled
         findViewById<SwitchMaterial>(R.id.switchLiveTranslate).isChecked = prefs.isLiveTranslateEnabled
+        findViewById<SwitchMaterial>(R.id.switchCalculator)?.isChecked = prefs.isCalculatorEnabled
     }
 
     private fun isImeEnabled(): Boolean {
