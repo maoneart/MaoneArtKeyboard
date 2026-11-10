@@ -346,16 +346,12 @@
        - Evaluasi `InputType.TYPE_CLASS_NUMBER`, `TYPE_CLASS_PHONE`, dan petunjuk kata kunci (nominal, pin, rekening, otp) untuk langsung membuka mode Numpad besar otentik iOS.
     2. **Tombol Cepat `000` & Tombol Transisi `ABC`**:
        - Penyisipan instan tiga nol untuk kemudahan transaksi m-Banking dan peralihan halus kembali ke QWERTY via tombol `ABC`.
-  - **Full QWERTY Long-Press Secondary Symbols & KeyCap Canvas (Release v1.0.56)**:
-    1. **Pemetaan Simbol Sekunder Lengkap 3 Baris**:
-       - Baris 1 (Q-P): Angka `1` sampai `0`.
-       - Baris 2 (A-L): Simbol esensial `@`, `#`, `$`, `%`, `&`, `-`, `+`, `(`, `)`.
-       - Baris 3 (Z-M): Tanda baca & kutip `*`, `"`, `'`, `:`, `;`, `!`, `?`.
-    2. **KeyCap Canvas Overlay Super Ringan (`KeyCapTextView`)**:
-       - Teks petunjuk sudut kanan-atas digambar langsung via hardware-accelerated Canvas `drawText` tanpa overhead hierarki View ekstra atau modifikasi `TextView.text`.
-       - Warna label petunjuk adaptif (`secondaryTextColor`) untuk tema Light, Dark/OLED, dan Woody.
-    3. **Multi-Touch & Swipe Isolation**:
-       - Debounce tahan 280ms dengan getaran taktil Taptic Engine `LONG_PRESS`.
-       - Pergerakan jari > 14dp membatalkan runnable seketika agar tidak mengganggu kecepatan 120 FPS swipe typing (QuickPath).
-    4. **Pengaturan Mandiri di Cupertino Settings**:
-       - Toggle switch baru "Angka & Simbol Tekan-Tahan" di Preferences dan `activity_settings.xml` dengan pembaruan cache instan.
+  - **Restorasi Desain Otentik Apple iOS: Keycap Huruf Bersih & Bebas Long-Press Angka (Release v1.0.57)**:
+    1. **Kemurnian Estetika Asli iPhone (100% Authentic iOS Minimalism)**:
+       - Di iPhone aslinya, tidak pernah ada fitur tekan tahan tuts huruf untuk angka/simbol ataupun label angka kecil di pojok tuts (fitur tersebut khas Android/Gboard).
+       - Menghapus seluruh render canvas petunjuk angka/simbol di sudut tuts huruf. Tuts huruf QWERTY kembali 100% bersih, elegan, dan lega persis iPhone aslinya.
+    2. **Performa Sentuhan 0ms Murni Tanpa Timer**:
+       - Menghapus runnable dan timer long-press dari `setupLetterKeyTouch`. Seluruh ketukan huruf diproses secara instan (0ms) dengan hardware-accelerated Taptic feedback tanpa overhead delay timer.
+    3. **Pembersihan Pengaturan & Basis Kode**:
+       - Menghapus switch dan preferensi `isLongPressSymbolsEnabled` dari Pengaturan, XML layout, dan service.
+       - Kode kembali ramping, terisolasi, dan sepenuhnya selaras dengan pedoman desain Apple iOS.

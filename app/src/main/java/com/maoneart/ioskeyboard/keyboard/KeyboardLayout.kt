@@ -63,33 +63,6 @@ class KeyboardLayout(private val context: Context) {
     private var returnButtonRef: ReturnButtonLayout? = null
     private var popupController: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathContainerLayout? = null
     private var onKeyActionCallback: ((String) -> Unit)? = null
-    private var longPressSymbolsActive: Boolean = true
-
-    /**
-     * Custom zero-overhead KeyCap TextView that renders optional secondary hint
-     * (1-0 & symbols @#$%!?) at top-right corner without changing TextView.text.
-     */
-    private class KeyCapTextView(
-        context: Context,
-        private val hintSymbol: String?,
-        hintColor: Int
-    ) : TextView(context) {
-        private val hintPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = hintColor
-            textSize = 9.5f * resources.displayMetrics.scaledDensity
-            textAlign = android.graphics.Paint.Align.RIGHT
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }
-        private val padRight = 4.5f * resources.displayMetrics.density
-        private val padTop = 10.5f * resources.displayMetrics.density
-
-        override fun onDraw(canvas: android.graphics.Canvas) {
-            super.onDraw(canvas)
-            if (!hintSymbol.isNullOrEmpty()) {
-                canvas.drawText(hintSymbol, width - padRight, padTop, hintPaint)
-            }
-        }
-    }
 
     data class KeyHitBox(
         val tv: TextView,
@@ -241,7 +214,6 @@ class KeyboardLayout(private val context: Context) {
         isSwipeEnabled: Boolean = true,
         isKeyPopupEnabled: Boolean = true,
         isDictationEnabled: Boolean = true,
-        isLongPressSymbolsEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int) -> Unit = { _, _ -> },
         onSwipeComplete: (List<Char>) -> Unit = {},
@@ -251,7 +223,6 @@ class KeyboardLayout(private val context: Context) {
         letterKeyViews.clear()
         cachedHitBoxes = emptyList()
         onKeyActionCallback = onKeyAction
-        longPressSymbolsActive = isLongPressSymbolsEnabled
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -283,19 +254,14 @@ class KeyboardLayout(private val context: Context) {
             isDark -> Color.WHITE
             else -> Color.BLACK
         }
-        val secondaryTextColor = when {
-            isWoody -> Color.parseColor("#C4A587")
-            isDark -> Color.parseColor("#98989D")
-            else -> Color.parseColor("#8E8E93")
-        }
 
         // Row 1
-        val r1Layout = createRow(row1, isShifted, keyBg, textColor, secondaryTextColor, isLongPressSymbolsEnabled, onKeyAction)
+        val r1Layout = createRow(row1, isShifted, keyBg, textColor, onKeyAction)
         r1Layout.isMotionEventSplittingEnabled = true
         root.addView(r1Layout)
 
         // Row 2 (Padded for iOS stagger)
-        val r2Layout = createRow(row2, isShifted, keyBg, textColor, secondaryTextColor, isLongPressSymbolsEnabled, onKeyAction)
+        val r2Layout = createRow(row2, isShifted, keyBg, textColor, onKeyAction)
         r2Layout.isMotionEventSplittingEnabled = true
         r2Layout.setPadding(dp(18), 0, dp(18), 0)
         root.addView(r2Layout)
@@ -328,8 +294,7 @@ class KeyboardLayout(private val context: Context) {
 
         for (ch in row3) {
             val label = if (isShifted) ch.uppercase() else ch
-            val hintSym = if (isLongPressSymbolsEnabled) longPressSymbolMap[ch] else null
-            val keyBtn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction, hintSym, secondaryTextColor)
+            val keyBtn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction)
             letterKeyViews.add(Pair(keyBtn, ch))
             r3Layout.addView(keyBtn)
         }
@@ -1839,8 +1804,6 @@ class KeyboardLayout(private val context: Context) {
         isShifted: Boolean,
         keyBg: Int,
         textColor: Int,
-        hintColor: Int = Color.GRAY,
-        showLongPressHints: Boolean = false,
         onKeyAction: (String) -> Unit
     ): LinearLayout {
         val row = LinearLayout(context).apply {
@@ -1854,8 +1817,7 @@ class KeyboardLayout(private val context: Context) {
         }
         for (k in keys) {
             val label = if (isShifted) k.uppercase() else k.lowercase()
-            val hintSym = if (showLongPressHints) longPressSymbolMap[k.lowercase()] else null
-            val btn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction, hintSym, hintColor)
+            val btn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction)
             letterKeyViews.add(Pair(btn, k))
             row.addView(btn)
         }
@@ -1867,11 +1829,9 @@ class KeyboardLayout(private val context: Context) {
         weight: Float,
         keyBg: Int,
         textColor: Int,
-        onKeyAction: (String) -> Unit,
-        hintSymbol: String? = null,
-        hintColor: Int = Color.GRAY
+        onKeyAction: (String) -> Unit
     ): TextView {
-        return KeyCapTextView(context, hintSymbol, hintColor).apply {
+        return TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
@@ -2062,50 +2022,13 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // Full QWERTY Long-Press Secondary Map: Row 1 (1-0), Row 2 (@#$%&-+()), Row 3 (*"':;!?)
-    private val longPressSymbolMap = mapOf(
-        // Row 1: Numbers 1-0
-        "q" to "1", "w" to "2", "e" to "3", "r" to "4", "t" to "5",
-        "y" to "6", "u" to "7", "i" to "8", "o" to "9", "p" to "0",
-        // Row 2: Common Symbols
-        "a" to "@", "s" to "#", "d" to "$", "f" to "%", "g" to "&",
-        "h" to "-", "j" to "+", "k" to "(", "l" to ")",
-        // Row 3: Punctuation & Quotes
-        "z" to "*", "x" to "\"", "c" to "'", "v" to ":", "b" to ";",
-        "n" to "!", "m" to "?"
-    )
-
-    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback, Multi-Touch & Long-Press Number/Symbol)
+    // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback & Multi-Touch)
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
-        val handler = Handler(Looper.getMainLooper())
-        var longPressTriggered = false
-        var downX = 0f
-        var downY = 0f
-        val longPressRunnable = Runnable {
-            if (!longPressSymbolsActive) return@Runnable
-            val baseKey = view.text.toString().lowercase()
-            val secSymbol = longPressSymbolMap[baseKey]
-            if (secSymbol != null && view.isPressed) {
-                longPressTriggered = true
-                try {
-                    view.performHapticFeedback(
-                        android.view.HapticFeedbackConstants.LONG_PRESS,
-                        android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-                    )
-                } catch (_: Throwable) {}
-                popupController?.showPopupForKey(view, secSymbol)
-                onKeyActionCallback?.invoke("ACTION_REPLACE_WITH_DIGIT:$secSymbol")
-            }
-        }
-
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                     v.isPressed = true
-                    longPressTriggered = false
-                    downX = event.x
-                    downY = event.y
                     try {
                         v.performHapticFeedback(
                             android.view.HapticFeedbackConstants.KEYBOARD_TAP,
@@ -2114,50 +2037,17 @@ class KeyboardLayout(private val context: Context) {
                     } catch (_: Throwable) {}
                     popupController?.showPopupForKey(v, view.text.toString())
                     onTrigger()
-                    val baseKey = view.text.toString().lowercase()
-                    if (longPressSymbolsActive && longPressSymbolMap.containsKey(baseKey)) {
-                        handler.removeCallbacks(longPressRunnable)
-                        handler.postDelayed(longPressRunnable, 280L)
-                    }
-                    true
-                }
-                MotionEvent.ACTION_POINTER_DOWN -> {
-                    handler.removeCallbacks(longPressRunnable)
-                    v.isPressed = true
-                    longPressTriggered = false
-                    val ptrIdx = event.actionIndex
-                    downX = event.getX(ptrIdx)
-                    downY = event.getY(ptrIdx)
-                    try {
-                        v.performHapticFeedback(
-                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
-                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-                        )
-                    } catch (_: Throwable) {}
-                    popupController?.showPopupForKey(v, view.text.toString())
-                    onTrigger()
-                    val baseKey = view.text.toString().lowercase()
-                    if (longPressSymbolsActive && longPressSymbolMap.containsKey(baseKey)) {
-                        handler.removeCallbacks(longPressRunnable)
-                        handler.postDelayed(longPressRunnable, 280L)
-                    }
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    if (!longPressTriggered) {
-                        val dist = kotlin.math.hypot((event.x - downX).toDouble(), (event.y - downY).toDouble())
-                        if (dist > dp(14)) {
-                            handler.removeCallbacks(longPressRunnable)
-                        }
-                    }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
-                    handler.removeCallbacks(longPressRunnable)
                     v.isPressed = false
                     popupController?.hidePopup()
                     true
                 }
+                else -> false
+            }
+        }
+    }
                 else -> false
             }
         }

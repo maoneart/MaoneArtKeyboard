@@ -686,7 +686,7 @@ class IosInputMethodService : InputMethodService() {
 
             val contentView = when (currentMode) {
                 Mode.QWERTY -> {
-                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|${prefs.isDictationEnabled}|${prefs.isLongPressSymbolsEnabled}"
+                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|${prefs.isDictationEnabled}"
                     val existing = cachedQwertyView
                     if (existing != null && cachedQwertyKeySignature == sig) {
                         (existing.parent as? android.view.ViewGroup)?.removeView(existing)
@@ -702,7 +702,6 @@ class IosInputMethodService : InputMethodService() {
                             isSwipeEnabled = prefs.isSwipeTypingEnabled,
                             isKeyPopupEnabled = prefs.isKeyPopupEnabled,
                             isDictationEnabled = prefs.isDictationEnabled,
-                            isLongPressSymbolsEnabled = prefs.isLongPressSymbolsEnabled,
                             onKeyAction = { handleKeyAction(it) },
                             onCursorMove = { dx, dy -> moveCursor2D(dx, dy) },
                             onSwipeComplete = { handleSwipeComplete(it) },
@@ -894,13 +893,7 @@ class IosInputMethodService : InputMethodService() {
                     handleSpace()
                 }
                 else -> {
-                    if (action.startsWith("ACTION_REPLACE_WITH_DIGIT:")) {
-                        val digit = action.removePrefix("ACTION_REPLACE_WITH_DIGIT:")
-                        handleBackspace()
-                        handleCharacterInput(digit)
-                    } else {
-                        handleCharacterInput(action)
-                    }
+                    handleCharacterInput(action)
                 }
             }
         } catch (_: Throwable) {}

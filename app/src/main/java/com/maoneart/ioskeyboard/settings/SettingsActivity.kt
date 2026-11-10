@@ -122,10 +122,6 @@ class SettingsActivity : AppCompatActivity() {
             prefs.isKeyPopupEnabled = isChecked
         }
 
-        findViewById<SwitchMaterial>(R.id.switchLongPressSymbols)?.setOnCheckedChangeListener { _, isChecked ->
-            prefs.isLongPressSymbolsEnabled = isChecked
-        }
-
         switchSound.setOnCheckedChangeListener { _, isChecked ->
             prefs.isSoundEnabled = isChecked
         }
@@ -240,7 +236,6 @@ class SettingsActivity : AppCompatActivity() {
         updateSetupCards()
 
         findViewById<SwitchMaterial>(R.id.switchKeyPopup).isChecked = prefs.isKeyPopupEnabled
-        findViewById<SwitchMaterial>(R.id.switchLongPressSymbols)?.isChecked = prefs.isLongPressSymbolsEnabled
         findViewById<SwitchMaterial>(R.id.switchSound).isChecked = prefs.isSoundEnabled
         findViewById<SwitchMaterial>(R.id.switchHaptic).isChecked = prefs.isHapticEnabled
         findViewById<SwitchMaterial>(R.id.switchAutoCapitalization)?.isChecked = prefs.isAutoCapitalizationEnabled
