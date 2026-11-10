@@ -2310,7 +2310,12 @@ class KeyboardLayout(private val context: Context) {
             isClickable = true
             isFocusable = false
             isHapticFeedbackEnabled = true
-            setupLetterKeyTouch(this) { onKeyAction(text.toString()) }
+            val isLetter = label.length == 1 && label[0].isLetter()
+            if (isLetter) {
+                setupLetterKeyTouch(this) { onKeyAction(text.toString()) }
+            } else {
+                setupSymbolKeyTouch(this) { onKeyAction(text.toString()) }
+            }
         }
     }
 
@@ -2335,6 +2340,14 @@ class KeyboardLayout(private val context: Context) {
         val stepDistanceX = dp(12).toFloat()
         val stepDistanceY = dp(14).toFloat()
         val isWoody = (themeMode == "woody")
+        val normalTextColor = if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+
+        fun restoreLetterKeyText() {
+            for ((tv, _) in letterKeyViews) {
+                tv.alpha = 1f
+                tv.setTextColor(normalTextColor)
+            }
+        }
 
         val activateRunnable = Runnable {
             isTrackpadActive = true
@@ -2344,9 +2357,9 @@ class KeyboardLayout(private val context: Context) {
             view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
             view.parent?.requestDisallowInterceptTouchEvent(true)
 
-            // Hide/fade out entire letter keys A-Z (authentic Apple blank trackpad)
+            // Hide ONLY the letter label text (A-Z), keeping key button shapes & layout completely intact
             for ((tv, _) in letterKeyViews) {
-                tv.animate().alpha(0f).setDuration(120L).start()
+                tv.setTextColor(Color.TRANSPARENT)
             }
 
             try {
@@ -2470,10 +2483,7 @@ class KeyboardLayout(private val context: Context) {
                             view.text = defaultText
                             view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
                             view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
-                            // Restore A-Z letter keys visibility
-                            for ((tv, _) in letterKeyViews) {
-                                tv.animate().alpha(1f).setDuration(120L).start()
-                            }
+                            restoreLetterKeyText()
                         } else {
                             onSpaceAction()
                         }
@@ -2491,10 +2501,7 @@ class KeyboardLayout(private val context: Context) {
                         view.text = defaultText
                         view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
                         view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
-                        // Restore A-Z letter keys visibility
-                        for ((tv, _) in letterKeyViews) {
-                            tv.animate().alpha(1f).setDuration(120L).start()
-                        }
+                        restoreLetterKeyText()
                     } else {
                         onSpaceAction()
                     }
@@ -2511,10 +2518,7 @@ class KeyboardLayout(private val context: Context) {
                         view.text = defaultText
                         view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
                         view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
-                        // Restore A-Z letter keys visibility
-                        for ((tv, _) in letterKeyViews) {
-                            tv.animate().alpha(1f).setDuration(120L).start()
-                        }
+                        restoreLetterKeyText()
                     }
                     true
                 }
@@ -2525,8 +2529,11 @@ class KeyboardLayout(private val context: Context) {
 
     // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback & Multi-Touch)
     // Augmented with Ken Kocienda's Apple Dynamic Predictive Hit-Testing for boundary touches
+    // Includes auto-release watchdog to prevent any key from getting stuck/mendem!
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
+        var currentTargetView: View? = null
+
         view.setOnTouchListener { v, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -2538,7 +2545,13 @@ class KeyboardLayout(private val context: Context) {
                     val targetView = (if (resolvedKey != null) findKeyViewAt(rx, ry) else null) ?: v
                     val charToSend = resolvedKey?.first ?: view.text.toString()
 
+                    // Release previously stuck view if any
+                    currentTargetView?.isPressed = false
+                    currentTargetView = targetView
+
+                    v.isPressed = true
                     targetView.isPressed = true
+
                     try {
                         targetView.performHapticFeedback(
                             android.view.HapticFeedbackConstants.KEYBOARD_TAP,
@@ -2552,6 +2565,47 @@ class KeyboardLayout(private val context: Context) {
                     } else {
                         onTrigger()
                     }
+
+                    // Anti-mendem watchdog: auto-release pressed state after 280ms if Android drops ACTION_UP
+                    targetView.postDelayed({
+                        targetView.isPressed = false
+                        v.isPressed = false
+                        popupController?.hidePopup()
+                    }, 280L)
+
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    currentTargetView?.isPressed = false
+                    currentTargetView = null
+                    popupController?.hidePopup()
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    // Symbol / Number Key Touch Handler (Zero predictive redirection: always sends exact symbol typed!)
+    private fun setupSymbolKeyTouch(view: TextView, onTrigger: () -> Unit) {
+        view.isHapticFeedbackEnabled = true
+        view.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    v.isPressed = true
+                    try {
+                        v.performHapticFeedback(
+                            android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                            android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                        )
+                    } catch (_: Throwable) {}
+                    popupController?.showPopupForKey(v, view.text.toString())
+                    onTrigger()
+                    v.postDelayed({
+                        v.isPressed = false
+                        popupController?.hidePopup()
+                    }, 280L)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {

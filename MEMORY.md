@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.70)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.71)
 
 ---
 
@@ -424,3 +424,12 @@
     4. **Toggle On/Off Fitur Kalkulator Otomatis di Pengaturan**:
        - Menambahkan switch Cupertino "Kalkulator Cerdas Otomatis" di menu Pengaturan Keyboard (ikon kalkulator oranye).
        - Pengguna dapat leluasa mengaktifkan atau menonaktifkan perhitungan rumus matematika otomatis (`evaluateInlineMath`).
+  - **Refined Blank Key Text-Only Fade, Anti-Mendem Watchdog, Strict Symbol Isolation & Apple Intelligence Modern Translate Panel (Release v1.0.71)**:
+    1. **Text-Only Blank Trackpad (Kotak Tuts Tetap Utuh)**:
+       - Memperbaiki mode trackpad spasi: kotak tuts tombol fisik (`keyBg`) tetap 100% utuh dan terlihat posisinya di keyboard, hanya teks tulisan hurufnya (`A-Z`) yang dibuat transparan (`Color.TRANSPARENT`) saat trackpad aktif, persis seperti keyboard iPhone asli.
+    2. **Anti-Mendem Touch Watchdog**:
+       - Mengatasi tombol nyangkut / mendem (`isPressed = true`) dengan tracking view pointer terisolasi dan timer auto-release watchdog 280ms. Tombol dipastikan selalu membal kembali tanpa pernah tertinggal dalam keadaan pressed.
+    3. **Isolasi Ketat Tombol Simbol & Angka (Anti Tertukar Huruf)**:
+       - Memisahkan penanganan sentuhan tombol simbol dan angka (`setupSymbolKeyTouch`) dari algoritma predictive hit-testing alfabet QWERTY. Mengetik angka atau simbol (`1, 2, 3`, `@, #, $`) 100% menghasilkan simbol yang ditekan tanpa pernah terkonversi ke huruf QWERTY.
+    4. **Redesign Mode Terjemahan Kekinian (Apple Intelligence / iOS 18 Glassmorphism)**:
+       - Panel terjemahan dirombak dengan desain modern: frosted glassmorphic card 16dp, rounded capsule input box dengan inner background bersih, pill chips bahasa beraksen Apple Blue / Indigo gradient, dan tombol Kirim modern `✦ Kirim ➔`.

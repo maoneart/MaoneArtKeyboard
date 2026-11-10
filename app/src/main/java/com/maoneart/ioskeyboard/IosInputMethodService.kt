@@ -548,15 +548,15 @@ class IosInputMethodService : InputMethodService() {
                 textSize = 11f
 
                 if (isSelected) {
-                    background = ContextCompat.getDrawable(this@IosInputMethodService, R.drawable.key_bg_blue)
+                    background = ContextCompat.getDrawable(this@IosInputMethodService, R.drawable.btn_apple_translate_send)
                     setTextColor(Color.WHITE)
                     setTypeface(typeface, Typeface.BOLD)
                 } else {
                     background = ContextCompat.getDrawable(
                         this@IosInputMethodService,
-                        if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light
+                        if (isDark) R.drawable.key_bg_special_dark else R.drawable.chip_bg_language_pill
                     )
-                    setTextColor(if (isDark) Color.LTGRAY else Color.DKGRAY)
+                    setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#48484A"))
                     setTypeface(typeface, Typeface.NORMAL)
                 }
 
@@ -625,14 +625,25 @@ class IosInputMethodService : InputMethodService() {
         try {
             if (isTranslatePanelOpen) {
                 translatePanel?.visibility = View.VISIBLE
+                val isDark = isDarkMode()
+                translatePanel?.background = ContextCompat.getDrawable(
+                    this@IosInputMethodService,
+                    if (isDark) R.drawable.panel_bg_apple_translate_dark else R.drawable.panel_bg_apple_translate
+                )
+                tvTranslateInputBox?.background = ContextCompat.getDrawable(
+                    this@IosInputMethodService,
+                    if (isDark) R.drawable.input_bg_apple_translate_dark else R.drawable.input_bg_apple_translate
+                )
+                tvTranslateInputBox?.setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+
                 val src = prefs.translateSourceLang.uppercase()
                 val tgt = prefs.translateTargetLang.uppercase()
-                tvTranslateLangPair?.text = "$src ⇄ $tgt"
+                tvTranslateLangPair?.text = "🌐 $src ⇄ $tgt"
 
                 if (translatePanelBuffer.isEmpty()) {
-                    tvTranslateStatus?.text = "Ketik kalimat di kotak, lalu tap Kirim"
+                    tvTranslateStatus?.text = "✦ Ketik kalimat lalu tap Kirim"
                 } else {
-                    tvTranslateStatus?.text = "Kalimat siap ($src ➔ $tgt)"
+                    tvTranslateStatus?.text = "✦ Kalimat siap ($src ➔ $tgt)"
                 }
                 updateTranslateInputBoxVisual()
                 renderQuickLanguageChips()
