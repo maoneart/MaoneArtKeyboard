@@ -105,25 +105,25 @@
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnPickImage"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:background="@drawable/key_bg_special_light"
+            android:background="@drawable/btn_apple_action"
             android:text="📁 Pilih Gambar dari Galeri"
-            android:textColor="@color/ios_blue"
-            android:textSize="15sp"
+            android:textColor="#FFFFFF"
+            android:textSize="15.5sp"
             android:textStyle="bold" />
 
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnSaveSticker"
             android:layout_width="match_parent"
             android:layout_height="50dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/btn_apple_action"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/btn_apple_action_green"
             android:text="✓ Simpan Jadi Stiker WebP"
             android:textColor="#FFFFFF"
-            android:textSize="15sp"
+            android:textSize="15.5sp"
             android:textStyle="bold"
             android:visibility="gone" />
     </LinearLayout>

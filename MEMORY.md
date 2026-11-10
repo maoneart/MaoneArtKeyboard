@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.67)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.68)
 
 ---
 
@@ -390,3 +390,12 @@
        - Menjaga urutan emoji paling populer dan sering dipakai di posisi terdepan tiap kategori untuk kenyamanan pengetikan.
     3. **Optimalisasi Render 60 FPS**:
        - Stagger animation dioptimalkan hanya untuk baris awal (`rowIndex < 6`), memastikan scrolling pada ratusan emoji tetap mulus 120 FPS tanpa frame drop.
+  - **Horizontal Swipe Emoji Navigation & Sticker Button Contrast Fix (Release v1.0.68)**:
+    1. **Navigasi Geser Kiri-Kanan Kategori Emoji (SwipeableEmojiContainer)**:
+       - Pengguna kini dapat mengusap/menggeser layar emoji ke kiri atau kanan untuk berpindah antar kategori secara instan tanpa harus mengetuk ikon tab satu per satu.
+       - Dilengkapi animasi geser mulus (*slide transition* 160ms dengan `DecelerateInterpolator`) dan getaran haptic Taptic Engine.
+       - Bilah tab di bagian atas otomatis bergulir (*smooth auto-scroll*) agar kategori aktif selalu berada tepat di tengah layar.
+    2. **Perbaikan Kontras Tombol Upload Stiker (activity_sticker_upload)**:
+       - Mengganti tombol default yang tertimpa tint background MaterialButton menjadi `AppCompatButton` dengan kontras tinggi.
+       - Tombol "📁 Pilih Gambar dari Galeri" kini tampil tegas berlatar iOS Blue (`btn_apple_action`) dengan teks putih solid (`#FFFFFF`).
+       - Tombol "✓ Simpan Jadi Stiker WebP" menggunakan latar Apple Green segar (`btn_apple_action_green`) dengan teks putih solid.

@@ -65,6 +65,73 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
+    class SwipeableEmojiContainer(context: Context) : FrameLayout(context) {
+        var onSwipeLeft: (() -> Unit)? = null
+        var onSwipeRight: (() -> Unit)? = null
+
+        private var startX = 0f
+        private var startY = 0f
+        private var isHorizontalSwipe = false
+        private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop * 1.2f
+        private val minSwipeDistance = 35 * resources.displayMetrics.density
+
+        override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    startX = ev.x
+                    startY = ev.y
+                    isHorizontalSwipe = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.x - startX
+                    val dy = ev.y - startY
+                    if (Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy) * 1.35f) {
+                        isHorizontalSwipe = true
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        return true
+                    }
+                }
+            }
+            return super.onInterceptTouchEvent(ev)
+        }
+
+        override fun onTouchEvent(ev: MotionEvent): Boolean {
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.x - startX
+                    val dy = ev.y - startY
+                    if (Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy) * 1.35f) {
+                        isHorizontalSwipe = true
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    val dx = ev.x - startX
+                    val dy = ev.y - startY
+                    if (isHorizontalSwipe && Math.abs(dx) >= minSwipeDistance && Math.abs(dx) > Math.abs(dy) * 1.2f) {
+                        try {
+                            performHapticFeedback(
+                                android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                            )
+                        } catch (_: Throwable) {}
+                        if (dx < 0) {
+                            onSwipeLeft?.invoke()
+                        } else {
+                            onSwipeRight?.invoke()
+                        }
+                        isHorizontalSwipe = false
+                        return true
+                    }
+                    isHorizontalSwipe = false
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    isHorizontalSwipe = false
+                }
+            }
+            return true
+        }
+    }
+
     private val letterKeyViews = mutableListOf<Pair<TextView, String>>()
     private var shiftButtonRef: ImageButton? = null
     private var returnButtonRef: ReturnButtonLayout? = null
@@ -1050,6 +1117,10 @@ class KeyboardLayout(private val context: Context) {
             Pair("ADD_STICKER", "➕")
         )
 
+        val contentTabKeys = listOf(
+            "ANIMATED", "Smileys", "People", "Animals", "Food", "Activity", "Travel", "Objects", "Symbols", "Flags", "STICKERS"
+        )
+
         var activeCat = "ANIMATED"
         val tabViews = mutableMapOf<String, TextView>()
 
@@ -1068,15 +1139,45 @@ class KeyboardLayout(private val context: Context) {
             setPadding(dp(6), 0, dp(6), 0)
         }
 
-        val contentContainer = FrameLayout(context).apply {
+        var switchToCategoryRef: ((String, Int) -> Unit)? = null
+
+        val contentContainer = SwipeableEmojiContainer(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1.0f
             )
+            onSwipeLeft = {
+                val currentIndex = contentTabKeys.indexOf(activeCat)
+                if (currentIndex in 0 until contentTabKeys.size - 1) {
+                    val nextCat = contentTabKeys[currentIndex + 1]
+                    switchToCategoryRef?.invoke(nextCat, 1)
+                }
+            }
+            onSwipeRight = {
+                val currentIndex = contentTabKeys.indexOf(activeCat)
+                if (currentIndex > 0) {
+                    val prevCat = contentTabKeys[currentIndex - 1]
+                    switchToCategoryRef?.invoke(prevCat, -1)
+                }
+            }
         }
 
-        fun renderContent(selectedCategory: String) {
+        fun applySlideTransition(view: View, direction: Int) {
+            if (direction != 0) {
+                val startX = if (direction > 0) dp(80).toFloat() else -dp(80).toFloat()
+                view.translationX = startX
+                view.alpha = 0.45f
+                view.animate()
+                    .translationX(0f)
+                    .alpha(1.0f)
+                    .setDuration(160L)
+                    .setInterpolator(DecelerateInterpolator())
+                    .start()
+            }
+        }
+
+        fun renderContent(selectedCategory: String, direction: Int = 0) {
             contentContainer.removeAllViews()
 
             if (selectedCategory == "ANIMATED") {
@@ -1221,6 +1322,7 @@ class KeyboardLayout(private val context: Context) {
 
                 scroll.addView(layout)
                 contentContainer.addView(scroll)
+                applySlideTransition(scroll, direction)
             } else if (selectedCategory == "STICKERS") {
                 // Render WhatsApp Stickers Grid
                 val stickerManager = com.maoneart.ioskeyboard.sticker.StickerManager(context)
@@ -1350,6 +1452,7 @@ class KeyboardLayout(private val context: Context) {
 
                 scroll.addView(layout)
                 contentContainer.addView(scroll)
+                applySlideTransition(scroll, direction)
             } else {
                 // Render Emojis for selected category
                 val scroll = ScrollView(context).apply {
@@ -1470,6 +1573,7 @@ class KeyboardLayout(private val context: Context) {
 
                 scroll.addView(layout)
                 contentContainer.addView(scroll)
+                applySlideTransition(scroll, direction)
             }
         }
 
@@ -1490,6 +1594,21 @@ class KeyboardLayout(private val context: Context) {
                 }
             }
         }
+
+        fun switchToCategory(newCat: String, direction: Int = 0) {
+            if (newCat == activeCat && direction == 0) return
+            activeCat = newCat
+            updateTabStyles()
+            renderContent(activeCat, direction)
+
+            tabViews[newCat]?.let { tabBtn ->
+                tabsScroll.post {
+                    val scrollX = tabBtn.left - (tabsScroll.width / 2) + (tabBtn.width / 2)
+                    tabsScroll.smoothScrollTo(scrollX.coerceAtLeast(0), 0)
+                }
+            }
+        }
+        switchToCategoryRef = { cat, dir -> switchToCategory(cat, dir) }
 
         // Build Tab Buttons
         for ((catKey, catLabel) in tabCategories) {
@@ -1520,9 +1639,10 @@ class KeyboardLayout(private val context: Context) {
                     if (catKey == "ADD_STICKER") {
                         onAddStickerAction()
                     } else {
-                        activeCat = catKey
-                        updateTabStyles()
-                        renderContent(activeCat)
+                        val oldIdx = contentTabKeys.indexOf(activeCat)
+                        val newIdx = contentTabKeys.indexOf(catKey)
+                        val dir = if (newIdx > oldIdx) 1 else if (newIdx < oldIdx) -1 else 0
+                        switchToCategory(catKey, dir)
                     }
                 }
             }
@@ -1535,7 +1655,7 @@ class KeyboardLayout(private val context: Context) {
 
         // Initial content render
         updateTabStyles()
-        renderContent(activeCat)
+        renderContent(activeCat, 0)
 
         mainLayout.addView(contentContainer)
 
