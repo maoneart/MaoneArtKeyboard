@@ -3,12 +3,14 @@ package com.maoneart.ioskeyboard.audio
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.SoundPool
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
 import android.view.View
+import com.maoneart.ioskeyboard.R
 import com.maoneart.ioskeyboard.preferences.KeyboardPreferences
 
 class AudioHapticManager(private val context: Context, private val prefs: KeyboardPreferences) {
@@ -16,16 +18,50 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
     var activeRootView: View? = null
     private val asyncExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
 
-    fun destroy() {
-        try {
-            asyncExecutor.shutdownNow()
-        } catch (_: Throwable) {}
-    }
-
     private val audioManager = try {
         context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     } catch (_: Throwable) {
         null
+    }
+
+    private var soundPool: SoundPool? = null
+    private var soundStandardId: Int = 0
+    private var soundSpacebarId: Int = 0
+    private var soundDeleteId: Int = 0
+    private var soundReturnId: Int = 0
+
+    init {
+        initSoundPool()
+    }
+
+    private fun initSoundPool() {
+        try {
+            val attrs = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                .setLegacyStreamType(AudioManager.STREAM_SYSTEM)
+                .build()
+
+            soundPool = SoundPool.Builder()
+                .setMaxStreams(8)
+                .setAudioAttributes(attrs)
+                .build()
+
+            soundPool?.let { sp ->
+                soundStandardId = sp.load(context, R.raw.keypress_standard, 1)
+                soundSpacebarId = sp.load(context, R.raw.keypress_spacebar, 1)
+                soundDeleteId = sp.load(context, R.raw.keypress_delete, 1)
+                soundReturnId = sp.load(context, R.raw.keypress_return, 1)
+            }
+        } catch (_: Throwable) {}
+    }
+
+    fun destroy() {
+        try {
+            soundPool?.release()
+            soundPool = null
+            asyncExecutor.shutdownNow()
+        } catch (_: Throwable) {}
     }
 
     private val vibrator: Vibrator? = try {
@@ -51,22 +87,33 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
                 return
             }
 
-            // Sync 100% with Android System Volume (STREAM_SYSTEM)
+            // Sync 100% dynamically with Android System Volume (STREAM_SYSTEM)
             val sysVol = am.getStreamVolume(AudioManager.STREAM_SYSTEM)
             val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
             if (sysVol <= 0) return // muted in system
 
-            // Ratio of current system volume (0.0 .. 1.0) scaled dynamically
-            val systemRatio = if (maxVol > 0) sysVol.toFloat() / maxVol.toFloat() else 1.0f
-            val finalVolume = (systemRatio * prefs.soundVolume.coerceIn(0.05f, 1.0f)).coerceIn(0.01f, 1.0f)
+            // Current ratio of system volume (0.0 .. 1.0)
+            val systemRatio = if (maxVol > 0) (sysVol.toFloat() / maxVol.toFloat()) else 1.0f
+            // Scaled dynamically by system ratio and user preference
+            val finalVolume = (systemRatio * prefs.soundVolume.coerceIn(0.1f, 1.0f)).coerceIn(0.01f, 1.0f)
 
-            if (!asyncExecutor.isShutdown && !asyncExecutor.isTerminated) {
-                asyncExecutor.execute {
-                    try {
-                        am.playSoundEffect(effectType, finalVolume)
-                    } catch (_: Throwable) {
+            val sp = soundPool
+            val soundId = when (effectType) {
+                AudioManager.FX_KEYPRESS_SPACEBAR -> soundSpacebarId
+                AudioManager.FX_KEYPRESS_DELETE -> soundDeleteId
+                AudioManager.FX_KEYPRESS_RETURN -> soundReturnId
+                else -> soundStandardId
+            }
+
+            if (sp != null && soundId > 0) {
+                // SoundPool on STREAM_SYSTEM: Hardware audio mixer directly responds to system volume changes!
+                sp.play(soundId, finalVolume, finalVolume, 1, 0, 1.0f)
+            } else {
+                // Fallback to AudioManager if SoundPool is not yet ready
+                if (!asyncExecutor.isShutdown && !asyncExecutor.isTerminated) {
+                    asyncExecutor.execute {
                         try {
-                            am.playSoundEffect(effectType)
+                            am.playSoundEffect(effectType, finalVolume)
                         } catch (_: Throwable) {
                             try {
                                 val target = view ?: activeRootView

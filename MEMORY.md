@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.83 / build 83)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.84 / build 84)
 
 ---
 
@@ -533,4 +533,13 @@
        - Kolom input pencarian di laci pemilih aplikasi (`Mode.APP_PICKER`) telah dicopot tuntas agar tidak memotong ruang vertikal dan karena keyboard sedang dalam mode laci aplikasi (tidak bisa mengetik teks pencarian). Ruang daftar aplikasi kini jauh lebih luas, leluasa di-scroll, dan rapi.
     4. **Kalibrasi Suara Dinamis Murni `STREAM_SYSTEM`**:
        - Volume klik ketikan tuts dikalibrasi rasio 1:1 langsung terhadap `STREAM_SYSTEM` tanpa batas bawah kaku, menghasilkan dinamika suara yang akurat saat tombol volume fisik HP dinaikkan atau diturunkan.
+  - **Koreksi Tema One Piece (Tombol Referensi Bajak Laut Solid) & SoundPool System Stream (Release v1.0.84)**:
+    1. **Koreksi Tema One Piece: Gambar Referensi Murni Desain Tuts, Bukan Wallpaper**:
+       - *Root Cause*: Sebelumnya seluruh gambar referensi One Piece dimuat sebagai wallpaper background keyboard sehingga bertumpuk dengan tuts dan silau.
+       - *Solusi Sesuai Permintaan User*: Menghapus wallpaper gambar anime background. Latar belakang keyboard kini menggunakan balok kayu kapal mahoni bajak laut gelap pekat (`#170B06` / `#261108`) yang bersih dan elegan.
+       - *Tuts Solid Berkualitas Tinggi*: Tuts huruf/QWERTY kini berupa kartu perkamen peta harta karun solid bertekstur hangat dengan border perunggu kuno, paku rivet baut di 4 sudut, shadow bawah 3D, serta teks huruf cokelat pekat bajak laut (`#1A0C05`) yang tajam dan kontras. Tuts fungsi (123, Shift, Backspace, Numpad) memakai pelat besi kapal berkarat dengan aksen emas cerah (`#FFE082`).
+    2. **Solusi Mutlak Suara Ketikan Tidak Mandiri (Native SoundPool STREAM_SYSTEM)**:
+       - *Root Cause Masalah "Volume Ketik Masih Mandiri"*: Method lama `am.playSoundEffect()` di banyak Android OS (khususnya Samsung One UI / Xiaomi) memutar efek suara sistem dengan volume internal yang terkunci (fixed touch sounds), mengabaikan slider volume fisik pengguna.
+       - *Solusi*: Mengganti total engine audio menggunakan **`SoundPool`** native Android yang di-bind langsung ke `AudioManager.STREAM_SYSTEM` dengan 4 asset audio ogg otentik (`keypress_standard.ogg`, `keypress_spacebar.ogg`, `keypress_delete.ogg`, `keypress_return.ogg` di `res/raw/`).
+       - Volume playback di-scale secara presisi mengikuti rasio `sysVol / maxVol` dari `STREAM_SYSTEM`. Ketika pengguna menaikkan volume sistem di HP, suara ketukan keyboard otomatis ikut mengeras; ketika dikecilkan, otomatis ikut mengecil; ketika di-mute atau silent mode, senyap seketika. 100% sinkron dan tidak mandiri lagi.
 

@@ -537,10 +537,11 @@ class IosInputMethodService : InputMethodService() {
             }
 
             if (isOnePiece) {
-                keyboardRoot?.setBackgroundResource(R.drawable.theme_onepiece_bg)
+                // Background keyboard bersih kayu kapal mahoni bajak laut gelap (BUKAN wallpaper gambar anime)
+                keyboardRoot?.setBackgroundColor(Color.parseColor("#170B06"))
                 keyboardRoot?.minimumHeight = 0
-                topToolbar?.setBackgroundColor(Color.parseColor("#EB2A0E06"))
-                translatePanel?.setBackgroundColor(Color.parseColor("#F02A0E06"))
+                topToolbar?.setBackgroundColor(Color.parseColor("#261108"))
+                translatePanel?.setBackgroundColor(Color.parseColor("#2A140A"))
                 tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_onepiece)
                 tvTranslateInputBox?.setTextColor(textColor)
             } else if (isWoody) {
