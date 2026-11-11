@@ -483,7 +483,11 @@ class KeyboardLayout(private val context: Context) {
 
         // Space Button with Spacebar Trackpad Mode
         val langLabel = if (activeLanguage == "en") "space" else "spasi"
-        val spaceWeight = if (isDictationEnabled) 4.45f else 5.4f
+        val spaceWeight = if (isLandscape) {
+            if (isDictationEnabled) 3.6f else 4.6f
+        } else {
+            if (isDictationEnabled) 4.45f else 5.4f
+        }
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
@@ -824,7 +828,11 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnEmoji)
 
-        val spaceWeight = if (isDictationEnabled) 4.45f else 5.4f
+        val spaceWeight = if (isLandscape) {
+            if (isDictationEnabled) 3.6f else 4.6f
+        } else {
+            if (isDictationEnabled) 4.45f else 5.4f
+        }
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
@@ -929,7 +937,7 @@ class KeyboardLayout(private val context: Context) {
                 val tvDigit = TextView(context).apply {
                     text = digit
                     setTextColor(textColor)
-                    textSize = if (isLandscape) 21f else 23f
+                    textSize = if (isLandscape) 20f else 23f
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     gravity = Gravity.CENTER
                     includeFontPadding = false
@@ -2357,7 +2365,7 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, keyBg)
             text = label
             setTextColor(textColor)
-            textSize = if (isLandscape) 21f else 22f
+            textSize = if (isLandscape) 20f else 22f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false

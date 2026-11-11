@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.77)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.78)
 
 ---
 
@@ -470,3 +470,10 @@
        - Mengganti variabel tunggal `activeFallbackView` dengan thread-safe Set `activeFallbackViews` + watchdog release 180ms per fallback view. Pengetikan cepat dua jempol di celah/margin tidak akan pernah meninggalkan tuts dalam keadaan mendem.
     4. **Global Safety Lifecycle Reset (`resetAllPressedStates`)**:
        - Ditambahkan metode `layoutEngine.resetAllPressedStates()` yang otomatis menyapu bersih seluruh tuts menjadi `isPressed = false` saat `onStartInputView`, `onFinishInputView`, `onWindowHidden`, dan `onConfigurationChanged`. Tuts dipastikan selalu dalam kondisi netral sempurna setiap kali keyboard dibuka, ditutup, atau diputar.
+  - **Resolusi Termux Landscape Flicker Loop & Normalisasi Insets / Spas Bawah WA (Release v1.0.78)**:
+    1. **Eliminasi Total Flicker Loop di Termux ("Keluar-Close Terus")**:
+       - *Root Cause*: Tinggi keyboard 190dp + toolbar 38dp (228dp) di layar landscape (tinggi fisik 384dp) menyisakan ruang terminal terlalu sempit (< 90dp bersama toolbar extra keys Termux). TerminalView Termux mendeteksi baris terminal < 4 baris sehingga otomatis memicu event hide soft input yang memperluas layar, lalu memicu re-focus request soft input lagi, menciptakan loop buka-tutup tak berujung ("kluar close terus"). Ditambah override `onConfigureWindow` yang memaksakan `WRAP_CONTENT` mengacaukan siklus window Android IME.
+       - *Solusi*: Menghapus `onConfigureWindow` dan memangkas tinggi kontainer landscape ke **155dp** + toolbar **34dp** (total **189dp**). Menyisakan 195dp (> 50% layar) ruang bebas sehingga Termux leluasa menampilkan 9–10 baris teks terminal tanpa pernah memicu auto-dismiss loop.
+    2. **Normalisasi Insets & Spas Bawah di WhatsApp**:
+       - *Root Cause*: `onConfigureWindow` yang memaksa `win.setLayout(MATCH_PARENT, WRAP_CONTENT)` dan `win.setGravity(Gravity.BOTTOM)` mengacaukan perhitungan `InputMethodManagerService` dan Samsung navigation insets, menyebabkan WhatsApp menyisipkan spacer kosong raksasa di bawah keyboard ("kegedan spas bawahnya"). Serta bobot space bar (`spaceWeight`) di layar landscape terlalu lebar.
+       - *Solusi*: Menghapus `onConfigureWindow` dan menghapus `layout_gravity="bottom"` serta `gravity="bottom"` dari `keyboardRoot`. Keyboard kembali ke sistem insets native Android yang rapat dan presisi di atas navigation bar. Bobot tuts spasi landscape dikalibrasi proporsional (`3.6f` / `4.5f`) dengan padding samping `44dp` dan font tuts `20sp`.
