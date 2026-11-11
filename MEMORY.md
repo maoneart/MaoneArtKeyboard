@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.79)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.80)
 
 ---
 
@@ -488,3 +488,17 @@
     3. **Ergonomi iPad Row 4 Landscape & Kalibrasi Spasi Bawah WhatsApp**:
        - *Root Cause*: Row 4 sebelumnya hanya diisi 4 tombol sehingga tuts spasi melebar raksasa hingga 50% layar (~400dp di landscape), terasa sangat canggung dan berjarak jauh.
        - *Solusi*: Mengadopsi tata letak ergonomi iPad Pro pada mode landscape: menambahkan tombol koma `,` di sebelah kiri spasi, titik `.` di sebelah kanan spasi, dan tombol sembunyikan keyboard (`ACTION_HIDE_KEYBOARD`) di pojok kanan bawah. Bobot spasi landscape dipangkas menjadi **2.5f** (hanya ~24% layar, pas dan proporsional di tengah), serta bobot spasi portrait diturunkan dari 5.4f menjadi **3.6f–4.4f**. Baris bawah di WhatsApp kini sangat seimbang, proporsional, dan tuts tanda baca koma & titik dapat langsung ditekan tanpa berpindah ke mode 123.
+  - **Laci Pintasan Aplikasi di Dalam Keyboard, Bilah Koreksi Super Lega & Solusi Drop Termux Landscape (Release v1.0.80)**:
+    1. **Bilah Koreksi / Rekomendasi Kata Super Lega & Bebas Sempit**:
+       - *Pembersihan Toolbar*: Tombol Settings dan Tombol Hide Keyboard dihapus sepenuhnya dari toolbar atas.
+       - Toolbar kini hanya berisi 3 ikon esensial (`btnQuickTranslate`, `btnQuickClipboard`, `btnQuickApps`) di kiri, badge bahasa di kanan, dan deretan 3 slot rekomendasi kata (`candidatesRow`) di tengah dengan ruang horizontal yang super luas, lega, dan nyaman dibaca.
+       - Tombol hide keyboard di Row 4 landscape juga dihilangkan sesuai permintaan user karena navigasi Android sudah memiliki tombol back bawaan.
+    2. **Laci Pintasan Aplikasi di Dalam Keyboard (App Launcher Drawer)**:
+       - Ketika tombol pintasan aplikasi (`btnQuickApps`) di toolbar diklik, keyboard bertransisi rapi menyembunyikan tuts huruf/angka dan menampilkan **Laci Pintasan Aplikasi iOS** di dalam wadah keyboard (`Mode.APP_SHORTCUTS`).
+       - Header laci menyediakan tombol `⚙️ Setting` (akses instan ke Pengaturan Keyboard), tombol `➕ Tambah` (membuka pemilih seluruh aplikasi terinstall `Mode.APP_PICKER`), dan tombol `✕` untuk kembali ke tuts QWERTY.
+       - Ikon aplikasi tersusun rapi dalam grid responsif (4 kolom di portrait, 6 kolom di landscape) lengkap dengan ikon resmi dan nama aplikasi. Sekali ketuk langsung meluncurkan aplikasi pilihan.
+       - Pengguna dapat bebas mencentang/menambah aplikasi apa saja yang terinstall di perangkat melalui laci pemilih aplikasi (`Mode.APP_PICKER`).
+    3. **Solusi Mutlak Termux Landscape Drop / Turun Sendiri & Spasi Bawah WA**:
+       - *Root Cause Termux Drop*: Override `onComputeInsets` menyetel `contentTopInsets = top` (0), yang menyebabkan sistem melaporkan insets 100% layar ke Termux. TerminalView Termux mendeteksi 0 tinggi ruang terminal sehingga langsung memanggil `KeyboardUtils.hideSoftKeyboard()` (drop/tutup setelah 160ms). Selain itu, delayed runnable sync clipboard (120ms/350ms) menginterupsi fokus jendela terminal.
+       - *Root Cause Spasi Bawah WhatsApp Lebar*: WhatsApp menerima insets `contentTopInsets = 0` sehingga mendorong chat ke atas dan menyisakan ruang kosong besar di bagian bawah.
+       - *Solusi Tuntas*: Menghapus override kustom `onComputeInsets` (membiarkan framework AOSP mengukur insets akurat secara native), serta membypass runnable clipboard delayed fetch dan kalkulasi saran kata saat `isTerminalOrRawInput()` aktif. Termux landscape kini 100% stabil, tidak pernah drop atau menutup sendiri, dan bagian bawah WhatsApp kembali rapat presisi tanpa rongga kosong.

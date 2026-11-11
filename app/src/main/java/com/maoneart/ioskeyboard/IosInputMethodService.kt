@@ -52,6 +52,7 @@ class IosInputMethodService : InputMethodService() {
         SYMBOLS_MORE,
         EMOJI,
         CLIPBOARD,
+        APP_SHORTCUTS,
         APP_PICKER
     }
 
@@ -95,8 +96,6 @@ class IosInputMethodService : InputMethodService() {
     private var candidate3: TextView? = null
     private var badgeLanguage: TextView? = null
     private var btnQuickApps: ImageButton? = null
-    private var appShortcutsBar: HorizontalScrollView? = null
-    private var layoutAppShortcuts: LinearLayout? = null
 
     // Translate Panel Views
     private var translatePanel: LinearLayout? = null
@@ -174,10 +173,8 @@ class IosInputMethodService : InputMethodService() {
             candidate3 = view.findViewById(R.id.candidate3)
             badgeLanguage = view.findViewById(R.id.badgeLanguage)
 
-            // Setup App Shortcuts
+            // Setup App Shortcuts Button
             btnQuickApps = view.findViewById<ImageButton>(R.id.btnQuickApps)
-            appShortcutsBar = view.findViewById<HorizontalScrollView>(R.id.appShortcutsBar)
-            layoutAppShortcuts = view.findViewById<LinearLayout>(R.id.layoutAppShortcuts)
 
             // Setup Translate Panel
             translatePanel = view.findViewById(R.id.translatePanel)
@@ -209,26 +206,15 @@ class IosInputMethodService : InputMethodService() {
 
             val btnQuickTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnQuickClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
-            val btnQuickSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
-            val btnHideKeyboard = view.findViewById<ImageButton>(R.id.btnHideKeyboard)
 
             btnQuickApps?.setOnClickListener {
                 audioHaptic.playClickSound(it)
                 audioHaptic.triggerHapticFeedback(it)
-                toggleAppShortcutsBar()
-            }
-
-            btnQuickApps?.setOnLongClickListener {
-                audioHaptic.playClickSound(it)
-                audioHaptic.triggerHapticFeedback(it)
-                switchMode(Mode.APP_PICKER)
-                true
-            }
-
-            btnHideKeyboard?.setOnClickListener {
-                audioHaptic.playClickSound(it)
-                audioHaptic.triggerHapticFeedback(it)
-                requestHideSelf(0)
+                if (currentMode == Mode.APP_SHORTCUTS) {
+                    switchMode(Mode.QWERTY)
+                } else {
+                    switchMode(Mode.APP_SHORTCUTS)
+                }
             }
 
             btnQuickTranslate?.setOnClickListener {
@@ -245,17 +231,6 @@ class IosInputMethodService : InputMethodService() {
                 } else {
                     switchMode(Mode.CLIPBOARD)
                 }
-            }
-
-            btnQuickSettings?.setOnClickListener {
-                audioHaptic.playClickSound(it)
-                audioHaptic.triggerHapticFeedback(it)
-                try {
-                    val intent = Intent(this, SettingsActivity::class.java).apply {
-                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                    }
-                    startActivity(intent)
-                } catch (_: Throwable) {}
             }
 
             badgeLanguage?.setOnClickListener {
@@ -301,11 +276,6 @@ class IosInputMethodService : InputMethodService() {
 
             updateLanguageBadge()
             updateTranslatePanelUI()
-            if (prefs.isAppShortcutsBarActive) {
-                appShortcutsBar?.visibility = View.VISIBLE
-                candidatesRow?.visibility = View.GONE
-                renderAppShortcutsBar()
-            }
             applyThemeStyling(view)
             adjustLayoutForOrientation(resources.configuration.orientation)
             renderCurrentLayout()
@@ -329,19 +299,6 @@ class IosInputMethodService : InputMethodService() {
 
     override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
         return true
-    }
-
-    override fun onComputeInsets(outInsets: InputMethodService.Insets) {
-        super.onComputeInsets(outInsets)
-        try {
-            val root = rootView ?: return
-            val loc = IntArray(2)
-            root.getLocationInWindow(loc)
-            val top = loc[1]
-            outInsets.contentTopInsets = top
-            outInsets.visibleTopInsets = top
-            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT
-        } catch (_: Throwable) {}
     }
 
     override fun updateFullscreenMode() {
@@ -380,9 +337,7 @@ class IosInputMethodService : InputMethodService() {
                 listOf(
                     R.id.btnQuickTranslate,
                     R.id.btnQuickClipboard,
-                    R.id.btnQuickApps,
-                    R.id.btnQuickSettings,
-                    R.id.btnHideKeyboard
+                    R.id.btnQuickApps
                 ).forEach { id ->
                     val btn = toolbar.findViewById<ImageButton>(id)
                     btn?.layoutParams?.let { lp ->
@@ -439,24 +394,27 @@ class IosInputMethodService : InputMethodService() {
             }
 
             // Android 10-15 Clipboard Focus Sync: fetch immediately + after window focus settles (120ms & 350ms)
-            clipboardManager.fetchCurrentClip()
-            suggestionHandler.postDelayed({
+            if (isTerminalOrRawInput()) {
+                candidate1?.text = ""
+                candidate2?.text = ""
+                candidate3?.text = ""
+            } else {
                 clipboardManager.fetchCurrentClip()
-                updateSuggestions(immediate = true)
-            }, 120L)
-            suggestionHandler.postDelayed({
-                clipboardManager.fetchCurrentClip()
-            }, 350L)
+                suggestionHandler.postDelayed({
+                    clipboardManager.fetchCurrentClip()
+                    updateSuggestions(immediate = true)
+                }, 120L)
+                suggestionHandler.postDelayed({
+                    clipboardManager.fetchCurrentClip()
+                }, 350L)
+            }
 
             adjustLayoutForOrientation(resources.configuration.orientation)
-            updateSuggestions()
+            if (!isTerminalOrRawInput()) {
+                updateSuggestions()
+            }
             updateLanguageBadge()
             updateTranslatePanelUI()
-            if (prefs.isAppShortcutsBarActive) {
-                appShortcutsBar?.visibility = View.VISIBLE
-                candidatesRow?.visibility = View.GONE
-                renderAppShortcutsBar()
-            }
             rootView?.let { applyThemeStyling(it) }
 
             if (!isCapsLock) {
@@ -493,11 +451,13 @@ class IosInputMethodService : InputMethodService() {
         super.onWindowShown()
         try {
             // Ensure Android 10+ clipboard is captured the exact moment IME window is shown & focused
-            clipboardManager.fetchCurrentClip()
-            suggestionHandler.postDelayed({
+            if (!isTerminalOrRawInput()) {
                 clipboardManager.fetchCurrentClip()
-                updateSuggestions(immediate = true)
-            }, 150L)
+                suggestionHandler.postDelayed({
+                    clipboardManager.fetchCurrentClip()
+                    updateSuggestions(immediate = true)
+                }, 150L)
+            }
         } catch (_: Throwable) {}
     }
 
@@ -593,15 +553,14 @@ class IosInputMethodService : InputMethodService() {
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnApps = view.findViewById<ImageButton>(R.id.btnQuickApps)
-            val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
-            val btnHide = view.findViewById<ImageButton>(R.id.btnHideKeyboard)
 
-            val isAppsActive = (appShortcutsBar?.visibility == View.VISIBLE)
-            btnTranslate?.setColorFilter(iconTint)
-            btnClipboard?.setColorFilter(iconTint)
+            val isAppsActive = (currentMode == Mode.APP_SHORTCUTS || currentMode == Mode.APP_PICKER)
+            val isClipboardActive = (currentMode == Mode.CLIPBOARD)
+            val isTranslateActive = isTranslatePanelOpen
+
+            btnTranslate?.setColorFilter(if (isTranslateActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
+            btnClipboard?.setColorFilter(if (isClipboardActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
             btnApps?.setColorFilter(if (isAppsActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
-            btnSettings?.setColorFilter(iconTint)
-            btnHide?.setColorFilter(iconTint)
             badgeLanguage?.setTextColor(iconTint)
         } catch (_: Throwable) {}
     }
@@ -638,134 +597,6 @@ class IosInputMethodService : InputMethodService() {
         updateTranslatePanelUI()
     }
 
-    private fun toggleAppShortcutsBar() {
-        val bar = appShortcutsBar ?: return
-        val cRow = candidatesRow ?: return
-        val isVisible = (bar.visibility == View.VISIBLE)
-
-        if (isVisible) {
-            bar.visibility = View.GONE
-            cRow.visibility = View.VISIBLE
-            prefs.isAppShortcutsBarActive = false
-            rootView?.let { applyThemeStyling(it) }
-        } else {
-            bar.visibility = View.VISIBLE
-            cRow.visibility = View.GONE
-            prefs.isAppShortcutsBarActive = true
-            btnQuickApps?.setColorFilter(ContextCompat.getColor(this, R.color.ios_blue))
-            renderAppShortcutsBar()
-        }
-    }
-
-    private fun renderAppShortcutsBar() {
-        val container = layoutAppShortcuts ?: return
-        container.removeAllViews()
-
-        val shortcuts = prefs.getAppShortcuts()
-        val pm = packageManager
-        val isDark = isDarkMode()
-        val isLandscape = (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
-        val isWoody = (prefs.themeMode == "woody")
-
-        val pillBg = when {
-            isWoody -> R.drawable.key_bg_woody
-            isDark -> R.drawable.key_bg_ios_dark
-            else -> R.drawable.key_bg_ios_light
-        }
-        val textColor = when {
-            isWoody -> Color.parseColor("#FFF3E0")
-            isDark -> Color.WHITE
-            else -> Color.BLACK
-        }
-
-        for (pkg in shortcuts) {
-            try {
-                val appInfo = pm.getApplicationInfo(pkg, 0)
-                val label = pm.getApplicationLabel(appInfo).toString()
-                val icon = pm.getApplicationIcon(appInfo)
-
-                val pill = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        dp(if (isLandscape) 26 else 32)
-                    ).apply { setMargins(dp(3), 0, dp(3), 0) }
-                    background = ContextCompat.getDrawable(this@IosInputMethodService, pillBg)
-                    setPadding(dp(7), 0, dp(9), 0)
-                    isClickable = true
-                    isFocusable = false
-                    setOnClickListener {
-                        audioHaptic.playClickSound(it)
-                        audioHaptic.triggerHapticFeedback(it)
-                        try {
-                            val intent = pm.getLaunchIntentForPackage(pkg)?.apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            if (intent != null) {
-                                startActivity(intent)
-                            }
-                        } catch (t: Throwable) {
-                            Log.e("IosInputMethodService", "Failed to launch $pkg", t)
-                        }
-                    }
-                }
-
-                val iv = android.widget.ImageView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(if (isLandscape) 18 else 20), dp(if (isLandscape) 18 else 20))
-                    setImageDrawable(icon)
-                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                }
-                pill.addView(iv)
-
-                val tv = TextView(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { setMargins(dp(5), 0, 0, 0) }
-                    text = label
-                    setTextColor(textColor)
-                    textSize = if (isLandscape) 10.5f else 11.5f
-                    setTypeface(typeface, android.graphics.Typeface.BOLD)
-                    maxLines = 1
-                }
-                pill.addView(tv)
-
-                container.addView(pill)
-            } catch (_: Throwable) {
-                // If app not installed or lookup fails, skip silently
-            }
-        }
-
-        // Add Button ("➕ Tambah")
-        val addBtn = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(if (isLandscape) 26 else 32)
-            ).apply { setMargins(dp(3), 0, dp(3), 0) }
-            background = ContextCompat.getDrawable(this@IosInputMethodService, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
-            setPadding(dp(8), 0, dp(8), 0)
-            isClickable = true
-            isFocusable = false
-            setOnClickListener {
-                audioHaptic.playClickSound(it)
-                audioHaptic.triggerHapticFeedback(it)
-                switchMode(Mode.APP_PICKER)
-            }
-        }
-
-        val addTv = TextView(this).apply {
-            text = "➕ Tambah"
-            setTextColor(ContextCompat.getColor(this@IosInputMethodService, R.color.ios_blue))
-            textSize = if (isLandscape) 10.5f else 11.5f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-        }
-        addBtn.addView(addTv)
-        container.addView(addBtn)
-    }
-
     private fun getInstalledLauncherApps(): List<KeyboardLayout.AppShortcutItem> {
         return try {
             val pm = packageManager
@@ -794,7 +625,6 @@ class IosInputMethodService : InputMethodService() {
         }
         prefs.saveAppShortcuts(current)
         renderCurrentLayout()
-        renderAppShortcutsBar()
     }
 
     // Render movable iOS blue cursor ('│') in Translate Input Box
@@ -993,6 +823,7 @@ class IosInputMethodService : InputMethodService() {
 
     private fun switchMode(mode: Mode) {
         currentMode = mode
+        rootView?.let { applyThemeStyling(it) }
         renderCurrentLayout()
     }
 
@@ -1093,6 +924,58 @@ class IosInputMethodService : InputMethodService() {
                     },
                     onCloseAction = { switchMode(Mode.QWERTY) }
                 )
+                Mode.APP_SHORTCUTS -> {
+                    val shortcuts = prefs.getAppShortcuts()
+                    val pm = packageManager
+                    val appItems = mutableListOf<KeyboardLayout.AppShortcutItem>()
+                    for (pkg in shortcuts) {
+                        try {
+                            val appInfo = pm.getApplicationInfo(pkg, 0)
+                            val label = pm.getApplicationLabel(appInfo).toString()
+                            val icon = pm.getApplicationIcon(appInfo)
+                            appItems.add(KeyboardLayout.AppShortcutItem(pkg, label, icon))
+                        } catch (_: Throwable) {}
+                    }
+                    layoutEngine.createAppShortcutsView(
+                        isDark = isDark,
+                        themeMode = prefs.themeMode,
+                        shortcuts = appItems,
+                        onLaunchApp = { pkg ->
+                            audioHaptic.playClickSound(null)
+                            audioHaptic.triggerHapticFeedback()
+                            try {
+                                val intent = packageManager.getLaunchIntentForPackage(pkg)?.apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                if (intent != null) {
+                                    startActivity(intent)
+                                }
+                            } catch (t: Throwable) {
+                                Log.e("IosInputMethodService", "Failed to launch $pkg", t)
+                            }
+                        },
+                        onOpenAppPicker = {
+                            audioHaptic.playClickSound(null)
+                            audioHaptic.triggerHapticFeedback()
+                            switchMode(Mode.APP_PICKER)
+                        },
+                        onOpenSettings = {
+                            audioHaptic.playClickSound(null)
+                            audioHaptic.triggerHapticFeedback()
+                            try {
+                                val intent = Intent(this, SettingsActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                }
+                                startActivity(intent)
+                            } catch (_: Throwable) {}
+                        },
+                        onCloseAction = {
+                            audioHaptic.playClickSound(null)
+                            audioHaptic.triggerHapticFeedback()
+                            switchMode(Mode.QWERTY)
+                        }
+                    )
+                }
                 Mode.APP_PICKER -> {
                     val installedApps = getInstalledLauncherApps()
                     val currentShortcuts = prefs.getAppShortcuts().toSet()
@@ -1104,7 +987,11 @@ class IosInputMethodService : InputMethodService() {
                         onToggleShortcut = { pkg ->
                             toggleAppShortcutPackage(pkg)
                         },
-                        onCloseAction = { switchMode(Mode.QWERTY) }
+                        onCloseAction = {
+                            audioHaptic.playClickSound(null)
+                            audioHaptic.triggerHapticFeedback()
+                            switchMode(Mode.APP_SHORTCUTS)
+                        }
                     )
                 }
             }

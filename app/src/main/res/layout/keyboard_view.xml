@@ -103,25 +103,6 @@
                 android:ellipsize="end" />
         </LinearLayout>
 
-        <!-- App Shortcuts Scroll Bar (Quick App Switcher) -->
-        <HorizontalScrollView
-            android:id="@+id/appShortcutsBar"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:scrollbars="none"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/layoutAppShortcuts"
-                android:layout_width="wrap_content"
-                android:layout_height="match_parent"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingStart="4dp"
-                android:paddingEnd="4dp" />
-        </HorizontalScrollView>
-
         <!-- Language Switch Badge (ID / EN) -->
         <TextView
             android:id="@+id/badgeLanguage"
@@ -135,24 +116,6 @@
             android:textColor="@color/ios_key_text_light"
             android:textSize="12sp"
             android:textStyle="bold" />
-
-        <!-- Settings Quick Button -->
-        <ImageButton
-            android:id="@+id/btnQuickSettings"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@drawable/btn_icon_ripple"
-            android:src="@drawable/ic_settings"
-            android:contentDescription="Settings" />
-
-        <!-- Hide Keyboard Quick Button (Mode Numpet) -->
-        <ImageButton
-            android:id="@+id/btnHideKeyboard"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@drawable/btn_icon_ripple"
-            android:src="@drawable/ic_keyboard_hide"
-            android:contentDescription="Hide Keyboard" />
     </LinearLayout>
 
     <!-- Apple Intelligence / iOS 18 Style Modern Glassmorphic Live Translate Panel -->
