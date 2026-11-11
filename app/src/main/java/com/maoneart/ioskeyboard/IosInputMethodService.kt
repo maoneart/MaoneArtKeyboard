@@ -537,11 +537,11 @@ class IosInputMethodService : InputMethodService() {
             }
 
             if (isOnePiece) {
-                // Background keyboard bersih kayu kapal mahoni bajak laut gelap (BUKAN wallpaper gambar anime)
-                keyboardRoot?.setBackgroundColor(Color.parseColor("#170B06"))
+                // Background One Piece asli murni dari gambar sampel (Luffy & Sunny)
+                keyboardRoot?.setBackgroundResource(R.drawable.theme_onepiece_bg)
                 keyboardRoot?.minimumHeight = 0
-                topToolbar?.setBackgroundColor(Color.parseColor("#261108"))
-                translatePanel?.setBackgroundColor(Color.parseColor("#2A140A"))
+                topToolbar?.setBackgroundColor(Color.parseColor("#E6261108"))
+                translatePanel?.setBackgroundColor(Color.parseColor("#F02A140A"))
                 tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_onepiece)
                 tvTranslateInputBox?.setTextColor(textColor)
             } else if (isWoody) {

@@ -141,6 +141,31 @@ class KeyboardLayout(private val context: Context) {
     private var popupController: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathContainerLayout? = null
     private var onKeyActionCallback: ((String) -> Unit)? = null
     private var predictedNextChars: Set<Char> = emptySet()
+    private var currentThemeMode: String = "auto"
+
+    private class CenteredIconDrawable(
+        private val icon: android.graphics.drawable.Drawable,
+        private val width: Int,
+        private val height: Int
+    ) : android.graphics.drawable.Drawable() {
+        override fun draw(canvas: android.graphics.Canvas) {
+            val b = bounds
+            val cx = b.exactCenterX()
+            val cy = b.exactCenterY()
+            val l = (cx - width / 2f).toInt()
+            val t = (cy - height / 2f).toInt()
+            icon.setBounds(l, t, l + width, t + height)
+            icon.draw(canvas)
+        }
+        override fun setAlpha(alpha: Int) {
+            icon.alpha = alpha
+        }
+        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
+            icon.colorFilter = colorFilter
+        }
+        @Suppress("DEPRECATION")
+        override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
+    }
 
     private val isLandscape: Boolean
         get() = context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
@@ -233,8 +258,16 @@ class KeyboardLayout(private val context: Context) {
 
     // Update letter cases in 0.1ms without rebuilding views
     fun updateShiftState(isShifted: Boolean) {
+        val isOnePiece = (currentThemeMode == "onepiece")
         for ((tv, baseChar) in letterKeyViews) {
-            tv.text = if (isShifted) baseChar.uppercase() else baseChar.lowercase()
+            val charLower = baseChar.lowercase()
+            val targetChar = if (isShifted) baseChar.uppercase() else charLower
+            tv.tag = targetChar
+            if (isOnePiece && (charLower == "o" || charLower == "x")) {
+                // Ikon helm kemudi & pedang bajak laut tetap terpasang, tag diperbarui untuk output
+            } else {
+                tv.text = targetChar
+            }
         }
     }
 
@@ -345,6 +378,7 @@ class KeyboardLayout(private val context: Context) {
         letterKeyViews.clear()
         cachedHitBoxes = emptyList()
         onKeyActionCallback = onKeyAction
+        currentThemeMode = themeMode
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -384,7 +418,7 @@ class KeyboardLayout(private val context: Context) {
             else -> R.drawable.key_bg_special_light
         }
         val textColor = when {
-            isOnePiece -> Color.parseColor("#1F130B")
+            isOnePiece -> Color.parseColor("#FFF2D6")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
@@ -396,7 +430,7 @@ class KeyboardLayout(private val context: Context) {
             else -> Color.BLACK
         }
         val secondaryTextColor = when {
-            isOnePiece -> Color.parseColor("#6D4C27")
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
@@ -441,7 +475,7 @@ class KeyboardLayout(private val context: Context) {
 
         for (ch in row3) {
             val label = if (isShifted) ch.uppercase() else ch
-            val keyBtn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction)
+            val keyBtn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction, baseChar = ch)
             letterKeyViews.add(Pair(keyBtn, ch))
             r3Layout.addView(keyBtn)
         }
@@ -523,19 +557,25 @@ class KeyboardLayout(private val context: Context) {
         }
 
         // Space Button with Spacebar Trackpad Mode
-        val langLabel = if (activeLanguage == "en") "space" else "spasi"
+        val langLabel = if (isOnePiece) "ONE PIECE" else (if (activeLanguage == "en") "space" else "spasi")
         val spaceWeight = if (isLandscape) {
             2.5f
         } else {
             if (isDictationEnabled) 3.6f else 4.4f
         }
+        val spaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, keyBg)
+            background = ContextCompat.getDrawable(context, spaceKeyBg)
             text = langLabel
-            setTextColor(secondaryTextColor)
-            textSize = 14f
+            setTextColor(if (isOnePiece) Color.parseColor("#FFE082") else secondaryTextColor)
+            textSize = if (isOnePiece) 14.5f else 14f
+            if (isOnePiece) {
+                setTypeface(typeface, Typeface.BOLD)
+                letterSpacing = 0.15f
+                setShadowLayer(dp(2).toFloat(), 0f, dp(1.5f).toFloat(), Color.parseColor("#CC100602"))
+            }
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
@@ -583,7 +623,7 @@ class KeyboardLayout(private val context: Context) {
         val btnReturn = ReturnButtonLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            showText("return", 15f, if (isOnePiece) Color.WHITE else textColor, specialKeyBg)
+            showText("return", 15f, if (isOnePiece) Color.parseColor("#FFE082") else textColor, specialKeyBg)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
@@ -737,6 +777,7 @@ class KeyboardLayout(private val context: Context) {
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int, Boolean) -> Unit = { _, _, _ -> }
     ): View {
+        currentThemeMode = themeMode
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = FrameLayout.LayoutParams(
@@ -785,7 +826,7 @@ class KeyboardLayout(private val context: Context) {
             else -> R.drawable.key_bg_special_light
         }
         val textColor = when {
-            isOnePiece -> Color.parseColor("#1F130B")
+            isOnePiece -> Color.parseColor("#FFF2D6")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
@@ -797,7 +838,7 @@ class KeyboardLayout(private val context: Context) {
             else -> Color.BLACK
         }
         val secondaryTextColor = when {
-            isOnePiece -> Color.parseColor("#6D4C27")
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
@@ -926,17 +967,24 @@ class KeyboardLayout(private val context: Context) {
         } else {
             if (isDictationEnabled) 3.6f else 4.4f
         }
+        val symSpaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
+        val symSpaceLabel = if (isOnePiece) "ONE PIECE" else "spasi"
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, keyBg)
-            text = "spasi"
-            setTextColor(secondaryTextColor)
-            textSize = 14f
+            background = ContextCompat.getDrawable(context, symSpaceKeyBg)
+            text = symSpaceLabel
+            setTextColor(if (isOnePiece) Color.parseColor("#FFE082") else secondaryTextColor)
+            textSize = if (isOnePiece) 14.5f else 14f
+            if (isOnePiece) {
+                setTypeface(typeface, Typeface.BOLD)
+                letterSpacing = 0.15f
+                setShadowLayer(dp(2).toFloat(), 0f, dp(1.5f).toFloat(), Color.parseColor("#CC100602"))
+            }
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupSpacebarTrackpadTouch(this, "spasi", isDark, themeMode, { onKeyAction(" ") }, onCursorMove)
+            setupSpacebarTrackpadTouch(this, symSpaceLabel, isDark, themeMode, { onKeyAction(" ") }, onCursorMove)
         }
         r4.addView(btnSpace)
 
@@ -980,7 +1028,7 @@ class KeyboardLayout(private val context: Context) {
         val btnReturn = ReturnButtonLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            showText("return", 15f, if (isOnePiece) Color.WHITE else textColor, specialKeyBg)
+            showText("return", 15f, if (isOnePiece) Color.parseColor("#FFE082") else textColor, specialKeyBg)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
@@ -1030,7 +1078,7 @@ class KeyboardLayout(private val context: Context) {
             else -> R.drawable.key_bg_blue
         }
         val textColor = when {
-            isOnePiece -> Color.parseColor("#1F130B")
+            isOnePiece -> Color.parseColor("#FFF2D6")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
@@ -1042,7 +1090,7 @@ class KeyboardLayout(private val context: Context) {
             else -> Color.BLACK
         }
         val subColor = when {
-            isOnePiece -> Color.parseColor("#6D4C27")
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
@@ -2473,7 +2521,7 @@ class KeyboardLayout(private val context: Context) {
         }
         for (k in keys) {
             val label = if (isShifted) k.uppercase() else k.lowercase()
-            val btn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction)
+            val btn = createKeyButton(label, 1.0f, keyBg, textColor, onKeyAction, baseChar = k)
             letterKeyViews.add(Pair(btn, k))
             row.addView(btn)
         }
@@ -2485,14 +2533,39 @@ class KeyboardLayout(private val context: Context) {
         weight: Float,
         keyBg: Int,
         textColor: Int,
-        onKeyAction: (String) -> Unit
+        onKeyAction: (String) -> Unit,
+        baseChar: String? = null
     ): TextView {
+        val isOnePiece = (currentThemeMode == "onepiece")
+        val charLower = (baseChar ?: label).lowercase()
+        val isOnePieceSpecialIcon = isOnePiece && (charLower == "o" || charLower == "x")
+
         return TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, keyBg)
-            text = label
-            setTextColor(textColor)
+            tag = label
+
+            if (isOnePieceSpecialIcon) {
+                val iconRes = if (charLower == "o") R.drawable.ic_onepiece_key_o else R.drawable.ic_onepiece_key_x
+                val d = ContextCompat.getDrawable(context, iconRes)?.mutate()
+                if (d != null) {
+                    val iconSize = dp(24)
+                    foreground = CenteredIconDrawable(d, iconSize, iconSize)
+                    text = ""
+                } else {
+                    text = label
+                    setTextColor(textColor)
+                }
+            } else {
+                text = label
+                setTextColor(textColor)
+                if (isOnePiece) {
+                    setTypeface(typeface, Typeface.BOLD)
+                    setShadowLayer(dp(2).toFloat(), 0f, dp(1.5f).toFloat(), Color.parseColor("#E60A0502"))
+                }
+            }
+
             textSize = if (isLandscape) 20f else 22f
             gravity = Gravity.CENTER
             isClickable = true
@@ -2500,9 +2573,15 @@ class KeyboardLayout(private val context: Context) {
             isHapticFeedbackEnabled = true
             val isLetter = label.length == 1 && label[0].isLetter()
             if (isLetter) {
-                setupLetterKeyTouch(this) { onKeyAction(text.toString()) }
+                setupLetterKeyTouch(this) {
+                    val commitChar = (tag as? String) ?: text.toString()
+                    onKeyAction(commitChar)
+                }
             } else {
-                setupSymbolKeyTouch(this) { onKeyAction(text.toString()) }
+                setupSymbolKeyTouch(this) {
+                    val commitChar = (tag as? String) ?: text.toString()
+                    onKeyAction(commitChar)
+                }
             }
         }
     }
@@ -2529,12 +2608,17 @@ class KeyboardLayout(private val context: Context) {
         val stepDistanceY = dp(14).toFloat()
         val isWoody = (themeMode == "woody")
         val isOnePiece = (themeMode == "onepiece")
-        val normalTextColor = if (isOnePiece) Color.parseColor("#1F130B") else if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+        val normalTextColor = if (isOnePiece) Color.parseColor("#FFF2D6") else if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
 
         fun restoreLetterKeyText() {
-            for ((tv, _) in letterKeyViews) {
-                tv.alpha = 1f
-                tv.setTextColor(normalTextColor)
+            for ((tv, baseChar) in letterKeyViews) {
+                val charLower = baseChar.lowercase()
+                if (isOnePiece && (charLower == "o" || charLower == "x")) {
+                    tv.foreground?.alpha = 255
+                } else {
+                    tv.alpha = 1f
+                    tv.setTextColor(normalTextColor)
+                }
             }
         }
 
@@ -2543,7 +2627,7 @@ class KeyboardLayout(private val context: Context) {
             isSpaceTrackpadActive = false
             isSelectingText = false
             view.text = defaultText
-            view.setTextColor(if (isOnePiece) Color.parseColor("#6D4C27") else if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+            view.setTextColor(if (isOnePiece) Color.parseColor("#FFE082") else if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
             view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
             restoreLetterKeyText()
             onTrackpadStateChanged?.invoke(false)
@@ -2559,8 +2643,13 @@ class KeyboardLayout(private val context: Context) {
             view.parent?.requestDisallowInterceptTouchEvent(true)
 
             // Hide ONLY the letter label text (A-Z), keeping key button shapes & layout completely intact
-            for ((tv, _) in letterKeyViews) {
-                tv.setTextColor(Color.TRANSPARENT)
+            for ((tv, baseChar) in letterKeyViews) {
+                val charLower = baseChar.lowercase()
+                if (isOnePiece && (charLower == "o" || charLower == "x")) {
+                    tv.foreground?.alpha = 0
+                } else {
+                    tv.setTextColor(Color.TRANSPARENT)
+                }
             }
 
             try {
@@ -2760,7 +2849,8 @@ class KeyboardLayout(private val context: Context) {
                         )
                     } catch (_: Throwable) {}
 
-                    popupController?.showPopupForKey(v, view.text.toString())
+                    val popupChar = (v.tag as? String) ?: view.text.toString()
+                    popupController?.showPopupForKey(v, popupChar)
                     onTrigger()
 
                     // Anti-mendem watchdog: auto-release pressed state after 180ms if Android drops ACTION_UP
@@ -2806,7 +2896,8 @@ class KeyboardLayout(private val context: Context) {
                             android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
                         )
                     } catch (_: Throwable) {}
-                    popupController?.showPopupForKey(v, view.text.toString())
+                    val popupChar = (v.tag as? String) ?: view.text.toString()
+                    popupController?.showPopupForKey(v, popupChar)
                     onTrigger()
                     val r = Runnable {
                         v.isPressed = false

@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.84 / build 84)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.85 / build 85)
 
 ---
 
@@ -542,4 +542,18 @@
        - *Root Cause Masalah "Volume Ketik Masih Mandiri"*: Method lama `am.playSoundEffect()` di banyak Android OS (khususnya Samsung One UI / Xiaomi) memutar efek suara sistem dengan volume internal yang terkunci (fixed touch sounds), mengabaikan slider volume fisik pengguna.
        - *Solusi*: Mengganti total engine audio menggunakan **`SoundPool`** native Android yang di-bind langsung ke `AudioManager.STREAM_SYSTEM` dengan 4 asset audio ogg otentik (`keypress_standard.ogg`, `keypress_spacebar.ogg`, `keypress_delete.ogg`, `keypress_return.ogg` di `res/raw/`).
        - Volume playback di-scale secara presisi mengikuti rasio `sysVol / maxVol` dari `STREAM_SYSTEM`. Ketika pengguna menaikkan volume sistem di HP, suara ketukan keyboard otomatis ikut mengeras; ketika dikecilkan, otomatis ikut mengecil; ketika di-mute atau silent mode, senyap seketika. 100% sinkron dan tidak mandiri lagi.
+  - **Tema One Piece Sedetail & Semirip Gambar Sampel (Release v1.0.85)**:
+    1. **Tuts Huruf QWERTY Semi-Transparan + Border Perunggu Rivet 3D**:
+       - Tuts huruf QWERTY semi-transparan (alpha 105, ~40% opacity) dengan border tembaga/perunggu bajak laut dan paku rivet baut di setiap sudut (`key_onepiece_normal.9.png`), memperlihatkan wallpaper Luffy & Thousand Sunny asli di balik tuts.
+       - Teks huruf emas gading tebal (`#FFF2D6`) dengan deep drop shadow (`#E60A0502`) menjamin keterbacaan yang tajam di atas background anime.
+    2. **Ikon Kemudi Kapal Bajak Laut pada Huruf 'O' & Dua Pedang Bersilang pada Huruf 'X'**:
+       - Tombol 'O' di-render dengan ikon kemudi/setir kapal bajak laut asli (`ic_onepiece_key_o.png`) dead-center via `CenteredIconDrawable`.
+       - Tombol 'X' di-render dengan ikon dua pedang bajak laut bersilang (`ic_onepiece_key_x.png`) dead-center via `CenteredIconDrawable`.
+       - Logika ketik 100% presisi: menekan tombol tetap meng-commit karakter `"o"` / `"O"` dan `"x"` / `"X"` (mengikuti shift/caps), balon popup tetap menampilkan huruf yang ditekan, dan swipe QuickPath tetap mengenali kata secara mulus.
+    3. **Tuts Spasi Pelat Seng Rantai dengan Tulisan Emas "ONE PIECE"**:
+       - Spasi memakai pelat seng berkarat dengan aksen rantai/paku rivet (`key_bg_onepiece_space.xml`) dan label tulisan emas bajak laut `"ONE PIECE"` (`#FFE082`, bold, letter-spacing 0.15f).
+    4. **Tuts Khusus Pelat Seng Besi Berkarat (Rustic Zinc/Iron Plate)**:
+       - Tuts Shift, 123, Backspace, dan Return beraksen pelat seng besi tebal dengan paku rivet baja (`key_onepiece_special_normal.9.png`) dan teks/ikon emas bajak laut (`#FFE082`).
+       - Tombol Emoji menampilkan kemudi kapal Luffy tersenyum (`ic_onepiece_luffy.png`).
+
 
