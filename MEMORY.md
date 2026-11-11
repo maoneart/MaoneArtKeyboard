@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.81 / build 80)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.82 / build 81)
 
 ---
 
@@ -502,3 +502,13 @@
        - *Root Cause Termux Drop*: Override `onComputeInsets` menyetel `contentTopInsets = top` (0), yang menyebabkan sistem melaporkan insets 100% layar ke Termux. TerminalView Termux mendeteksi 0 tinggi ruang terminal sehingga langsung memanggil `KeyboardUtils.hideSoftKeyboard()` (drop/tutup setelah 160ms). Selain itu, delayed runnable sync clipboard (120ms/350ms) menginterupsi fokus jendela terminal.
        - *Root Cause Spasi Bawah WhatsApp Lebar*: WhatsApp menerima insets `contentTopInsets = 0` sehingga mendorong chat ke atas dan menyisakan ruang kosong besar di bagian bawah.
        - *Solusi Tuntas*: Menghapus override kustom `onComputeInsets` (membiarkan framework AOSP mengukur insets akurat secara native), serta membypass runnable clipboard delayed fetch dan kalkulasi saran kata saat `isTerminalOrRawInput()` aktif. Termux landscape kini 100% stabil, tidak pernah drop atau menutup sendiri, dan bagian bawah WhatsApp kembali rapat presisi tanpa rongga kosong.
+  - **Redesign Otentik Apple iOS App Drawer, Scroll Mulus & In-Place Selector (Release v1.0.81)**:
+    1. **Eliminasi Total Masalah "Gak Bisa Di-Scroll"**:
+       - *Root Cause*: Baris aplikasi sebelumnya dipasangi `setupInstantTouch` yang mengonsumsi `ACTION_DOWN` dan me-return `true`, sehingga gesture drag vertikal `ACTION_MOVE` tidak pernah sampai ke `ScrollView`. Ditambah pemanggilan `renderCurrentLayout()` pada setiap touch-down menghancurkan dan membangun ulang seluruh hierarki view di bawah jari pengguna.
+       - *Solusi*: Mengganti `setupInstantTouch` dengan `setOnClickListener` standar Android yang ramah ScrollView. Pada layar pemilih aplikasi (`Mode.APP_PICKER`), pemilihan aplikasi kini dilakukan secara *in-place*: langsung mengubah visual indikator lingkaran centang dan subtitle tanpa me-rebuild layout. Pengguna bebas melakukan usap dan scroll vertikal dengan inertia dan scrollbar aktif tanpa ada lag atau lompat ke atas.
+    2. **Desain Ulang Otentik Apple iOS 18 (Cupertino UI & Aesthetic)**:
+       - *Ubin Tambah iOS (Apple Add Tile)*: Menghilangkan tombol teks "+ Tambah" kaku di header. Sebagai gantinya, tombol tambah kini hadir sebagai **Ubin Tambah iOS** langsung di dalam grid aplikasi (kartu squircle transparan biru muda dengan border halus, simbol `+` biru Apple tebal, dan label "Tambah" ala Widget iOS).
+       - *Cupertino Circular Header*: Header drawer kini bersih dengan judul "Pintasan", kapsul badge jumlah aplikasi, serta dua tombol bundar Apple frosted disc (`30dp x 30dp`) untuk Pengaturan (`ic_settings`) dan Tutup (`✕`).
+       - *Cupertino Checkmark Circle*: Di laci pemilih aplikasi, tombol kaku "+ Tambah / ✓ Aktif" diganti dengan **Lingkaran Centang Apple iOS**: lingkaran kosong bergaris halus saat belum dipilih dan lingkaran biru Apple solid `#007AFF` dengan centang putih bersih `✓` saat aktif.
+       - *Bilah Pencarian Cepat Cupertino*: Dilengkapi kotak pencarian instan iOS (`🔍 Cari aplikasi...`) di bagian atas pemilih aplikasi untuk menyaring puluhan aplikasi terpasang secara real-time.
+       - *Tombol "Selesai" Apple Blue*: Tombol modal Apple Blue kapsul (`#007AFF`) di sudut kanan atas laci pemilih aplikasi untuk menyimpan pilihan dan kembali ke drawer.

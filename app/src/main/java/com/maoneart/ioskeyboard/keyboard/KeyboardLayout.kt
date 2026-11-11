@@ -20,6 +20,8 @@ import androidx.core.content.ContextCompat
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.drawable.AnimatedImageDrawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.Typeface
 import android.os.Build
 import com.maoneart.ioskeyboard.R
 import com.maoneart.ioskeyboard.emoji.AnimatedEmojiManager
@@ -2982,38 +2984,38 @@ class KeyboardLayout(private val context: Context) {
             )
         }
 
-        val mainLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            setPadding(dp(10), dp(4), dp(10), dp(4))
-        }
-
         val isWoody = (themeMode == "woody")
-        val cardBg = when {
-            isWoody -> R.drawable.key_bg_woody
-            isDark -> R.drawable.key_bg_ios_dark
-            else -> R.drawable.key_bg_ios_light
-        }
-        val specialBg = when {
-            isWoody -> R.drawable.key_bg_woody_special
-            isDark -> R.drawable.key_bg_special_dark
-            else -> R.drawable.key_bg_special_light
-        }
         val textColor = when {
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
-            else -> Color.BLACK
+            else -> Color.parseColor("#000000")
         }
         val subtextColor = when {
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
         }
+        val surfaceColor = when {
+            isWoody -> Color.parseColor("#331A0E08")
+            isDark -> Color.parseColor("#2C2C2E")
+            else -> Color.parseColor("#FFFFFF")
+        }
+        val circularBtnBg = when {
+            isWoody -> Color.parseColor("#4D1A0E08")
+            isDark -> Color.parseColor("#2C2C2E")
+            else -> Color.parseColor("#E5E5EA")
+        }
 
-        // Header Row
+        val mainLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        // Header Row: Authentic iOS Cupertino Navigation Bar
         val headerRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -3023,74 +3025,99 @@ class KeyboardLayout(private val context: Context) {
             ).apply { setMargins(0, 0, 0, dp(4)) }
         }
 
-        val title = TextView(context).apply {
+        val titleContainer = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
-            text = "🚀 Pintasan Aplikasi"
-            setTextColor(textColor)
-            textSize = 14f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
-        headerRow.addView(title)
 
-        // Settings Button ("⚙️ Setting")
-        val btnSettings = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(28)).apply {
-                setMargins(0, 0, dp(6), 0)
-            }
-            background = ContextCompat.getDrawable(context, specialBg)
-            setPadding(dp(8), 0, dp(8), 0)
-            text = "⚙️ Setting"
+        val title = TextView(context).apply {
+            text = "Pintasan"
             setTextColor(textColor)
-            textSize = 11.5f
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        titleContainer.addView(title)
+
+        val countBadge = TextView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(18)).apply {
+                setMargins(dp(6), 0, 0, 0)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(9).toFloat()
+                setColor(circularBtnBg)
+            }
+            setPadding(dp(6), 0, dp(6), 0)
             gravity = Gravity.CENTER
+            text = "${shortcuts.size}"
+            setTextColor(subtextColor)
+            textSize = 10.5f
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        titleContainer.addView(countBadge)
+        headerRow.addView(titleContainer)
+
+        // Apple Settings Circular Button (⚙️)
+        val btnSettings = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                setMargins(0, 0, dp(8), 0)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(circularBtnBg)
+            }
             isClickable = true
             isFocusable = false
-            setupInstantTouch(this) { onOpenSettings() }
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                onOpenSettings()
+            }
         }
+        val ivSettings = android.widget.ImageView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(15), dp(15), Gravity.CENTER)
+            setImageResource(R.drawable.ic_settings)
+            setColorFilter(textColor)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+        }
+        btnSettings.addView(ivSettings)
         headerRow.addView(btnSettings)
 
-        // Add Button ("➕ Tambah")
-        val btnAdd = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(28)).apply {
-                setMargins(0, 0, dp(6), 0)
+        // Apple Close Circular Button (✕)
+        val btnClose = FrameLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(circularBtnBg)
             }
-            background = ContextCompat.getDrawable(context, R.drawable.btn_apple_translate_send)
-            setPadding(dp(8), 0, dp(8), 0)
-            text = "➕ Tambah"
-            setTextColor(Color.WHITE)
-            textSize = 11.5f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
-            gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupInstantTouch(this) { onOpenAppPicker() }
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                onCloseAction()
+            }
         }
-        headerRow.addView(btnAdd)
-
-        // Close Button ("✕")
-        val btnClose = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
-            background = ContextCompat.getDrawable(context, specialBg)
+        val tvClose = TextView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+            gravity = Gravity.CENTER
             text = "✕"
             setTextColor(textColor)
-            textSize = 13f
-            gravity = Gravity.CENTER
-            isClickable = true
-            isFocusable = false
-            setupInstantTouch(this) { onCloseAction() }
+            textSize = 11.5f
+            setTypeface(typeface, Typeface.BOLD)
         }
+        btnClose.addView(tvClose)
         headerRow.addView(btnClose)
         mainLayout.addView(headerRow)
 
-        // Grid / Horizontal Scroll of Shortcuted Apps
-        val scrollView = android.widget.ScrollView(context).apply {
+        // Grid of Apps in a Smooth ScrollView
+        val scrollView = ScrollView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1.0f
             )
             isFillViewport = true
-            isVerticalScrollBarEnabled = false
+            isVerticalScrollBarEnabled = true
         }
 
         val gridLayout = LinearLayout(context).apply {
@@ -3101,8 +3128,16 @@ class KeyboardLayout(private val context: Context) {
             )
         }
 
-        val itemsPerRow = if (context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 6 else 4
-        val allItems = shortcuts.toMutableList()
+        val isLandscape = (context.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+        val itemsPerRow = if (isLandscape) 6 else 4
+
+        // All items = current shortcuts + the authentic iOS "+ Tambah" Card at the end
+        data class GridItem(val app: AppShortcutItem?, val isAddButton: Boolean)
+        val allItems = mutableListOf<GridItem>()
+        for (sc in shortcuts) {
+            allItems.add(GridItem(sc, false))
+        }
+        allItems.add(GridItem(null, true)) // Add Tile!
 
         val rows = allItems.chunked(itemsPerRow)
         for (chunk in rows) {
@@ -3111,49 +3146,112 @@ class KeyboardLayout(private val context: Context) {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, dp(3), 0, dp(3)) }
+                ).apply { setMargins(0, dp(2), 0, dp(4)) }
             }
 
-            for (app in chunk) {
-                val itemCell = LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    layoutParams = LinearLayout.LayoutParams(
-                        0,
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        1.0f
-                    ).apply { setMargins(dp(3), 0, dp(3), 0) }
-                    background = ContextCompat.getDrawable(context, cardBg)
-                    setPadding(dp(4), dp(6), dp(4), dp(6))
-                    isClickable = true
-                    isFocusable = false
-                    setupInstantTouch(this) { onLaunchApp(app.packageName) }
-                }
-
-                val iconView = android.widget.ImageView(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(34), dp(34))
-                    if (app.icon != null) {
-                        setImageDrawable(app.icon)
-                    } else {
-                        setImageResource(R.drawable.ic_launcher)
+            for (item in chunk) {
+                if (item.isAddButton) {
+                    // Authentic Apple iOS Add Tile (Square card with rounded corners, translucent blue tint & '+' symbol)
+                    val addTile = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f).apply {
+                            setMargins(dp(3), 0, dp(3), 0)
+                        }
+                        isClickable = true
+                        isFocusable = false
+                        setOnClickListener {
+                            it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                            onOpenAppPicker()
+                        }
                     }
-                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-                }
-                itemCell.addView(iconView)
 
-                val labelView = TextView(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply { setMargins(0, dp(3), 0, 0) }
-                    text = app.appName
-                    setTextColor(textColor)
-                    textSize = 10.5f
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    val addIconBox = FrameLayout(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.RECTANGLE
+                            cornerRadius = dp(11).toFloat()
+                            setColor(Color.parseColor(if (isDark) "#26007AFF" else "#14007AFF"))
+                            setStroke(dp(1.2f), Color.parseColor(if (isDark) "#55007AFF" else "#33007AFF"))
+                        }
+                    }
+
+                    val plusTv = TextView(context).apply {
+                        layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                        gravity = Gravity.CENTER
+                        text = "+"
+                        setTextColor(Color.parseColor("#007AFF"))
+                        textSize = 22f
+                        setTypeface(typeface, Typeface.NORMAL)
+                    }
+                    addIconBox.addView(plusTv)
+                    addTile.addView(addIconBox)
+
+                    val addLabel = TextView(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                            setMargins(0, dp(3), 0, 0)
+                        }
+                        text = "Tambah"
+                        setTextColor(Color.parseColor("#007AFF"))
+                        textSize = 10.5f
+                        setTypeface(typeface, Typeface.BOLD)
+                        maxLines = 1
+                    }
+                    addTile.addView(addLabel)
+                    row.addView(addTile)
+                } else {
+                    val app = item.app ?: continue
+                    val itemCell = LinearLayout(context).apply {
+                        orientation = LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f).apply {
+                            setMargins(dp(3), 0, dp(3), 0)
+                        }
+                        isClickable = true
+                        isFocusable = false
+                        setOnClickListener {
+                            it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                            onLaunchApp(app.packageName)
+                        }
+                    }
+
+                    val iconWrapper = FrameLayout(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.RECTANGLE
+                            cornerRadius = dp(11).toFloat()
+                            setColor(surfaceColor)
+                        }
+                        clipToOutline = true
+                        elevation = dp(1).toFloat()
+                    }
+
+                    val iconView = android.widget.ImageView(context).apply {
+                        layoutParams = FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER)
+                        if (app.icon != null) {
+                            setImageDrawable(app.icon)
+                        } else {
+                            setImageResource(R.drawable.ic_launcher)
+                        }
+                        scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                    }
+                    iconWrapper.addView(iconView)
+                    itemCell.addView(iconWrapper)
+
+                    val labelView = TextView(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).apply { setMargins(0, dp(3), 0, 0) }
+                        text = app.appName
+                        setTextColor(textColor)
+                        textSize = 10.5f
+                        maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    }
+                    itemCell.addView(labelView)
+                    row.addView(itemCell)
                 }
-                itemCell.addView(labelView)
-                row.addView(itemCell)
             }
 
             // Fill empty slots in last row to maintain alignment
@@ -3192,77 +3290,142 @@ class KeyboardLayout(private val context: Context) {
             )
         }
 
-        val mainLayout = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            setPadding(dp(10), dp(6), dp(10), dp(6))
-        }
-
         val isWoody = (themeMode == "woody")
-        val cardBg = when {
-            isWoody -> R.drawable.key_bg_woody
-            isDark -> R.drawable.key_bg_ios_dark
-            else -> R.drawable.key_bg_ios_light
-        }
         val textColor = when {
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
-            else -> Color.BLACK
+            else -> Color.parseColor("#000000")
         }
         val subtextColor = when {
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
         }
+        val rowBg = when {
+            isWoody -> Color.parseColor("#331A0E08")
+            isDark -> Color.parseColor("#242426")
+            else -> Color.parseColor("#FFFFFF")
+        }
+        val searchBg = when {
+            isWoody -> Color.parseColor("#4D1A0E08")
+            isDark -> Color.parseColor("#2C2C2E")
+            else -> Color.parseColor("#E5E5EA")
+        }
 
-        // Header Row: Title + Count + Selesai Button
+        val selectedSet = selectedPackages.toMutableSet()
+
+        val mainLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+        }
+
+        // Header Row: Title + Subtitle + Apple Blue "Selesai" Pill Button
         val headerRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(38)
-            ).apply { setMargins(0, 0, 0, dp(4)) }
+                dp(36)
+            ).apply { setMargins(dp(2), 0, dp(2), dp(4)) }
+        }
+
+        val titleContainer = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
         }
 
         val title = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
-            text = "🚀 Pintasan Aplikasi (${selectedPackages.size})"
+            text = "Pilih Pintasan"
             setTextColor(textColor)
-            textSize = 14.5f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
         }
-        headerRow.addView(title)
+        titleContainer.addView(title)
 
+        val subTitle = TextView(context).apply {
+            text = "${selectedSet.size} aplikasi dipilih"
+            setTextColor(subtextColor)
+            textSize = 11f
+        }
+        titleContainer.addView(subTitle)
+        headerRow.addView(titleContainer)
+
+        // Apple Blue "Selesai" Pill Button
         val btnDone = TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(76), dp(30)).apply { setMargins(0, 0, 0, 0) }
-            background = ContextCompat.getDrawable(context, R.drawable.btn_apple_translate_send)
-            text = "✓ Selesai"
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(28))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(14).toFloat()
+                setColor(Color.parseColor("#007AFF"))
+            }
+            setPadding(dp(14), 0, dp(14), 0)
+            text = "Selesai"
             setTextColor(Color.WHITE)
-            textSize = 12.5f
-            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            textSize = 12f
+            setTypeface(typeface, Typeface.BOLD)
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false
-            setupInstantTouch(this) {
+            setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 onCloseAction()
             }
         }
         headerRow.addView(btnDone)
         mainLayout.addView(headerRow)
 
+        // Cupertino Real-Time Search Bar
+        val searchBox = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(30)
+            ).apply { setMargins(dp(2), 0, dp(2), dp(6)) }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(9).toFloat()
+                setColor(searchBg)
+            }
+            setPadding(dp(8), 0, dp(8), 0)
+        }
+
+        val searchIcon = TextView(context).apply {
+            text = "🔍"
+            textSize = 10f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                setMargins(0, 0, dp(6), 0)
+            }
+        }
+        searchBox.addView(searchIcon)
+
+        val searchInput = android.widget.EditText(context).apply {
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
+            background = null
+            hint = "Cari aplikasi..."
+            setHintTextColor(subtextColor)
+            setTextColor(textColor)
+            textSize = 12f
+            maxLines = 1
+            isSingleLine = true
+            imeOptions = EditorInfo.IME_ACTION_DONE
+        }
+        searchBox.addView(searchInput)
+        mainLayout.addView(searchBox)
+
         // Scrollable List of Installed Apps
-        val scrollView = android.widget.ScrollView(context).apply {
+        val scrollView = ScrollView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1.0f
             )
             isFillViewport = true
-            isVerticalScrollBarEnabled = false
+            isVerticalScrollBarEnabled = true
         }
 
         val listContainer = LinearLayout(context).apply {
@@ -3273,27 +3436,53 @@ class KeyboardLayout(private val context: Context) {
             )
         }
 
+        // Live Filter
+        searchInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val q = s?.toString()?.trim()?.lowercase() ?: ""
+                for (i in 0 until listContainer.childCount) {
+                    val child = listContainer.getChildAt(i)
+                    val tagStr = (child.tag as? String) ?: ""
+                    child.visibility = if (q.isEmpty() || tagStr.lowercase().contains(q)) View.VISIBLE else View.GONE
+                }
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
         for (app in installedApps) {
-            val isSelected = selectedPackages.contains(app.packageName)
+            val isSelected = selectedSet.contains(app.packageName)
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                tag = app.appName
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(46)
-                ).apply { setMargins(0, dp(2), 0, dp(2)) }
-                background = ContextCompat.getDrawable(context, cardBg)
+                    dp(44)
+                ).apply { setMargins(0, dp(1.5f), 0, dp(1.5f)) }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(9).toFloat()
+                    setColor(rowBg)
+                }
                 setPadding(dp(10), dp(4), dp(10), dp(4))
                 isClickable = true
                 isFocusable = false
-                setupInstantTouch(this) {
-                    onToggleShortcut(app.packageName)
-                }
             }
 
-            // App Icon
+            // iOS Squircle Icon Wrapper
+            val iconWrapper = FrameLayout(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(7.5f).toFloat()
+                    setColor(Color.parseColor(if (isDark) "#2C2C2E" else "#F2F2F7"))
+                }
+                clipToOutline = true
+            }
+
             val iconView = android.widget.ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+                layoutParams = FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER)
                 if (app.icon != null) {
                     setImageDrawable(app.icon)
                 } else {
@@ -3301,7 +3490,8 @@ class KeyboardLayout(private val context: Context) {
                 }
                 scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             }
-            row.addView(iconView)
+            iconWrapper.addView(iconView)
+            row.addView(iconWrapper)
 
             // App Name
             val nameView = TextView(context).apply {
@@ -3310,31 +3500,66 @@ class KeyboardLayout(private val context: Context) {
                 }
                 text = app.appName
                 setTextColor(textColor)
-                textSize = 13.5f
+                textSize = 13f
+                setTypeface(typeface, Typeface.BOLD)
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             }
             row.addView(nameView)
 
-            // Status Pill Button
-            val statusPill = TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(68), dp(26))
-                if (isSelected) {
-                    background = ContextCompat.getDrawable(context, R.drawable.btn_apple_translate_send)
-                    text = "✓ Aktif"
-                    setTextColor(Color.WHITE)
-                } else {
-                    background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
-                    text = "+ Tambah"
-                    setTextColor(subtextColor)
+            // Apple Circular Checkmark Indicator
+            val checkCircle = FrameLayout(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(22), dp(22))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    if (isSelected) {
+                        setColor(Color.parseColor("#007AFF"))
+                        setStroke(0, Color.TRANSPARENT)
+                    } else {
+                        setColor(Color.TRANSPARENT)
+                        setStroke(dp(1.5f), Color.parseColor(if (isDark) "#48484A" else "#C7C7CC"))
+                    }
                 }
-                textSize = 11.5f
-                setTypeface(typeface, android.graphics.Typeface.BOLD)
-                gravity = Gravity.CENTER
-                isClickable = false
-                isFocusable = false
             }
-            row.addView(statusPill)
+
+            val checkText = TextView(context).apply {
+                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                gravity = Gravity.CENTER
+                text = if (isSelected) "✓" else ""
+                setTextColor(Color.WHITE)
+                textSize = 12f
+                setTypeface(typeface, Typeface.BOLD)
+            }
+            checkCircle.addView(checkText)
+            row.addView(checkCircle)
+
+            // In-place Toggle: No full re-render, zero scroll displacement!
+            row.setOnClickListener {
+                it.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                val pkg = app.packageName
+                val isNowSelected = if (selectedSet.contains(pkg)) {
+                    selectedSet.remove(pkg)
+                    false
+                } else {
+                    selectedSet.add(pkg)
+                    true
+                }
+
+                subTitle.text = "${selectedSet.size} aplikasi dipilih"
+
+                val bg = checkCircle.background as? GradientDrawable
+                if (isNowSelected) {
+                    bg?.setColor(Color.parseColor("#007AFF"))
+                    bg?.setStroke(0, Color.TRANSPARENT)
+                    checkText.text = "✓"
+                } else {
+                    bg?.setColor(Color.TRANSPARENT)
+                    bg?.setStroke(dp(1.5f), Color.parseColor(if (isDark) "#48484A" else "#C7C7CC"))
+                    checkText.text = ""
+                }
+
+                onToggleShortcut(pkg)
+            }
 
             listContainer.addView(row)
         }
@@ -3347,4 +3572,5 @@ class KeyboardLayout(private val context: Context) {
     }
 
     private fun dp(v: Int): Int = (v * context.resources.displayMetrics.density).toInt()
+    private fun dp(v: Float): Int = (v * context.resources.displayMetrics.density).toInt()
 }

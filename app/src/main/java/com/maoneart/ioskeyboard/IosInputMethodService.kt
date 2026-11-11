@@ -624,7 +624,6 @@ class IosInputMethodService : InputMethodService() {
             current.add(pkg)
         }
         prefs.saveAppShortcuts(current)
-        renderCurrentLayout()
     }
 
     // Render movable iOS blue cursor ('│') in Translate Input Box
