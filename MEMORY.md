@@ -453,3 +453,10 @@
        - *Core Hit-Box Boundary Priority*: Mengetuk tepat di dalam batas fisik tuts huruf langsung mengirimkan karakter asli tuts tersebut tanpa risiko dibelokkan ke huruf tetangga oleh algoritma prediksi.
        - *Tracked Watchdog Runnable*: Menghindari pembatalan status pressed prematur saat pengetikan cepat atau double-tap berulang.
        - *Multi-Touch Swipe Immunity*: `QuickPathContainerLayout` otomatis mengabaikan deteksi usapan jika terdeteksi lebih dari 1 jari (`pointerCount > 1`), mencegah pengetikan dua jempol terpotong oleh gesture swipe.
+  - **Bottom-Docked Landscape & Chunky Thumb-Friendly Keys (Release v1.0.74)**:
+    1. **Eliminasi Fullscreen Extract Mode (Anti Keyboard "Terlalu Atas")**:
+       - *Root Cause*: Android `InputMethodService` secara default mengaktifkan *Fullscreen Extract Mode* saat orientasi landscape, memunculkan wadah extract teks Android yang mendorong keyboard ke tengah/atas layar.
+       - *Solusi*: Meng-override `onEvaluateFullscreenMode() = false` dan `setExtractViewShown(false)`. Mengonfigurasi `onConfigureWindow` ke `Gravity.BOTTOM` dan `keyboardRoot` ke `layout_gravity="bottom"`. Keyboard kini 100% menempel stabil di dasar layar (bottom docked) tanpa pernah melayang atau terdorong ke atas.
+    2. **Ukuran Tuts Ergonomis & Nyaman untuk Dua Jempol ("Gak Kekecilan")**:
+       - *Root Cause*: Tinggi 140dp sebelumnya membuat tuts terlalu pipih (~35dp per baris) dan font 18.5sp sulit ditekan jempol.
+       - *Solusi*: Menaikkan tinggi kontainer keyboard landscape ke **190dp** (tinggi tuts ~47.5dp per baris, sangat empuk dan pas untuk jempol), font huruf diperbesar menjadi **21sp** (tebal & terbaca jelas), font angka numpad **21sp**, toolbar disesuaikan ke **38dp**, dan padding samping disetel ke **36dp** untuk memusatkan keyboard dalam jangkauan natural dua jempol. Mengetik di mode landscape kini super nyaman dan pas.

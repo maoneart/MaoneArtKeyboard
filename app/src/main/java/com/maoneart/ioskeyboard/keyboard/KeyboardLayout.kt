@@ -918,7 +918,7 @@ class KeyboardLayout(private val context: Context) {
                 val tvDigit = TextView(context).apply {
                     text = digit
                     setTextColor(textColor)
-                    textSize = 23f
+                    textSize = if (isLandscape) 21f else 23f
                     setTypeface(typeface, android.graphics.Typeface.BOLD)
                     gravity = Gravity.CENTER
                     includeFontPadding = false
@@ -2346,7 +2346,7 @@ class KeyboardLayout(private val context: Context) {
             background = ContextCompat.getDrawable(context, keyBg)
             text = label
             setTextColor(textColor)
-            textSize = if (isLandscape) 18.5f else 22f
+            textSize = if (isLandscape) 21f else 22f
             gravity = Gravity.CENTER
             isClickable = true
             isFocusable = false

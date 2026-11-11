@@ -287,6 +287,22 @@ class IosInputMethodService : InputMethodService() {
         }
     }
 
+    override fun onEvaluateFullscreenMode(): Boolean {
+        // Never allow full-screen extract mode in landscape so keyboard is always anchored cleanly at the bottom
+        return false
+    }
+
+    override fun updateFullscreenMode() {
+        super.updateFullscreenMode()
+        setExtractViewShown(false)
+    }
+
+    override fun onConfigureWindow(win: android.view.Window, isFullscreen: Boolean, isCandidatesOnly: Boolean) {
+        super.onConfigureWindow(win, isFullscreen, isCandidatesOnly)
+        win.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT)
+        win.setGravity(Gravity.BOTTOM)
+    }
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         try {
@@ -310,10 +326,10 @@ class IosInputMethodService : InputMethodService() {
 
             if (toolbar != null) {
                 val tbLp = toolbar.layoutParams
-                tbLp.height = dp(if (isLandscape) 34 else 44)
+                tbLp.height = dp(if (isLandscape) 38 else 44)
                 toolbar.layoutParams = tbLp
 
-                val btnSize = dp(if (isLandscape) 30 else 36)
+                val btnSize = dp(if (isLandscape) 32 else 36)
                 listOf(
                     R.id.btnQuickTranslate,
                     R.id.btnQuickClipboard,
@@ -331,9 +347,9 @@ class IosInputMethodService : InputMethodService() {
 
             if (container != null) {
                 val cLp = container.layoutParams
-                cLp.height = dp(if (isLandscape) 140 else 235)
+                cLp.height = dp(if (isLandscape) 190 else 235)
                 container.layoutParams = cLp
-                val padH = dp(if (isLandscape) 24 else 3)
+                val padH = dp(if (isLandscape) 36 else 3)
                 val padV = dp(if (isLandscape) 2 else 3)
                 container.setPadding(padH, padV, padH, padV)
             }
