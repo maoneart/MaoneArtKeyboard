@@ -38,6 +38,7 @@ class QuickPathContainerLayout(
 
     private val touchSlop = 26f * resources.displayMetrics.density
     private var activeFallbackView: View? = null
+    private val activeFallbackViews = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<View, Boolean>())
     private val keyPopupPositions = HashMap<View, Pair<Float, Float>>()
 
     fun clearPopupPositionCache() {
@@ -220,6 +221,28 @@ class QuickPathContainerLayout(
         return false
     }
 
+    fun resetFallbackPressedViews() {
+        hidePopup()
+        for (v in activeFallbackViews) {
+            v.isPressed = false
+        }
+        activeFallbackViews.clear()
+        activeFallbackView?.isPressed = false
+        activeFallbackView = null
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        resetFallbackPressedViews()
+    }
+
+    override fun onVisibilityChanged(changedView: View, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
+        if (visibility != View.VISIBLE) {
+            resetFallbackPressedViews()
+        }
+    }
+
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
@@ -231,15 +254,22 @@ class QuickPathContainerLayout(
                 val keyInfo = findKeyAtCoords(pRawX, pRawY)
                 if (keyInfo != null && keyInfo.first.isNotEmpty()) {
                     val targetView = findKeyViewAtCoords(pRawX, pRawY)
-                    targetView?.isPressed = true
-                    try {
-                        targetView?.performHapticFeedback(
-                            HapticFeedbackConstants.KEYBOARD_TAP,
-                            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
-                        )
-                    } catch (_: Throwable) {}
-                    if (targetView != null) {
-                        showPopupForKey(targetView, keyInfo.first)
+                    targetView?.let { tv ->
+                        tv.isPressed = true
+                        activeFallbackViews.add(tv)
+                        try {
+                            tv.performHapticFeedback(
+                                HapticFeedbackConstants.KEYBOARD_TAP,
+                                HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                            )
+                        } catch (_: Throwable) {}
+                        showPopupForKey(tv, keyInfo.first)
+                        // Anti-mendem watchdog: auto-release fallback key after 180ms
+                        tv.postDelayed({
+                            tv.isPressed = false
+                            activeFallbackViews.remove(tv)
+                            hidePopup()
+                        }, 180L)
                     }
                     onFallbackKeyAction(keyInfo.first, targetView)
                     activeFallbackView = targetView
@@ -265,6 +295,10 @@ class QuickPathContainerLayout(
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
                 hidePopup()
+                for (v in activeFallbackViews) {
+                    v.isPressed = false
+                }
+                activeFallbackViews.clear()
                 activeFallbackView?.isPressed = false
                 activeFallbackView = null
                 swipeTrailView.clearTrail()

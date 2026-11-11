@@ -309,6 +309,7 @@ class IosInputMethodService : InputMethodService() {
             cachedQwertyView = null
             cachedQwertyKeySignature = ""
             layoutEngine.resetTrackpadState()
+            layoutEngine.resetAllPressedStates()
             layoutEngine.clearHitBoxCache()
             adjustLayoutForOrientation(newConfig.orientation)
             renderCurrentLayout()
@@ -376,6 +377,7 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.activeRootView = rootView
             composingWord.clear()
             layoutEngine.resetTrackpadState()
+            layoutEngine.resetAllPressedStates()
 
             // Auto-detect Numeric / Phone / Bank Transfer / PIN input fields vs standard Text fields
             currentMode = if (isNumericOrPhoneField(info)) {
@@ -424,6 +426,7 @@ class IosInputMethodService : InputMethodService() {
             // Always reset mode to QWERTY when keyboard is closed
             currentMode = Mode.QWERTY
             layoutEngine.resetTrackpadState()
+            layoutEngine.resetAllPressedStates()
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
@@ -452,6 +455,7 @@ class IosInputMethodService : InputMethodService() {
             // Always reset mode to QWERTY when keyboard window is hidden
             currentMode = Mode.QWERTY
             layoutEngine.resetTrackpadState()
+            layoutEngine.resetAllPressedStates()
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }

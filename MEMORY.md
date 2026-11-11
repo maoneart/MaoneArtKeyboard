@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.72)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.77)
 
 ---
 
@@ -460,3 +460,13 @@
     2. **Ukuran Tuts Ergonomis & Nyaman untuk Dua Jempol ("Gak Kekecilan")**:
        - *Root Cause*: Tinggi 140dp sebelumnya membuat tuts terlalu pipih (~35dp per baris) dan font 18.5sp sulit ditekan jempol.
        - *Solusi*: Menaikkan tinggi kontainer keyboard landscape ke **190dp** (tinggi tuts ~47.5dp per baris, sangat empuk dan pas untuk jempol), font huruf diperbesar menjadi **21sp** (tebal & terbaca jelas), font angka numpad **21sp**, toolbar disesuaikan ke **38dp**, dan padding samping disetel ke **36dp** untuk memusatkan keyboard dalam jangkauan natural dua jempol. Mengetik di mode landscape kini super nyaman dan pas.
+  - **Eliminasi Total Ghost Pressed & Tuts Mendem Tanpa Teks (Release v1.0.77)**:
+    1. **Isolasi Ketat Tuts Huruf & Eliminasi Polusi Cross-View**:
+       - *Root Cause Masalah "Ke Teken tapi Gak Muncul Teks"*: Pada `setupLetterKeyTouch`, sentuhan di dekat perbatasan tuts `v` ('A') memanggil `findKeyAt` yang menyetel `targetView.isPressed = true` pada tuts tetangga ('S') sambil menyetel `v.isPressed = true` dan meng-commit karakter tetangga. Pengguna melihat tuts 'A' tenggelam ("ke teken") namun karakter 'A' tidak muncul, sementara tuts 'S' tertinggal dalam status pressed permanen ("mendem") karena Android tidak pernah mengirimkan siklus event sentuhan ke tuts 'S'.
+       - *Solusi*: Menghilangkan manipulasi cross-view. Setiap tuts huruf HANYA mengelola status `isPressed` dirinya sendiri. Tuts yang ditekan 100% adalah tuts yang membal, menampilkan balon preview, dan langsung meng-commit karakternya sendiri (0ms).
+    2. **Anti-Mendem Watchdog Timer (180ms)**:
+       - Seluruh tuts huruf (`setupLetterKeyTouch`), simbol (`setupSymbolKeyTouch`), dan tombol instan (`setupInstantTouch`) dipasangi runnable watchdog otomatis 180ms. Jika OS Android melewatkan event `ACTION_UP` atau `ACTION_CANCEL`, status `isPressed` otomatis di-reset ke `false` dan balon preview disembunyikan.
+    3. **Multi-Touch Fallback Safety di `QuickPathContainerLayout`**:
+       - Mengganti variabel tunggal `activeFallbackView` dengan thread-safe Set `activeFallbackViews` + watchdog release 180ms per fallback view. Pengetikan cepat dua jempol di celah/margin tidak akan pernah meninggalkan tuts dalam keadaan mendem.
+    4. **Global Safety Lifecycle Reset (`resetAllPressedStates`)**:
+       - Ditambahkan metode `layoutEngine.resetAllPressedStates()` yang otomatis menyapu bersih seluruh tuts menjadi `isPressed = false` saat `onStartInputView`, `onFinishInputView`, `onWindowHidden`, dan `onConfigurationChanged`. Tuts dipastikan selalu dalam kondisi netral sempurna setiap kali keyboard dibuka, ditutup, atau diputar.

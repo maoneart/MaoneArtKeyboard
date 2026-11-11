@@ -163,6 +163,17 @@ class KeyboardLayout(private val context: Context) {
         popupController?.clearPopupPositionCache()
     }
 
+    fun resetAllPressedStates() {
+        for ((tv, _) in letterKeyViews) {
+            tv.isPressed = false
+        }
+        for (box in cachedHitBoxes) {
+            box.tv.isPressed = false
+        }
+        popupController?.resetFallbackPressedViews()
+        popupController?.hidePopup()
+    }
+
     fun updatePredictedNextChars(chars: Set<Char>) {
         predictedNextChars = chars
     }
@@ -2588,11 +2599,9 @@ class KeyboardLayout(private val context: Context) {
     }
 
     // iOS Key Pop-up Preview Touch Handler (0ms Latency, Hardware Accelerated with Haptic Feedback & Multi-Touch)
-    // Augmented with Ken Kocienda's Apple Dynamic Predictive Hit-Testing for boundary touches
-    // Includes auto-release watchdog to prevent any key from getting stuck/mendem!
+    // Direct view isolation: each key manages ONLY its own pressed state to completely eliminate ghost presses & stuck "mendem" keys.
     private fun setupLetterKeyTouch(view: TextView, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
-        var currentTargetView: View? = null
         var watchdogRunnable: Runnable? = null
 
         view.setOnTouchListener { v, event ->
@@ -2604,67 +2613,33 @@ class KeyboardLayout(private val context: Context) {
             }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
-                    val pIdx = event.actionIndex
-                    val loc = IntArray(2)
-                    v.getLocationOnScreen(loc)
-                    val px = try { event.getX(pIdx) } catch (_: Throwable) { event.x }
-                    val py = try { event.getY(pIdx) } catch (_: Throwable) { event.y }
-                    val rx = loc[0] + px
-                    val ry = loc[1] + py
-
-                    // Core boundary check: if firmly inside key bounds, keep exact key; only snap on outer border gaps
-                    val isInsideDirectly = px >= dp(3) && px <= (v.width - dp(3)) && py >= dp(2) && py <= (v.height - dp(2))
-                    val resolvedKey = if (isInsideDirectly) null else findKeyAt(rx, ry)
-                    val targetView = (if (resolvedKey != null) findKeyViewAt(rx, ry) else null) ?: v
-                    val charToSend = resolvedKey?.first ?: view.text.toString()
-
-                    // Cancel previous watchdog if rapid typing
-                    watchdogRunnable?.let {
-                        targetView.removeCallbacks(it)
-                        v.removeCallbacks(it)
-                    }
-
-                    // Release previously stuck view if any
-                    currentTargetView?.isPressed = false
-                    currentTargetView = targetView
-
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     v.isPressed = true
-                    targetView.isPressed = true
 
                     try {
-                        targetView.performHapticFeedback(
+                        v.performHapticFeedback(
                             android.view.HapticFeedbackConstants.KEYBOARD_TAP,
                             android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
                         )
                     } catch (_: Throwable) {}
-                    popupController?.showPopupForKey(targetView, charToSend)
 
-                    if (resolvedKey != null && onKeyActionCallback != null) {
-                        onKeyActionCallback?.invoke(charToSend)
-                    } else {
-                        onTrigger()
-                    }
+                    popupController?.showPopupForKey(v, view.text.toString())
+                    onTrigger()
 
-                    // Anti-mendem watchdog: auto-release pressed state after 280ms if Android drops ACTION_UP
+                    // Anti-mendem watchdog: auto-release pressed state after 180ms if Android drops ACTION_UP
                     val r = Runnable {
-                        targetView.isPressed = false
                         v.isPressed = false
                         popupController?.hidePopup()
                     }
                     watchdogRunnable = r
-                    targetView.postDelayed(r, 280L)
+                    v.postDelayed(r, 180L)
 
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
-                    watchdogRunnable?.let {
-                        v.removeCallbacks(it)
-                        currentTargetView?.removeCallbacks(it)
-                    }
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     watchdogRunnable = null
                     v.isPressed = false
-                    currentTargetView?.isPressed = false
-                    currentTargetView = null
                     popupController?.hidePopup()
                     true
                 }
@@ -2701,7 +2676,7 @@ class KeyboardLayout(private val context: Context) {
                         popupController?.hidePopup()
                     }
                     watchdogRunnable = r
-                    v.postDelayed(r, 280L)
+                    v.postDelayed(r, 180L)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
@@ -2716,9 +2691,10 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // 0ms Latency Instant Touch Down Listener with Hardware Haptic Trigger & Multi-Touch
+    // 0ms Latency Instant Touch Down Listener with Hardware Haptic Trigger & Multi-Touch + Safety Watchdog
     private fun setupInstantTouch(view: View, onTrigger: () -> Unit) {
         view.isHapticFeedbackEnabled = true
+        var watchdogRunnable: Runnable? = null
         view.setOnTouchListener { v, event ->
             if (isSpaceTrackpadActive) {
                 if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
@@ -2728,6 +2704,7 @@ class KeyboardLayout(private val context: Context) {
             }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     v.isPressed = true
                     try {
                         v.performHapticFeedback(
@@ -2736,9 +2713,14 @@ class KeyboardLayout(private val context: Context) {
                         )
                     } catch (_: Throwable) {}
                     onTrigger()
+                    val r = Runnable { v.isPressed = false }
+                    watchdogRunnable = r
+                    v.postDelayed(r, 180L)
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
+                    watchdogRunnable = null
                     v.isPressed = false
                     true
                 }
@@ -2754,6 +2736,7 @@ class KeyboardLayout(private val context: Context) {
         view.isHapticFeedbackEnabled = true
         var isEligibleDown = false
         var downTime = 0L
+        var watchdogRunnable: Runnable? = null
 
         view.setOnTouchListener { v, event ->
             if (isSpaceTrackpadActive) {
@@ -2764,13 +2747,21 @@ class KeyboardLayout(private val context: Context) {
             }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     isEligibleDown = true
                     downTime = System.currentTimeMillis()
                     v.isPressed = true
+                    val r = Runnable {
+                        v.isPressed = false
+                        isEligibleDown = false
+                    }
+                    watchdogRunnable = r
+                    v.postDelayed(r, 1200L)
                     true
                 }
                 MotionEvent.ACTION_POINTER_DOWN -> {
                     // Multi-touch means user is typing letters with two thumbs -> cancel mic touch!
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     isEligibleDown = false
                     v.isPressed = false
                     false
@@ -2779,6 +2770,7 @@ class KeyboardLayout(private val context: Context) {
                     if (isEligibleDown) {
                         val inBounds = event.x in 0f..v.width.toFloat() && event.y in 0f..v.height.toFloat()
                         if (!inBounds) {
+                            watchdogRunnable?.let { v.removeCallbacks(it) }
                             isEligibleDown = false
                             v.isPressed = false
                         }
@@ -2786,6 +2778,7 @@ class KeyboardLayout(private val context: Context) {
                     true
                 }
                 MotionEvent.ACTION_UP -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     v.isPressed = false
                     if (isEligibleDown) {
                         val inBounds = event.x in 0f..v.width.toFloat() && event.y in 0f..v.height.toFloat()
@@ -2804,6 +2797,7 @@ class KeyboardLayout(private val context: Context) {
                     true
                 }
                 MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
                     isEligibleDown = false
                     v.isPressed = false
                     true
@@ -2813,13 +2807,20 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
-    // High-Speed Auto Repeat Backspace ("Hapus Ngebut" with Multi-Touch)
+    // High-Speed Auto Repeat Backspace ("Hapus Ngebut" with Multi-Touch + Safety Release Watchdog)
     private fun setupRapidBackspaceTouch(view: View, onBackspace: () -> Unit) {
         view.isHapticFeedbackEnabled = true
         val handler = Handler(Looper.getMainLooper())
         var repeatRunnable: Runnable? = null
         var deleteCount = 0
         var activePointerId = -1
+
+        fun cancelRepeat(v: View) {
+            v.isPressed = false
+            repeatRunnable?.let { handler.removeCallbacks(it) }
+            repeatRunnable = null
+            activePointerId = -1
+        }
 
         view.setOnTouchListener { v, event ->
             if (isSpaceTrackpadActive) {
@@ -2830,10 +2831,10 @@ class KeyboardLayout(private val context: Context) {
             }
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    cancelRepeat(v)
                     v.isPressed = true
                     activePointerId = event.getPointerId(0)
                     deleteCount = 0
-                    repeatRunnable?.let { handler.removeCallbacks(it) }
                     try {
                         v.performHapticFeedback(
                             android.view.HapticFeedbackConstants.KEYBOARD_TAP,
@@ -2870,18 +2871,12 @@ class KeyboardLayout(private val context: Context) {
                 MotionEvent.ACTION_POINTER_UP -> {
                     val pIdx = event.actionIndex
                     if (event.getPointerId(pIdx) == activePointerId) {
-                        v.isPressed = false
-                        repeatRunnable?.let { handler.removeCallbacks(it) }
-                        repeatRunnable = null
-                        activePointerId = -1
+                        cancelRepeat(v)
                     }
                     true
                 }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.isPressed = false
-                    repeatRunnable?.let { handler.removeCallbacks(it) }
-                    repeatRunnable = null
-                    activePointerId = -1
+                    cancelRepeat(v)
                     true
                 }
                 else -> false
