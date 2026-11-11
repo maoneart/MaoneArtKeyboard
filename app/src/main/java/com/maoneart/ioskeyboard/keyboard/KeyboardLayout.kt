@@ -224,7 +224,8 @@ class KeyboardLayout(private val context: Context) {
                 btn.setColorFilter(Color.parseColor("#FF3B30")) // Distinct Apple Red recording indicator
             } else {
                 val isWoody = (themeMode == "woody")
-                val normalColor = if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+                val isOnePiece = (themeMode == "onepiece")
+                val normalColor = if (isOnePiece) Color.parseColor("#FFE082") else if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
                 btn.setColorFilter(normalColor)
             }
         }
@@ -240,8 +241,9 @@ class KeyboardLayout(private val context: Context) {
     fun updateShiftButtonVisual(isShifted: Boolean, isCapsLock: Boolean, isDark: Boolean, themeMode: String = "auto") {
         shiftButtonRef?.let { btn ->
             val isWoody = (themeMode == "woody")
-            val activeColor = if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue)
-            val normalColor = if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+            val isOnePiece = (themeMode == "onepiece")
+            val activeColor = if (isOnePiece) Color.parseColor("#FFD54F") else if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue)
+            val normalColor = if (isOnePiece) Color.parseColor("#FFE082") else if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
             btn.setColorFilter(if (isShifted || isCapsLock) activeColor else normalColor)
         }
     }
@@ -250,16 +252,20 @@ class KeyboardLayout(private val context: Context) {
     fun updateReturnButton(editorInfo: EditorInfo?, themeMode: String = "auto", isDark: Boolean = false) {
         val btn = returnButtonRef ?: return
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         val specialKeyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece_special
             isWoody -> R.drawable.key_bg_woody_special
             isDark -> R.drawable.key_bg_special_dark
             else -> R.drawable.key_bg_special_light
         }
         val actionKeyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece_action
             isWoody -> R.drawable.key_bg_woody_action
             else -> R.drawable.key_bg_blue
         }
         val textColor = when {
+            isOnePiece -> Color.WHITE
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
@@ -364,22 +370,33 @@ class KeyboardLayout(private val context: Context) {
         val row3 = listOf("z", "x", "c", "v", "b", "n", "m")
 
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         val keyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece
             isWoody -> R.drawable.key_bg_woody
             isDark -> R.drawable.key_bg_ios_dark
             else -> R.drawable.key_bg_ios_light
         }
         val specialKeyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece_special
             isWoody -> R.drawable.key_bg_woody_special
             isDark -> R.drawable.key_bg_special_dark
             else -> R.drawable.key_bg_special_light
         }
         val textColor = when {
+            isOnePiece -> Color.parseColor("#1F130B")
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+        val specialTextColor = when {
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
         }
         val secondaryTextColor = when {
+            isOnePiece -> Color.parseColor("#6D4C27")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
@@ -413,8 +430,8 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_shift)
-            val shiftActiveColor = if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue)
-            setColorFilter(if (isShifted) shiftActiveColor else textColor)
+            val shiftActiveColor = if (isOnePiece) Color.parseColor("#FFD54F") else if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue)
+            setColorFilter(if (isShifted) shiftActiveColor else specialTextColor)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_SHIFT") }
@@ -435,7 +452,7 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_backspace)
-            setColorFilter(textColor)
+            setColorFilter(specialTextColor)
             isClickable = true
             isFocusable = false
             setupRapidBackspaceTouch(this) { onKeyAction("ACTION_BACKSPACE") }
@@ -460,7 +477,7 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = "123"
-            setTextColor(textColor)
+            setTextColor(specialTextColor)
             textSize = 15f
             gravity = Gravity.CENTER
             isClickable = true
@@ -469,13 +486,18 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btn123)
 
-        // Emoji Button (Apple iOS Outline Smiley Icon, Monochrome Tint)
+        // Emoji Button (Apple iOS Outline Smiley Icon or One Piece Luffy Helm)
         val btnEmoji = ImageButton(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
-            setImageResource(R.drawable.ic_emoji_smile)
-            setColorFilter(textColor)
+            if (isOnePiece) {
+                setImageResource(R.drawable.ic_onepiece_luffy)
+                clearColorFilter()
+            } else {
+                setImageResource(R.drawable.ic_emoji_smile)
+                setColorFilter(textColor)
+            }
             scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
             isClickable = true
             isFocusable = false
@@ -545,7 +567,7 @@ class KeyboardLayout(private val context: Context) {
                     .apply { setMargins(dp(2), 0, dp(2), 0) }
                 background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_mic_ios)
-                setColorFilter(textColor)
+                setColorFilter(specialTextColor)
                 scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
                 isClickable = true
                 isFocusable = false
@@ -561,7 +583,7 @@ class KeyboardLayout(private val context: Context) {
         val btnReturn = ReturnButtonLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            showText("return", 15f, textColor, specialKeyBg)
+            showText("return", 15f, if (isOnePiece) Color.WHITE else textColor, specialKeyBg)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
@@ -583,10 +605,13 @@ class KeyboardLayout(private val context: Context) {
             onSwipeCharDetected = onSwipeHaptic,
             onSwipeLiveUpdate = onSwipeLiveUpdate
         )
-        if (isWoody) {
+        if (isOnePiece) {
+            container.setTrailColor(Color.parseColor("#99FFE082"))
+        } else if (isWoody) {
             container.setTrailColor(Color.parseColor("#99FFA726"))
         } else if (isDark) {
             container.setTrailColor(Color.parseColor("#9964D2FF"))
+        }
         } else {
             container.setTrailColor(Color.parseColor("#99007AFF"))
         }
@@ -747,22 +772,33 @@ class KeyboardLayout(private val context: Context) {
             listOf(".", ",", "?", "!", "'")
 
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         val keyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece
             isWoody -> R.drawable.key_bg_woody
             isDark -> R.drawable.key_bg_ios_dark
             else -> R.drawable.key_bg_ios_light
         }
         val specialKeyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece_special
             isWoody -> R.drawable.key_bg_woody_special
             isDark -> R.drawable.key_bg_special_dark
             else -> R.drawable.key_bg_special_light
         }
         val textColor = when {
+            isOnePiece -> Color.parseColor("#1F130B")
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+        val specialTextColor = when {
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
         }
         val secondaryTextColor = when {
+            isOnePiece -> Color.parseColor("#6D4C27")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
@@ -786,7 +822,7 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = if (!isMoreSymbols) "#+=" else "123"
-            setTextColor(textColor)
+            setTextColor(specialTextColor)
             textSize = 14f
             gravity = Gravity.CENTER
             isClickable = true
@@ -801,7 +837,7 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = "🔢"
-            setTextColor(textColor)
+            setTextColor(specialTextColor)
             textSize = 15f
             gravity = Gravity.CENTER
             isClickable = true
@@ -819,7 +855,7 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_backspace)
-            setColorFilter(textColor)
+            setColorFilter(specialTextColor)
             isClickable = true
             isFocusable = false
             setupRapidBackspaceTouch(this) { onKeyAction("ACTION_BACKSPACE") }
@@ -842,7 +878,7 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             text = "ABC"
-            setTextColor(textColor)
+            setTextColor(specialTextColor)
             textSize = 15f
             gravity = Gravity.CENTER
             isClickable = true
@@ -855,8 +891,13 @@ class KeyboardLayout(private val context: Context) {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
-            setImageResource(R.drawable.ic_emoji_smile)
-            setColorFilter(textColor)
+            if (isOnePiece) {
+                setImageResource(R.drawable.ic_onepiece_luffy)
+                clearColorFilter()
+            } else {
+                setImageResource(R.drawable.ic_emoji_smile)
+                setColorFilter(textColor)
+            }
             scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
             isClickable = true
             isFocusable = false
@@ -924,7 +965,7 @@ class KeyboardLayout(private val context: Context) {
                     .apply { setMargins(dp(2), 0, dp(2), 0) }
                 background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_mic_ios)
-                setColorFilter(textColor)
+                setColorFilter(specialTextColor)
                 scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
                 isClickable = true
                 isFocusable = false
@@ -932,13 +973,15 @@ class KeyboardLayout(private val context: Context) {
             }
             micButtonRef = btnMic
             r4.addView(btnMic)
+        } else {
+            micButtonRef = null
         }
 
         // Return / Enter Action Button (return / Dead Center Search Icon)
         val btnReturn = ReturnButtonLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 2.2f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            showText("return", 15f, textColor, specialKeyBg)
+            showText("return", 15f, if (isOnePiece) Color.WHITE else textColor, specialKeyBg)
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_RETURN") }
@@ -969,26 +1012,38 @@ class KeyboardLayout(private val context: Context) {
         }
 
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         val keyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece
             isWoody -> R.drawable.key_bg_woody
             isDark -> R.drawable.key_bg_ios_dark
             else -> R.drawable.key_bg_ios_light
         }
         val specialKeyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece_special
             isWoody -> R.drawable.key_bg_woody_special
             isDark -> R.drawable.key_bg_special_dark
             else -> R.drawable.key_bg_special_light
         }
         val actionKeyBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece_action
             isWoody -> R.drawable.key_bg_woody_action
             else -> R.drawable.key_bg_blue
         }
         val textColor = when {
+            isOnePiece -> Color.parseColor("#1F130B")
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+        val specialTextColor = when {
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
         }
         val subColor = when {
+            isOnePiece -> Color.parseColor("#6D4C27")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
@@ -1030,7 +1085,7 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        fun createNumpadSpecialButton(label: String, output: String, bgRes: Int = specialKeyBg, txtColor: Int = textColor, weight: Float = 0.85f): TextView {
+        fun createNumpadSpecialButton(label: String, output: String, bgRes: Int = specialKeyBg, txtColor: Int = specialTextColor, weight: Float = 0.85f): TextView {
             return TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
                     .apply { setMargins(dp(3), 0, dp(3), 0) }
@@ -1087,7 +1142,7 @@ class KeyboardLayout(private val context: Context) {
                 .apply { setMargins(dp(3), 0, dp(3), 0) }
             background = ContextCompat.getDrawable(context, specialKeyBg)
             setImageResource(R.drawable.ic_backspace)
-            setColorFilter(textColor)
+            setColorFilter(specialTextColor)
             isClickable = true
             isFocusable = false
             setupRapidBackspaceTouch(this) { onKeyAction("ACTION_BACKSPACE") }
@@ -1104,7 +1159,7 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(createNumpadSpecialButton("ABC", "ACTION_ABC", weight = 1.0f))
         r4.addView(createNumpadDigitButton("0", "", weight = 1.0f))
-        r4.addView(createNumpadSpecialButton(".", ".", bgRes = keyBg, weight = 1.0f))
+        r4.addView(createNumpadSpecialButton(".", ".", bgRes = keyBg, txtColor = textColor, weight = 1.0f))
 
         val btnReturn = ReturnButtonLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 0.85f)
@@ -1981,17 +2036,21 @@ class KeyboardLayout(private val context: Context) {
         }
 
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         val cardBg = when {
+            isOnePiece -> R.drawable.key_bg_onepiece
             isWoody -> R.drawable.key_bg_woody
             isDark -> R.drawable.key_bg_ios_dark
             else -> R.drawable.key_bg_ios_light
         }
         val textColor = when {
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.BLACK
         }
         val subtextColor = when {
+            isOnePiece -> Color.parseColor("#C4A587")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
@@ -2019,7 +2078,7 @@ class KeyboardLayout(private val context: Context) {
         // View Mode Toggle Button (Card vs List)
         val btnMode = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(dp(72), dp(30)).apply { setMargins(0, 0, dp(6), 0) }
-            background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+            background = ContextCompat.getDrawable(context, if (isOnePiece) R.drawable.key_bg_onepiece_special else if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
             text = if (currentViewMode == "card") "🎴 Card" else "📑 List"
             setTextColor(textColor)
             textSize = 12f
@@ -2135,7 +2194,7 @@ class KeyboardLayout(private val context: Context) {
         if (items.any { !it.isPinned }) {
             val btnClear = TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(72), dp(30)).apply { setMargins(0, 0, dp(6), 0) }
-                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+                background = ContextCompat.getDrawable(context, if (isOnePiece) R.drawable.key_bg_onepiece_special else if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
                 text = "🗑️ Bersih"
                 setTextColor(subtextColor)
                 textSize = 11.5f
@@ -2150,7 +2209,7 @@ class KeyboardLayout(private val context: Context) {
         // Close Button
         val btnClose = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(dp(60), dp(30))
-            background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_action else R.drawable.key_bg_blue)
+            background = ContextCompat.getDrawable(context, if (isOnePiece) R.drawable.key_bg_onepiece_action else if (isWoody) R.drawable.key_bg_woody_action else R.drawable.key_bg_blue)
             text = "Tutup"
             setTextColor(Color.WHITE)
             textSize = 12.5f
@@ -2470,7 +2529,8 @@ class KeyboardLayout(private val context: Context) {
         val stepDistanceX = dp(12).toFloat()
         val stepDistanceY = dp(14).toFloat()
         val isWoody = (themeMode == "woody")
-        val normalTextColor = if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+        val isOnePiece = (themeMode == "onepiece")
+        val normalTextColor = if (isOnePiece) Color.parseColor("#1F130B") else if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
 
         fun restoreLetterKeyText() {
             for ((tv, _) in letterKeyViews) {
@@ -2484,7 +2544,7 @@ class KeyboardLayout(private val context: Context) {
             isSpaceTrackpadActive = false
             isSelectingText = false
             view.text = defaultText
-            view.setTextColor(if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
+            view.setTextColor(if (isOnePiece) Color.parseColor("#6D4C27") else if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#8E8E93"))
             view.setTypeface(view.typeface, android.graphics.Typeface.NORMAL)
             restoreLetterKeyText()
             onTrackpadStateChanged?.invoke(false)
@@ -2495,7 +2555,7 @@ class KeyboardLayout(private val context: Context) {
             isSpaceTrackpadActive = true
             isSelectingText = false
             view.text = "│   geser kursor   │"
-            view.setTextColor(if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
+            view.setTextColor(if (isOnePiece) Color.parseColor("#FFD54F") else if (isWoody) Color.parseColor("#FFA726") else ContextCompat.getColor(context, R.color.ios_blue))
             view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
             view.parent?.requestDisallowInterceptTouchEvent(true)
 
@@ -2985,22 +3045,27 @@ class KeyboardLayout(private val context: Context) {
         }
 
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         val textColor = when {
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.parseColor("#000000")
         }
         val subtextColor = when {
+            isOnePiece -> Color.parseColor("#C4A587")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
         }
         val surfaceColor = when {
+            isOnePiece -> Color.parseColor("#802A0E06")
             isWoody -> Color.parseColor("#331A0E08")
             isDark -> Color.parseColor("#2C2C2E")
             else -> Color.parseColor("#FFFFFF")
         }
         val circularBtnBg = when {
+            isOnePiece -> Color.parseColor("#CC2A0E06")
             isWoody -> Color.parseColor("#4D1A0E08")
             isDark -> Color.parseColor("#2C2C2E")
             else -> Color.parseColor("#E5E5EA")
@@ -3291,22 +3356,27 @@ class KeyboardLayout(private val context: Context) {
         }
 
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         val textColor = when {
+            isOnePiece -> Color.parseColor("#FFE082")
             isWoody -> Color.parseColor("#FFF3E0")
             isDark -> Color.WHITE
             else -> Color.parseColor("#000000")
         }
         val subtextColor = when {
+            isOnePiece -> Color.parseColor("#C4A587")
             isWoody -> Color.parseColor("#C4A587")
             isDark -> Color.parseColor("#98989D")
             else -> Color.parseColor("#8E8E93")
         }
         val rowBg = when {
+            isOnePiece -> Color.parseColor("#802A0E06")
             isWoody -> Color.parseColor("#331A0E08")
             isDark -> Color.parseColor("#242426")
             else -> Color.parseColor("#FFFFFF")
         }
         val searchBg = when {
+            isOnePiece -> Color.parseColor("#CC2A0E06")
             isWoody -> Color.parseColor("#4D1A0E08")
             isDark -> Color.parseColor("#2C2C2E")
             else -> Color.parseColor("#E5E5EA")
@@ -3378,45 +3448,6 @@ class KeyboardLayout(private val context: Context) {
         headerRow.addView(btnDone)
         mainLayout.addView(headerRow)
 
-        // Cupertino Real-Time Search Bar
-        val searchBox = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(30)
-            ).apply { setMargins(dp(2), 0, dp(2), dp(6)) }
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(9).toFloat()
-                setColor(searchBg)
-            }
-            setPadding(dp(8), 0, dp(8), 0)
-        }
-
-        val searchIcon = TextView(context).apply {
-            text = "🔍"
-            textSize = 10f
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                setMargins(0, 0, dp(6), 0)
-            }
-        }
-        searchBox.addView(searchIcon)
-
-        val searchInput = android.widget.EditText(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.0f)
-            background = null
-            hint = "Cari aplikasi..."
-            setHintTextColor(subtextColor)
-            setTextColor(textColor)
-            textSize = 12f
-            maxLines = 1
-            isSingleLine = true
-            imeOptions = EditorInfo.IME_ACTION_DONE
-        }
-        searchBox.addView(searchInput)
-        mainLayout.addView(searchBox)
-
         // Scrollable List of Installed Apps
         val scrollView = ScrollView(context).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -3435,20 +3466,6 @@ class KeyboardLayout(private val context: Context) {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
-
-        // Live Filter
-        searchInput.addTextChangedListener(object : android.text.TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val q = s?.toString()?.trim()?.lowercase() ?: ""
-                for (i in 0 until listContainer.childCount) {
-                    val child = listContainer.getChildAt(i)
-                    val tagStr = (child.tag as? String) ?: ""
-                    child.visibility = if (q.isEmpty() || tagStr.lowercase().contains(q)) View.VISIBLE else View.GONE
-                }
-            }
-            override fun afterTextChanged(s: android.text.Editable?) {}
-        })
 
         for (app in installedApps) {
             val isSelected = selectedSet.contains(app.packageName)

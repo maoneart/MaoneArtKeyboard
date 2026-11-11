@@ -58,7 +58,7 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
 
             // Ratio of current system volume (0.0 .. 1.0) scaled dynamically
             val systemRatio = if (maxVol > 0) sysVol.toFloat() / maxVol.toFloat() else 1.0f
-            val finalVolume = (systemRatio * prefs.soundVolume.coerceIn(0.5f, 1.0f)).coerceIn(0.01f, 1.0f)
+            val finalVolume = (systemRatio * prefs.soundVolume.coerceIn(0.05f, 1.0f)).coerceIn(0.01f, 1.0f)
 
             if (!asyncExecutor.isShutdown && !asyncExecutor.isTerminated) {
                 asyncExecutor.execute {

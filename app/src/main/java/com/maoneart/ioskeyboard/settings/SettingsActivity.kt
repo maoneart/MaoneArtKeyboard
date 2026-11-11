@@ -321,6 +321,7 @@ class SettingsActivity : AppCompatActivity() {
             "dark" -> "iOS Dark"
             "light" -> "iOS Light"
             "woody" -> "Woody (Sony Xperia) 🪵"
+            "onepiece" -> "One Piece (Bajak Laut) 🏴‍☠️"
             else -> "Otomatis"
         }
     }
@@ -356,12 +357,14 @@ class SettingsActivity : AppCompatActivity() {
             "Otomatis (Ikuti Sistem)",
             "iOS Light (Terang)",
             "iOS Dark (Gelap)",
-            "Woody (Sony Xperia Edition) 🪵"
+            "Woody (Sony Xperia Edition) 🪵",
+            "One Piece (Bajak Laut) 🏴‍☠️"
         )
         val currentSelection = when (prefs.themeMode) {
             "light" -> 1
             "dark" -> 2
             "woody" -> 3
+            "onepiece" -> 4
             else -> 0
         }
 
@@ -373,6 +376,7 @@ class SettingsActivity : AppCompatActivity() {
                         1 -> "light"
                         2 -> "dark"
                         3 -> "woody"
+                        4 -> "onepiece"
                         else -> "auto"
                     }
                     updateThemeLabel()

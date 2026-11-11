@@ -72,7 +72,12 @@ class QuickPathContainerLayout(
         isMotionEventSplittingEnabled = true
 
         val isWoody = (themeMode == "woody")
+        val isOnePiece = (themeMode == "onepiece")
         when {
+            isOnePiece -> {
+                popupBubble.background = ContextCompat.getDrawable(context, R.drawable.ios_key_popup_onepiece)
+                tvPopupChar.setTextColor(Color.parseColor("#2A1808"))
+            }
             isWoody -> {
                 popupBubble.background = ContextCompat.getDrawable(context, R.drawable.ios_key_popup_woody)
                 tvPopupChar.setTextColor(Color.parseColor("#FFF3E0"))

@@ -2,6 +2,7 @@ package com.maoneart.ioskeyboard
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
@@ -495,6 +496,7 @@ class IosInputMethodService : InputMethodService() {
     private fun isDarkMode(): Boolean {
         return try {
             when (prefs.themeMode) {
+                "onepiece" -> true
                 "woody" -> true
                 "dark" -> true
                 "light" -> false
@@ -512,25 +514,36 @@ class IosInputMethodService : InputMethodService() {
         try {
             val isDark = isDarkMode()
             val isWoody = (prefs.themeMode == "woody")
+            val isOnePiece = (prefs.themeMode == "onepiece")
             val keyboardRoot = view.findViewById<LinearLayout>(R.id.keyboardRoot)
             val topToolbar = view.findViewById<LinearLayout>(R.id.topToolbar)
             val textColor = when {
+                isOnePiece -> Color.parseColor("#2A1808")
                 isWoody -> Color.parseColor("#FFF3E0")
                 isDark -> Color.WHITE
                 else -> Color.BLACK
             }
             val secondaryText = when {
+                isOnePiece -> Color.parseColor("#FFE082")
                 isWoody -> Color.parseColor("#C4A587")
                 isDark -> Color.LTGRAY
                 else -> Color.DKGRAY
             }
             val iconTint = when {
+                isOnePiece -> Color.parseColor("#FFE082")
                 isWoody -> Color.parseColor("#E8D5B5")
                 isDark -> Color.WHITE
                 else -> Color.BLACK
             }
 
-            if (isWoody) {
+            if (isOnePiece) {
+                keyboardRoot?.setBackgroundResource(R.drawable.theme_onepiece_bg)
+                keyboardRoot?.minimumHeight = 0
+                topToolbar?.setBackgroundColor(Color.parseColor("#EB2A0E06"))
+                translatePanel?.setBackgroundColor(Color.parseColor("#F02A0E06"))
+                tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_onepiece)
+                tvTranslateInputBox?.setTextColor(textColor)
+            } else if (isWoody) {
                 keyboardRoot?.setBackgroundResource(R.drawable.theme_woody_bg)
                 keyboardRoot?.minimumHeight = 0
                 topToolbar?.setBackgroundColor(Color.parseColor("#4D1A0E08"))
@@ -546,9 +559,11 @@ class IosInputMethodService : InputMethodService() {
                 tvTranslateInputBox?.setTextColor(textColor)
             }
 
-            candidate1?.setTextColor(secondaryText)
-            candidate2?.setTextColor(textColor)
-            candidate3?.setTextColor(secondaryText)
+            val toolbarCandidateColor = if (isOnePiece) Color.parseColor("#FFE082") else textColor
+            val toolbarSecondaryColor = if (isOnePiece) Color.parseColor("#C4A587") else secondaryText
+            candidate1?.setTextColor(toolbarSecondaryColor)
+            candidate2?.setTextColor(toolbarCandidateColor)
+            candidate3?.setTextColor(toolbarSecondaryColor)
 
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
@@ -603,14 +618,19 @@ class IosInputMethodService : InputMethodService() {
             val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
-            val list = pm.queryIntentActivities(mainIntent, 0)
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PackageManager.MATCH_ALL
+            } else {
+                0
+            }
+            val list = pm.queryIntentActivities(mainIntent, flags)
             list.mapNotNull { resolveInfo ->
                 val pkg = resolveInfo.activityInfo.packageName
                 if (pkg == packageName) return@mapNotNull null // Exclude ourselves
                 val label = resolveInfo.loadLabel(pm).toString()
                 val icon = resolveInfo.loadIcon(pm)
                 KeyboardLayout.AppShortcutItem(pkg, label, icon)
-            }.sortedBy { it.appName.lowercase() }
+            }.distinctBy { it.packageName }.sortedBy { it.appName.lowercase() }
         } catch (_: Throwable) {
             emptyList()
         }

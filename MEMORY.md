@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.84 / build 82)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.83 / build 83)
 
 ---
 
@@ -517,3 +517,20 @@
        - Suara tombol keyboard kini 100% mengikuti volume sistem Android secara real-time (`audioManager.getStreamVolume(STREAM_SYSTEM)`).
        - Ketika tombol volume HP dinaikkan, suara ketikan ikut membesar; ketika dikecilkan, suara ketikan ikut mengecil proporsional.
        - Jika HP dalam mode Silent, Getar (`RINGER_MODE_SILENT` / `RINGER_MODE_VIBRATE`), atau slider volume sistem di-mute (0), suara tombol otomatis senyap tanpa delay.
+  - **Tema One Piece Bajak Laut, Query All Packages WA/IG & Penghapusan Kolom Cari (Release v1.0.83)**:
+    1. **Tema Baru One Piece (Bajak Laut Straw Hat Luffy & Thousand Sunny) 🏴‍☠️**:
+       - Penambahan tema keyboard kelima "One Piece (Bajak Laut)" di Pengaturan Keyboard.
+       - Background wallpaper: Monkey D. Luffy tersenyum di sisi kiri dan kapal Thousand Sunny berlayar di lautan biru cerah di sisi kanan (`onepiece_bg.jpg`).
+       - Tuts Huruf/QWERTY: Kartu perkamen peta harta karun semi-transparan dengan bingkai perunggu kuno dan paku rivet (`key_bg_onepiece`).
+       - Tuts Fungsi/Spesial (123, Shift, Backspace, Numpad): Pelat besi berkarat bajak laut dengan teks dan ikon emas bajak laut (`key_bg_onepiece_special`).
+       - Tuts Aksi (Return/Enter/Cari): Plakat logam perunggu emas bajak laut (`key_bg_onepiece_action`).
+       - Tombol Emoji: Kemudi kapal bajak laut otentik dengan kepala Luffy tersenyum di tengah (`ic_onepiece_luffy.png`).
+       - Toolbar: Balok kayu kapal mahoni bajak laut gelap (`#2A0E06`) dengan teks kandidat dan tombol emas bajak laut (`#FFE082`).
+    2. **Visibilitas 100% Seluruh Aplikasi Pihak Ketiga (WhatsApp, Instagram, dll.)**:
+       - Ditambahkan `<uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />` dan blok `<queries>` di `AndroidManifest.xml`.
+       - Filter launcher di `IosInputMethodService.kt` ditingkatkan dengan flag `PackageManager.MATCH_ALL` dan `.distinctBy { it.packageName }`. Seluruh aplikasi non-sistem (WhatsApp, IG, TikTok, games, dll.) kini terdeteksi bersih dan lengkap.
+    3. **Pencopotan Kolom Cari di Laci Pemilih Aplikasi**:
+       - Kolom input pencarian di laci pemilih aplikasi (`Mode.APP_PICKER`) telah dicopot tuntas agar tidak memotong ruang vertikal dan karena keyboard sedang dalam mode laci aplikasi (tidak bisa mengetik teks pencarian). Ruang daftar aplikasi kini jauh lebih luas, leluasa di-scroll, dan rapi.
+    4. **Kalibrasi Suara Dinamis Murni `STREAM_SYSTEM`**:
+       - Volume klik ketikan tuts dikalibrasi rasio 1:1 langsung terhadap `STREAM_SYSTEM` tanpa batas bawah kaku, menghasilkan dinamika suara yang akurat saat tombol volume fisik HP dinaikkan atau diturunkan.
+

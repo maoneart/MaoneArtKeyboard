@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Deep Pirate Shadow -->
+    <item android:left="1dp" android:right="1dp" android:top="2dp" android:bottom="0dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="11dp" />
+            <solid android:color="#70000000" />
+        </shape>
+    </item>
+    <!-- Warm Pirate Parchment Pop-up with Bronze Accent -->
+    <item android:left="1dp" android:right="1dp" android:top="0dp" android:bottom="2dp">
+        <shape android:shape="rectangle">
+            <corners android:radius="10dp" />
+            <solid android:color="#F5E8D0" />
+            <stroke android:width="1.5dp" android:color="#9B6937" />
+        </shape>
+    </item>
+</layer-list>
