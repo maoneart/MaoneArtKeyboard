@@ -40,19 +40,33 @@ class AudioHapticManager(private val context: Context, private val prefs: Keyboa
         null
     }
 
-    fun playClickSound(view: View? = null) {
+    fun playClickSound(view: View? = null, effectType: Int = AudioManager.FX_KEYPRESS_STANDARD) {
         if (!prefs.isSoundEnabled) return
-        val vol = prefs.soundVolume.coerceIn(0f, 1.0f)
-        if (vol <= 0.01f) return
 
+        val am = audioManager ?: return
         try {
+            // Respect ringer mode: if silent or vibrate, do not play click sound
+            val ringerMode = am.ringerMode
+            if (ringerMode == AudioManager.RINGER_MODE_SILENT || ringerMode == AudioManager.RINGER_MODE_VIBRATE) {
+                return
+            }
+
+            // Sync 100% with Android System Volume (STREAM_SYSTEM)
+            val sysVol = am.getStreamVolume(AudioManager.STREAM_SYSTEM)
+            val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_SYSTEM)
+            if (sysVol <= 0) return // muted in system
+
+            // Ratio of current system volume (0.0 .. 1.0) scaled dynamically
+            val systemRatio = if (maxVol > 0) sysVol.toFloat() / maxVol.toFloat() else 1.0f
+            val finalVolume = (systemRatio * prefs.soundVolume.coerceIn(0.5f, 1.0f)).coerceIn(0.01f, 1.0f)
+
             if (!asyncExecutor.isShutdown && !asyncExecutor.isTerminated) {
                 asyncExecutor.execute {
                     try {
-                        audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD, vol)
+                        am.playSoundEffect(effectType, finalVolume)
                     } catch (_: Throwable) {
                         try {
-                            audioManager?.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD)
+                            am.playSoundEffect(effectType)
                         } catch (_: Throwable) {
                             try {
                                 val target = view ?: activeRootView

@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.82 / build 81)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.83 / build 82)
 
 ---
 
@@ -512,3 +512,8 @@
        - *Cupertino Checkmark Circle*: Di laci pemilih aplikasi, tombol kaku "+ Tambah / ✓ Aktif" diganti dengan **Lingkaran Centang Apple iOS**: lingkaran kosong bergaris halus saat belum dipilih dan lingkaran biru Apple solid `#007AFF` dengan centang putih bersih `✓` saat aktif.
        - *Bilah Pencarian Cepat Cupertino*: Dilengkapi kotak pencarian instan iOS (`🔍 Cari aplikasi...`) di bagian atas pemilih aplikasi untuk menyaring puluhan aplikasi terpasang secara real-time.
        - *Tombol "Selesai" Apple Blue*: Tombol modal Apple Blue kapsul (`#007AFF`) di sudut kanan atas laci pemilih aplikasi untuk menyimpan pilihan dan kembali ke drawer.
+  - **Sinkronisasi Volume Suara Tombol dengan Volume Sistem (Release v1.0.82)**:
+    1. **Dynamic System Volume Tracking (`STREAM_SYSTEM`)**:
+       - Suara tombol keyboard kini 100% mengikuti volume sistem Android secara real-time (`audioManager.getStreamVolume(STREAM_SYSTEM)`).
+       - Ketika tombol volume HP dinaikkan, suara ketikan ikut membesar; ketika dikecilkan, suara ketikan ikut mengecil proporsional.
+       - Jika HP dalam mode Silent, Getar (`RINGER_MODE_SILENT` / `RINGER_MODE_VIBRATE`), atau slider volume sistem di-mute (0), suara tombol otomatis senyap tanpa delay.
