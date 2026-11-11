@@ -611,7 +611,6 @@ class KeyboardLayout(private val context: Context) {
             container.setTrailColor(Color.parseColor("#99FFA726"))
         } else if (isDark) {
             container.setTrailColor(Color.parseColor("#9964D2FF"))
-        }
         } else {
             container.setTrailColor(Color.parseColor("#99007AFF"))
         }
