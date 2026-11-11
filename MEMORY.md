@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.78)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.79)
 
 ---
 
@@ -477,3 +477,14 @@
     2. **Normalisasi Insets & Spas Bawah di WhatsApp**:
        - *Root Cause*: `onConfigureWindow` yang memaksa `win.setLayout(MATCH_PARENT, WRAP_CONTENT)` dan `win.setGravity(Gravity.BOTTOM)` mengacaukan perhitungan `InputMethodManagerService` dan Samsung navigation insets, menyebabkan WhatsApp menyisipkan spacer kosong raksasa di bawah keyboard ("kegedan spas bawahnya"). Serta bobot space bar (`spaceWeight`) di layar landscape terlalu lebar.
        - *Solusi*: Menghapus `onConfigureWindow` dan menghapus `layout_gravity="bottom"` serta `gravity="bottom"` dari `keyboardRoot`. Keyboard kembali ke sistem insets native Android yang rapat dan presisi di atas navigation bar. Bobot tuts spasi landscape dikalibrasi proporsional (`3.6f` / `4.5f`) dengan padding samping `44dp` dan font tuts `20sp`.
+  - **Fitur Pintasan Aplikasi Cepat, Solusi Termux Landscape Auto-Dismiss & Ergonomi iPad Row 4 (Release v1.0.79)**:
+    1. **Fitur Bilah Pintasan Aplikasi Cepat (Quick App Switcher Bar)**:
+       - *Tombol Toolbar Grid Apps (`btnQuickApps`)*: Ikon grid minimalis 4 squircle iOS (`ic_apps_grid.xml`) di toolbar atas sebelah tombol clipboard. Sekali ketuk langsung menggeser/mengganti deretan bilah saran dengan deretan ikon aplikasi terpasang (`appShortcutsBar`).
+       - *Pill Kapsul Aplikasi Bergaya iOS*: Setiap aplikasi ditampilkan dengan ikon resmi jernih dan label nama aplikasi, dikemas dalam kapsul berlatar belakang rapi. Sekali klik langsung berpindah ke aplikasi tersebut via `FLAG_ACTIVITY_NEW_TASK`.
+       - *Kustomisasi Bebas Aplikasi Terinstall*: Tekan tombol `➕ Tambah` atau tahan tombol `btnQuickApps` untuk membuka panel pengelola pintasan di dalam keyboard (`Mode.APP_PICKER`). Menampilkan seluruh aplikasi yang terpasang di Android (`CATEGORY_LAUNCHER`), lengkap dengan status centang aktif/tambah. Minimal 5 aplikasi bawaan (WhatsApp, Termux, Chrome, YouTube, Settings) yang tersimpan permanen di `KeyboardPreferences`.
+    2. **Solusi Mutlak Termux Landscape Auto-Dismiss ("Drop ke Bawah & Hilang")**:
+       - *Root Cause*: (a) `onEvaluateInputViewShown()` default Android mengembalikan `false` saat rotasi landscape atau konfigurasi tertentu pada TerminalView Termux; (b) insets touchable tidak terdefinisi presisi sehingga sentuhan keyboard bocor ke Termux di baliknya yang memicu `hideSoftInput`; (c) pemanggilan `getTextBeforeCursor` di `executeSuggestionUpdate` mereset koneksi PTY terminal Termux.
+       - *Solusi*: Meng-override `onEvaluateInputViewShown() = true` dan `onShowInputRequested() = true` (menjamin keyboard TIDAK AKAN PERNAH menutup sendiri di landscape); meng-override `onComputeInsets` dengan `TOUCHABLE_INSETS_CONTENT` terkunci pada koordinat root view; serta bypass instan pada `executeSuggestionUpdate` saat `isTerminalOrRawInput()` aktif tanpa memicu query cursor ke terminal.
+    3. **Ergonomi iPad Row 4 Landscape & Kalibrasi Spasi Bawah WhatsApp**:
+       - *Root Cause*: Row 4 sebelumnya hanya diisi 4 tombol sehingga tuts spasi melebar raksasa hingga 50% layar (~400dp di landscape), terasa sangat canggung dan berjarak jauh.
+       - *Solusi*: Mengadopsi tata letak ergonomi iPad Pro pada mode landscape: menambahkan tombol koma `,` di sebelah kiri spasi, titik `.` di sebelah kanan spasi, dan tombol sembunyikan keyboard (`ACTION_HIDE_KEYBOARD`) di pojok kanan bawah. Bobot spasi landscape dipangkas menjadi **2.5f** (hanya ~24% layar, pas dan proporsional di tengah), serta bobot spasi portrait diturunkan dari 5.4f menjadi **3.6f–4.4f**. Baris bawah di WhatsApp kini sangat seimbang, proporsional, dan tuts tanda baca koma & titik dapat langsung ditekan tanpa berpindah ke mode 123.

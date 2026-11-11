@@ -81,4 +81,42 @@ class KeyboardPreferences(context: Context) {
     var isAutoCapitalizationEnabled: Boolean
         get() = prefs.getBoolean("auto_capitalization_enabled", true)
         set(value) = prefs.edit().putBoolean("auto_capitalization_enabled", value).apply()
+
+    var appShortcutsJson: String
+        get() = prefs.getString("app_shortcuts_json", "") ?: ""
+        set(value) = prefs.edit().putString("app_shortcuts_json", value).apply()
+
+    var isAppShortcutsBarActive: Boolean
+        get() = prefs.getBoolean("app_shortcuts_bar_active", false)
+        set(value) = prefs.edit().putBoolean("app_shortcuts_bar_active", value).apply()
+
+    fun getAppShortcuts(): List<String> {
+        val raw = appShortcutsJson.trim()
+        if (raw.isNotEmpty()) {
+            try {
+                val array = org.json.JSONArray(raw)
+                val list = mutableListOf<String>()
+                for (i in 0 until array.length()) {
+                    val pkg = array.optString(i)
+                    if (pkg.isNotEmpty() && !list.contains(pkg)) {
+                        list.add(pkg)
+                    }
+                }
+                if (list.isNotEmpty()) return list
+            } catch (_: Throwable) {}
+        }
+        return listOf(
+            "com.whatsapp",
+            "com.termux",
+            "com.android.chrome",
+            "com.google.android.youtube",
+            "com.android.settings"
+        )
+    }
+
+    fun saveAppShortcuts(list: List<String>) {
+        val array = org.json.JSONArray()
+        list.distinct().forEach { array.put(it) }
+        appShortcutsJson = array.toString()
+    }
 }

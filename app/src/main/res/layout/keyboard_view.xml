@@ -38,6 +38,15 @@
             android:src="@drawable/ic_clipboard"
             android:contentDescription="Clipboard History" />
 
+        <!-- Quick App Shortcuts Button -->
+        <ImageButton
+            android:id="@+id/btnQuickApps"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@drawable/btn_icon_ripple"
+            android:src="@drawable/ic_apps_grid"
+            android:contentDescription="Pintasan Aplikasi" />
+
         <!-- Candidate Suggestions Row -->
         <LinearLayout
             android:id="@+id/candidatesRow"
@@ -93,6 +102,25 @@
                 android:maxLines="1"
                 android:ellipsize="end" />
         </LinearLayout>
+
+        <!-- App Shortcuts Scroll Bar (Quick App Switcher) -->
+        <HorizontalScrollView
+            android:id="@+id/appShortcutsBar"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/layoutAppShortcuts"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp" />
+        </HorizontalScrollView>
 
         <!-- Language Switch Badge (ID / EN) -->
         <TextView

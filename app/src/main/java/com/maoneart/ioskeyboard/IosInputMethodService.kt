@@ -50,7 +50,8 @@ class IosInputMethodService : InputMethodService() {
         SYMBOLS_123,
         SYMBOLS_MORE,
         EMOJI,
-        CLIPBOARD
+        CLIPBOARD,
+        APP_PICKER
     }
 
     private lateinit var prefs: KeyboardPreferences
@@ -87,10 +88,14 @@ class IosInputMethodService : InputMethodService() {
     // View References
     private var rootView: View? = null
     private var keyboardContainer: FrameLayout? = null
+    private var candidatesRow: LinearLayout? = null
     private var candidate1: TextView? = null
     private var candidate2: TextView? = null
     private var candidate3: TextView? = null
     private var badgeLanguage: TextView? = null
+    private var btnQuickApps: ImageButton? = null
+    private var appShortcutsBar: HorizontalScrollView? = null
+    private var layoutAppShortcuts: LinearLayout? = null
 
     // Translate Panel Views
     private var translatePanel: LinearLayout? = null
@@ -162,10 +167,16 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.activeRootView = view
 
             keyboardContainer = view.findViewById(R.id.keyboardContainer)
+            candidatesRow = view.findViewById(R.id.candidatesRow)
             candidate1 = view.findViewById(R.id.candidate1)
             candidate2 = view.findViewById(R.id.candidate2)
             candidate3 = view.findViewById(R.id.candidate3)
             badgeLanguage = view.findViewById(R.id.badgeLanguage)
+
+            // Setup App Shortcuts
+            btnQuickApps = view.findViewById(R.id.btnQuickApps)
+            appShortcutsBar = view.findViewById(R.id.appShortcutsBar)
+            layoutAppShortcuts = view.findViewById(R.id.layoutAppShortcuts)
 
             // Setup Translate Panel
             translatePanel = view.findViewById(R.id.translatePanel)
@@ -199,6 +210,19 @@ class IosInputMethodService : InputMethodService() {
             val btnQuickClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
             val btnQuickSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
             val btnHideKeyboard = view.findViewById<ImageButton>(R.id.btnHideKeyboard)
+
+            btnQuickApps?.setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                toggleAppShortcutsBar()
+            }
+
+            btnQuickApps?.setOnLongClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                switchMode(Mode.APP_PICKER)
+                true
+            }
 
             btnHideKeyboard?.setOnClickListener {
                 audioHaptic.playClickSound(it)
@@ -276,6 +300,11 @@ class IosInputMethodService : InputMethodService() {
 
             updateLanguageBadge()
             updateTranslatePanelUI()
+            if (prefs.isAppShortcutsBarActive) {
+                appShortcutsBar?.visibility = View.VISIBLE
+                candidatesRow?.visibility = View.GONE
+                renderAppShortcutsBar()
+            }
             applyThemeStyling(view)
             adjustLayoutForOrientation(resources.configuration.orientation)
             renderCurrentLayout()
@@ -290,6 +319,28 @@ class IosInputMethodService : InputMethodService() {
     override fun onEvaluateFullscreenMode(): Boolean {
         // Never allow full-screen extract mode in landscape so keyboard is always anchored cleanly at the bottom
         return false
+    }
+
+    override fun onEvaluateInputViewShown(): Boolean {
+        super.onEvaluateInputViewShown()
+        return true
+    }
+
+    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        return true
+    }
+
+    override fun onComputeInsets(outInsets: InputMethodService.Insets) {
+        super.onComputeInsets(outInsets)
+        try {
+            val root = rootView ?: return
+            val loc = IntArray(2)
+            root.getLocationInWindow(loc)
+            val top = loc[1]
+            outInsets.contentTopInsets = top
+            outInsets.visibleTopInsets = top
+            outInsets.touchableInsets = InputMethodService.Insets.TOUCHABLE_INSETS_CONTENT
+        } catch (_: Throwable) {}
     }
 
     override fun updateFullscreenMode() {
@@ -328,6 +379,7 @@ class IosInputMethodService : InputMethodService() {
                 listOf(
                     R.id.btnQuickTranslate,
                     R.id.btnQuickClipboard,
+                    R.id.btnQuickApps,
                     R.id.btnQuickSettings,
                     R.id.btnHideKeyboard
                 ).forEach { id ->
@@ -399,6 +451,11 @@ class IosInputMethodService : InputMethodService() {
             updateSuggestions()
             updateLanguageBadge()
             updateTranslatePanelUI()
+            if (prefs.isAppShortcutsBarActive) {
+                appShortcutsBar?.visibility = View.VISIBLE
+                candidatesRow?.visibility = View.GONE
+                renderAppShortcutsBar()
+            }
             rootView?.let { applyThemeStyling(it) }
 
             if (!isCapsLock) {
@@ -534,11 +591,14 @@ class IosInputMethodService : InputMethodService() {
 
             val btnTranslate = view.findViewById<ImageButton>(R.id.btnQuickTranslate)
             val btnClipboard = view.findViewById<ImageButton>(R.id.btnQuickClipboard)
+            val btnApps = view.findViewById<ImageButton>(R.id.btnQuickApps)
             val btnSettings = view.findViewById<ImageButton>(R.id.btnQuickSettings)
             val btnHide = view.findViewById<ImageButton>(R.id.btnHideKeyboard)
 
+            val isAppsActive = (appShortcutsBar?.visibility == View.VISIBLE)
             btnTranslate?.setColorFilter(iconTint)
             btnClipboard?.setColorFilter(iconTint)
+            btnApps?.setColorFilter(if (isAppsActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
             btnSettings?.setColorFilter(iconTint)
             btnHide?.setColorFilter(iconTint)
             badgeLanguage?.setTextColor(iconTint)
@@ -575,6 +635,165 @@ class IosInputMethodService : InputMethodService() {
             switchMode(Mode.QWERTY)
         }
         updateTranslatePanelUI()
+    }
+
+    private fun toggleAppShortcutsBar() {
+        val bar = appShortcutsBar ?: return
+        val cRow = candidatesRow ?: return
+        val isVisible = (bar.visibility == View.VISIBLE)
+
+        if (isVisible) {
+            bar.visibility = View.GONE
+            cRow.visibility = View.VISIBLE
+            prefs.isAppShortcutsBarActive = false
+            rootView?.let { applyThemeStyling(it) }
+        } else {
+            bar.visibility = View.VISIBLE
+            cRow.visibility = View.GONE
+            prefs.isAppShortcutsBarActive = true
+            btnQuickApps?.setColorFilter(ContextCompat.getColor(this, R.color.ios_blue))
+            renderAppShortcutsBar()
+        }
+    }
+
+    private fun renderAppShortcutsBar() {
+        val container = layoutAppShortcuts ?: return
+        container.removeAllViews()
+
+        val shortcuts = prefs.getAppShortcuts()
+        val pm = packageManager
+        val isDark = isDarkMode()
+        val isLandscape = (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
+        val isWoody = (prefs.themeMode == "woody")
+
+        val pillBg = when {
+            isWoody -> R.drawable.key_bg_woody
+            isDark -> R.drawable.key_bg_ios_dark
+            else -> R.drawable.key_bg_ios_light
+        }
+        val textColor = when {
+            isWoody -> Color.parseColor("#FFF3E0")
+            isDark -> Color.WHITE
+            else -> Color.BLACK
+        }
+
+        for (pkg in shortcuts) {
+            try {
+                val appInfo = pm.getApplicationInfo(pkg, 0)
+                val label = pm.getApplicationLabel(appInfo).toString()
+                val icon = pm.getApplicationIcon(appInfo)
+
+                val pill = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        dp(if (isLandscape) 26 else 32)
+                    ).apply { setMargins(dp(3), 0, dp(3), 0) }
+                    background = ContextCompat.getDrawable(this@IosInputMethodService, pillBg)
+                    setPadding(dp(7), 0, dp(9), 0)
+                    isClickable = true
+                    isFocusable = false
+                    setOnClickListener {
+                        audioHaptic.playClickSound(it)
+                        audioHaptic.triggerHapticFeedback(it)
+                        try {
+                            val intent = pm.getLaunchIntentForPackage(pkg)?.apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            if (intent != null) {
+                                startActivity(intent)
+                            }
+                        } catch (t: Throwable) {
+                            Log.e("IosInputMethodService", "Failed to launch $pkg", t)
+                        }
+                    }
+                }
+
+                val iv = android.widget.ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(if (isLandscape) 18 else 20), dp(if (isLandscape) 18 else 20))
+                    setImageDrawable(icon)
+                    scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                }
+                pill.addView(iv)
+
+                val tv = TextView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { setMargins(dp(5), 0, 0, 0) }
+                    text = label
+                    setTextColor(textColor)
+                    textSize = if (isLandscape) 10.5f else 11.5f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    maxLines = 1
+                }
+                pill.addView(tv)
+
+                container.addView(pill)
+            } catch (_: Throwable) {
+                // If app not installed or lookup fails, skip silently
+            }
+        }
+
+        // Add Button ("➕ Tambah")
+        val addBtn = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(if (isLandscape) 26 else 32)
+            ).apply { setMargins(dp(3), 0, dp(3), 0) }
+            background = ContextCompat.getDrawable(this@IosInputMethodService, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+            setPadding(dp(8), 0, dp(8), 0)
+            isClickable = true
+            isFocusable = false
+            setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                switchMode(Mode.APP_PICKER)
+            }
+        }
+
+        val addTv = TextView(this).apply {
+            text = "➕ Tambah"
+            setTextColor(ContextCompat.getColor(this@IosInputMethodService, R.color.ios_blue))
+            textSize = if (isLandscape) 10.5f else 11.5f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        addBtn.addView(addTv)
+        container.addView(addBtn)
+    }
+
+    private fun getInstalledLauncherApps(): List<KeyboardLayout.AppShortcutItem> {
+        return try {
+            val pm = packageManager
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            val list = pm.queryIntentActivities(mainIntent, 0)
+            list.mapNotNull { resolveInfo ->
+                val pkg = resolveInfo.activityInfo.packageName
+                if (pkg == packageName) return@mapNotNull null // Exclude ourselves
+                val label = resolveInfo.loadLabel(pm).toString()
+                val icon = resolveInfo.loadIcon(pm)
+                KeyboardLayout.AppShortcutItem(pkg, label, icon)
+            }.sortedBy { it.appName.lowercase() }
+        } catch (_: Throwable) {
+            emptyList()
+        }
+    }
+
+    private fun toggleAppShortcutPackage(pkg: String) {
+        val current = prefs.getAppShortcuts().toMutableList()
+        if (current.contains(pkg)) {
+            current.remove(pkg)
+        } else {
+            current.add(pkg)
+        }
+        prefs.saveAppShortcuts(current)
+        renderCurrentLayout()
+        renderAppShortcutsBar()
     }
 
     // Render movable iOS blue cursor ('│') in Translate Input Box
@@ -873,6 +1092,20 @@ class IosInputMethodService : InputMethodService() {
                     },
                     onCloseAction = { switchMode(Mode.QWERTY) }
                 )
+                Mode.APP_PICKER -> {
+                    val installedApps = getInstalledLauncherApps()
+                    val currentShortcuts = prefs.getAppShortcuts().toSet()
+                    layoutEngine.createAppPickerView(
+                        isDark = isDark,
+                        themeMode = prefs.themeMode,
+                        installedApps = installedApps,
+                        selectedPackages = currentShortcuts,
+                        onToggleShortcut = { pkg ->
+                            toggleAppShortcutPackage(pkg)
+                        },
+                        onCloseAction = { switchMode(Mode.QWERTY) }
+                    )
+                }
             }
 
             container.addView(contentView)
@@ -1058,6 +1291,9 @@ class IosInputMethodService : InputMethodService() {
                 }
                 "ACTION_RETURN" -> {
                     handleReturn()
+                }
+                "ACTION_HIDE_KEYBOARD" -> {
+                    requestHideSelf(0)
                 }
                 " " -> {
                     handleSpace()
@@ -1655,6 +1891,13 @@ class IosInputMethodService : InputMethodService() {
 
     private fun executeSuggestionUpdate() {
         try {
+            if (isTerminalOrRawInput()) {
+                candidate1?.text = ""
+                candidate2?.text = ""
+                candidate3?.text = ""
+                return
+            }
+
             if (!prefs.isPredictiveTextEnabled) {
                 candidate1?.text = ""
                 candidate2?.text = ""
