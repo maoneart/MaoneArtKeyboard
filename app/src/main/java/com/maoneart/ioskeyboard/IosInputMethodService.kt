@@ -25,6 +25,7 @@ import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -174,9 +175,9 @@ class IosInputMethodService : InputMethodService() {
             badgeLanguage = view.findViewById(R.id.badgeLanguage)
 
             // Setup App Shortcuts
-            btnQuickApps = view.findViewById(R.id.btnQuickApps)
-            appShortcutsBar = view.findViewById(R.id.appShortcutsBar)
-            layoutAppShortcuts = view.findViewById(R.id.layoutAppShortcuts)
+            btnQuickApps = view.findViewById<ImageButton>(R.id.btnQuickApps)
+            appShortcutsBar = view.findViewById<HorizontalScrollView>(R.id.appShortcutsBar)
+            layoutAppShortcuts = view.findViewById<LinearLayout>(R.id.layoutAppShortcuts)
 
             // Setup Translate Panel
             translatePanel = view.findViewById(R.id.translatePanel)

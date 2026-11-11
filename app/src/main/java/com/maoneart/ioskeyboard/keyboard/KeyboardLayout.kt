@@ -493,7 +493,7 @@ class KeyboardLayout(private val context: Context) {
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = false
-                setupLetterKeyTouch(this, ",", { onKeyAction(",") }, isPopupEnabled = false)
+                setupLetterKeyTouch(this) { onKeyAction(",") }
             }
             r4Layout.addView(btnComma)
         }
@@ -531,7 +531,7 @@ class KeyboardLayout(private val context: Context) {
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = false
-                setupLetterKeyTouch(this, ".", { onKeyAction(".") }, isPopupEnabled = false)
+                setupLetterKeyTouch(this) { onKeyAction(".") }
             }
             r4Layout.addView(btnPeriod)
         }
@@ -891,7 +891,7 @@ class KeyboardLayout(private val context: Context) {
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = false
-                setupLetterKeyTouch(this, ",", { onKeyAction(",") }, isPopupEnabled = false)
+                setupLetterKeyTouch(this) { onKeyAction(",") }
             }
             r4.addView(btnComma)
         }
@@ -927,7 +927,7 @@ class KeyboardLayout(private val context: Context) {
                 gravity = Gravity.CENTER
                 isClickable = true
                 isFocusable = false
-                setupLetterKeyTouch(this, ".", { onKeyAction(".") }, isPopupEnabled = false)
+                setupLetterKeyTouch(this) { onKeyAction(".") }
             }
             r4.addView(btnPeriod)
         }
