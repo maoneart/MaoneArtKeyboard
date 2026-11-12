@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.90 / build 90)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.91 / build 91)
 
 ---
 
@@ -555,5 +555,13 @@
     4. **Tuts Khusus Pelat Seng Besi Berkarat (Rustic Zinc/Iron Plate)**:
        - Tuts Shift, 123, Backspace, dan Return beraksen pelat seng besi tebal dengan paku rivet baja (`key_onepiece_special_normal.9.png`) dan teks/ikon emas bajak laut (`#FFE082`).
        - Tombol Emoji menampilkan kemudi kapal Luffy tersenyum (`ic_onepiece_luffy.png`).
+  - **Tombol Spasi Fleksibel Anti-Gepeng & Background Crop Rasio Tinggi Asli Keyboard (Release v1.0.91)**:
+    1. **Tombol Spasi Fleksibel Anti-Gepeng (Multi-Zone 9-Patch Architecture)**:
+       - *Root Cause*: Gambar spasi `crop_button_spasi.png` memiliki aspect ratio 5.19 : 1 (1423x274), sedangkan tuts spasi di layar ponsel portrait memiliki rasio ~3.8 : 1 (tinggi 46dp). Peregangan atau kompresi statis membuat logo One Piece di tengah menjadi pipih/gepeng.
+       - *Solusi Multi-Zone Elastic Stretch*: Konstruksi 9-patch disusun dengan membagi tuts menjadi 5 segmen: Cap Kiri (50px) + Zona Stretch Pelat 1 (10px) + Logo One Piece Utuh Proporsional (240px, rasio 2.2:1) + Zona Stretch Pelat 2 (10px) + Cap Kanan (50px).
+       - Stretch horizontal 9-patch dikunci HANYA pada Zona Stretch Pelat 1 dan 2 di kiri-kanan. Logo One Piece di tengah 100% terlindungi dari tarikan horizontal maupun kompresi, sehingga logo tetap bulat sempurna, tajam, dan tidak pernah gepeng di semua ukuran layar portrait, landscape, maupun tablet.
+    2. **Crop Background Murni Sesuai Rasio & Tinggi Asli Keyboard**:
+       - `Bacground.jpg` asli (2400x1792) di-crop presisi pada rasio 1.547 : 1 (lebar 2400 x tinggi 1551 px, membuang langit atas yang berlebih) lalu di-render ke ukuran tepat keyboard fisik `(1080, 698)`.
+       - Menghilangkan pembengkakan tinggi keyboard secara total (`keyboardContainer` 210dp + `topToolbar` 38dp = ~248dp) tanpa distorsi, menghadirkan pemandangan Luffy & Thousand Sunny yang luas dan jernih.
 
 
