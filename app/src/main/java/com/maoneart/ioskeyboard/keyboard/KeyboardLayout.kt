@@ -557,7 +557,7 @@ class KeyboardLayout(private val context: Context) {
         }
 
         // Space Button with Spacebar Trackpad Mode
-        val langLabel = if (isOnePiece) "ONE PIECE" else (if (activeLanguage == "en") "space" else "spasi")
+        val langLabel = if (isOnePiece) "" else (if (activeLanguage == "en") "space" else "spasi")
         val spaceWeight = if (isLandscape) {
             2.5f
         } else {
@@ -968,7 +968,7 @@ class KeyboardLayout(private val context: Context) {
             if (isDictationEnabled) 3.6f else 4.4f
         }
         val symSpaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
-        val symSpaceLabel = if (isOnePiece) "ONE PIECE" else "spasi"
+        val symSpaceLabel = if (isOnePiece) "" else "spasi"
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
