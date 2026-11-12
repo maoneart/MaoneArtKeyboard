@@ -521,14 +521,14 @@ class KeyboardLayout(private val context: Context) {
         r4Layout.addView(btn123)
 
         // Emoji Button (Apple iOS Outline Smiley Icon or One Piece Luffy Button)
+        val emojiWeight = if (isLandscape) 1.0f else (if (isOnePiece) 1.25f else 1.15f)
         val btnEmoji = ImageButton(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, emojiWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             if (isOnePiece) {
-                background = null
-                setImageResource(R.drawable.btn_onepiece_emoji)
-                scaleType = android.widget.ImageView.ScaleType.FIT_XY
-                clearColorFilter()
+                setPadding(0, 0, 0, 0)
+                background = ContextCompat.getDrawable(context, R.drawable.btn_onepiece_emoji)
+                setImageDrawable(null)
             } else {
                 background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_emoji_smile)
@@ -563,7 +563,11 @@ class KeyboardLayout(private val context: Context) {
         val spaceWeight = if (isLandscape) {
             2.5f
         } else {
-            if (isDictationEnabled) 3.6f else 4.4f
+            if (isOnePiece) {
+                if (isDictationEnabled) 3.5f else 4.3f
+            } else {
+                if (isDictationEnabled) 3.6f else 4.4f
+            }
         }
         val spaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
         val btnSpace = TextView(context).apply {
@@ -929,14 +933,14 @@ class KeyboardLayout(private val context: Context) {
         }
         r4.addView(btnAbc)
 
+        val emojiWeight = if (isLandscape) 1.0f else (if (isOnePiece) 1.25f else 1.15f)
         val btnEmoji = ImageButton(context).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, emojiWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             if (isOnePiece) {
-                background = null
-                setImageResource(R.drawable.btn_onepiece_emoji)
-                scaleType = android.widget.ImageView.ScaleType.FIT_XY
-                clearColorFilter()
+                setPadding(0, 0, 0, 0)
+                background = ContextCompat.getDrawable(context, R.drawable.btn_onepiece_emoji)
+                setImageDrawable(null)
             } else {
                 background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_emoji_smile)
@@ -969,7 +973,11 @@ class KeyboardLayout(private val context: Context) {
         val spaceWeight = if (isLandscape) {
             2.5f
         } else {
-            if (isDictationEnabled) 3.6f else 4.4f
+            if (isOnePiece) {
+                if (isDictationEnabled) 3.5f else 4.3f
+            } else {
+                if (isDictationEnabled) 3.6f else 4.4f
+            }
         }
         val symSpaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
         val symSpaceLabel = if (isOnePiece) "" else "spasi"

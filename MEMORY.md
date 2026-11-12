@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.97 / build 97)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.98 / build 98)
 
 ---
 
@@ -598,5 +598,12 @@
        - *Root Cause*: Peregangan 9-patch pada tombol emoji sebelumnya menambahkan ~50px ke zona border (x=3..8 & 72..77) sehingga bingkai kayu menjadi bengkak dan sangat tebal (+40% ketebalan), tidak mirip dengan foto asli `luffy_button_emoji.png`.
        - *Solusi Presisi*: Menghapus mekanisme 9-patch untuk tombol emoji. Aset `luffy_button_emoji.png` di-crop murni (1045x1258 px tanpa padding) dan di-render langsung via `ImageView.ScaleType.FIT_XY` (`btn_onepiece_emoji.xml` dengan resolusi 260x312 px).
        - Hasil: Ketebalan border bingkai kayu kembali ramping dan elegan (~2.4%) persis 100% sesuai foto asli kiriman pengguna. Luffy memenuhi tombol secara proporsional dan ukuran tombol tetap penuh sesuai standar baris ke-4.
+  - **Pembesaran Tombol Emoji Luffy Sesuai Ukuran Standar (Release v1.0.98)**:
+    1. **Eliminasi Default Padding ImageButton & Pembesaran Proporsional Tombol Emoji Luffy**:
+       - *Root Cause "Gambar Bagus Tapi Malah Kecil"*: Pada v1.0.97 tombol emoji diatur menggunakan `ImageButton` dengan `setImageResource(btn_onepiece_emoji)`. Secara default Android menerapkan padding sistem `imageButtonStyle` (~12-16dp di semua sisi) pada `ImageButton`, sehingga konten gambar dipaksa mengecil ke dalam area tengah sempit (~23.5dp) meskipun baris tuts setinggi 47.5dp.
+       - *Solusi Tuntas*:
+         - Menerapkan `setPadding(0, 0, 0, 0)` dan menyetel aset langsung sebagai `background = ContextCompat.getDrawable(context, R.drawable.btn_onepiece_emoji)` dengan `setImageDrawable(null)`. Gambar tombol Luffy kini merentang 100% penuh dari ujung atas hingga ujung bawah tuts (height: MATCH_PARENT) persis setinggi tombol 123 dan Return tanpa terpotong padding.
+         - Bobot layout portrait `emojiWeight` dinaikkan dari `1.15f` ke `1.25f` agar lebar fisiknya sejajar dan proporsional dengan tombol 123 (`1.35f`), dengan bobot spasi dikalibrasi ke `4.3f` (seimbang total bobot baris 9.1f).
+       - Hasil: Tombol emoji Luffy kini tampil besar, penuh, tajam, dengan border ramping dan presisi standar baris ke-4 keyboard.
 
 
