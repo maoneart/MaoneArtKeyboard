@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.98 / build 98)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.99 / build 99)
 
 ---
 
@@ -605,5 +605,14 @@
          - Menerapkan `setPadding(0, 0, 0, 0)` dan menyetel aset langsung sebagai `background = ContextCompat.getDrawable(context, R.drawable.btn_onepiece_emoji)` dengan `setImageDrawable(null)`. Gambar tombol Luffy kini merentang 100% penuh dari ujung atas hingga ujung bawah tuts (height: MATCH_PARENT) persis setinggi tombol 123 dan Return tanpa terpotong padding.
          - Bobot layout portrait `emojiWeight` dinaikkan dari `1.15f` ke `1.25f` agar lebar fisiknya sejajar dan proporsional dengan tombol 123 (`1.35f`), dengan bobot spasi dikalibrasi ke `4.3f` (seimbang total bobot baris 9.1f).
        - Hasil: Tombol emoji Luffy kini tampil besar, penuh, tajam, dengan border ramping dan presisi standar baris ke-4 keyboard.
+  - **Transformasi Ikon Huruf 'X' Menjadi Dua Katana Ikonik Roronoa Zoro (Release v1.0.99)**:
+    1. **Restorasi Otentisitas Katana Zoro (Wado Ichimonji & Enma) pada Tombol 'X' (`ic_onepiece_key_x.png`)**:
+       - *Latar Belakang*: Pengguna menginginkan tombol 'X' menggunakan pedang Zoro asli karena pedang sebelumnya (cutlass bajak laut Barat generik dengan pelindung mangkuk) kurang mencerminkan ciri khas samurai Roronoa Zoro.
+       - *Solusi Presisi*:
+         - Mengganti aset `ic_onepiece_key_x.png` (84x84 RGBA) dengan ilustrasi dua katana legendaris Zoro bersilang membentuk huruf 'X' proporsional dan simetris:
+           1. **Wado Ichimonji**: Gagang putih murni berbalut tsukamaki tradisional, tsuba lingkaran emas murni, dan bilah katana baja perak melengkung tajam.
+           2. **Enma**: Gagang royal violet / ungu tua dengan aksen lilitan emas, tsuba semanggi (trefoil) emas, dan bilah bergaris hamon.
+         - Ditambahkan rim kontur gelap halus di sekeliling katana untuk memastikan visibilitas dan kontras maksimal di atas tuts bronze semi-transparan keyboard One Piece.
+       - Hasil: Tuts 'X' kini 100% otentik katana Roronoa Zoro, sangat gagah, tajam, dan membentuk huruf 'X' yang jelas serta mudah dikenali saat mengetik.
 
 
