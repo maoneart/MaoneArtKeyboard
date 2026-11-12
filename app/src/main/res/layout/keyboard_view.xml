@@ -13,7 +13,7 @@
     <LinearLayout
         android:id="@+id/topToolbar"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="38dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@color/ios_toolbar_light"
@@ -23,8 +23,8 @@
         <!-- Translate Quick Button -->
         <ImageButton
             android:id="@+id/btnQuickTranslate"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="@drawable/btn_icon_ripple"
             android:src="@drawable/ic_translate"
             android:contentDescription="Live Translate" />
@@ -32,8 +32,8 @@
         <!-- Clipboard Quick Button -->
         <ImageButton
             android:id="@+id/btnQuickClipboard"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="@drawable/btn_icon_ripple"
             android:src="@drawable/ic_clipboard"
             android:contentDescription="Clipboard History" />
@@ -41,8 +41,8 @@
         <!-- Quick App Shortcuts Button -->
         <ImageButton
             android:id="@+id/btnQuickApps"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
             android:background="@drawable/btn_icon_ripple"
             android:src="@drawable/ic_apps_grid"
             android:contentDescription="Pintasan Aplikasi" />
@@ -107,14 +107,14 @@
         <TextView
             android:id="@+id/badgeLanguage"
             android:layout_width="wrap_content"
-            android:layout_height="28dp"
+            android:layout_height="26dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
             android:gravity="center"
             android:background="@drawable/key_bg_special_light"
             android:text="ID"
             android:textColor="@color/ios_key_text_light"
-            android:textSize="12sp"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -247,9 +247,9 @@
     <FrameLayout
         android:id="@+id/keyboardContainer"
         android:layout_width="match_parent"
-        android:layout_height="235dp"
+        android:layout_height="210dp"
         android:clipChildren="false"
         android:clipToPadding="false"
-        android:padding="3dp" />
+        android:padding="2dp" />
 
 </LinearLayout>

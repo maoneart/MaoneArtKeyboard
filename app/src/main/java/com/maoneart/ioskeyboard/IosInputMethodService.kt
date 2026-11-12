@@ -331,10 +331,10 @@ class IosInputMethodService : InputMethodService() {
 
             if (toolbar != null) {
                 val tbLp = toolbar.layoutParams
-                tbLp.height = dp(if (isLandscape) 34 else 44)
+                tbLp.height = dp(if (isLandscape) 32 else 38)
                 toolbar.layoutParams = tbLp
 
-                val btnSize = dp(if (isLandscape) 30 else 36)
+                val btnSize = dp(if (isLandscape) 28 else 32)
                 listOf(
                     R.id.btnQuickTranslate,
                     R.id.btnQuickClipboard,
@@ -351,10 +351,10 @@ class IosInputMethodService : InputMethodService() {
 
             if (container != null) {
                 val cLp = container.layoutParams
-                cLp.height = dp(if (isLandscape) 155 else 235)
+                cLp.height = dp(if (isLandscape) 145 else 210)
                 container.layoutParams = cLp
                 val padH = dp(if (isLandscape) 44 else 3)
-                val padV = dp(if (isLandscape) 2 else 3)
+                val padV = dp(if (isLandscape) 2 else 2)
                 container.setPadding(padH, padV, padH, padV)
             }
         } catch (_: Throwable) {}
