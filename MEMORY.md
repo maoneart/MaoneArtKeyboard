@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.96 / build 96)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.97 / build 97)
 
 ---
 
@@ -593,5 +593,10 @@
        - *Root Cause*: Pada v1.0.95, spasi diberi padding transparan atas dan bawah (total 26px) sehingga badan tombol spasi menyusut menjadi strip tipis setinggi 84px saja, terlihat menciut dibanding tuts lain.
        - *Solusi*: Tuts spasi dikalibrasi ke ukuran standar penuh 393x96 px (`inner bbox: 0, 0, 393, 96`), mengisi 100% ketinggian baris tuts tanpa celah transparan. Titik stretch vertikal diletakkan pada balok kayu atas (y=3..18) dan balok kayu bawah (y=74..93), sementara karakter kru dan teks "ONE PIECE" di zona tengah terlindungi penuh dari distorsi peregangan.
        - Hasil: Seluruh tombol di baris ke-4 (123, Emoji Luffy, Spasi One Piece, Return) kini memiliki tinggi identik 96px, penuh, tegap, dan 100% sesuai standar keyboard fisik.
+  - **Koreksi Border Tebal Emoji Luffy Murni Sesuai Foto Asli (Release v1.0.97)**:
+    1. **Eliminasi Total Masalah Border Tebal pada Tombol Emoji Luffy**:
+       - *Root Cause*: Peregangan 9-patch pada tombol emoji sebelumnya menambahkan ~50px ke zona border (x=3..8 & 72..77) sehingga bingkai kayu menjadi bengkak dan sangat tebal (+40% ketebalan), tidak mirip dengan foto asli `luffy_button_emoji.png`.
+       - *Solusi Presisi*: Menghapus mekanisme 9-patch untuk tombol emoji. Aset `luffy_button_emoji.png` di-crop murni (1045x1258 px tanpa padding) dan di-render langsung via `ImageView.ScaleType.FIT_XY` (`btn_onepiece_emoji.xml` dengan resolusi 260x312 px).
+       - Hasil: Ketebalan border bingkai kayu kembali ramping dan elegan (~2.4%) persis 100% sesuai foto asli kiriman pengguna. Luffy memenuhi tombol secara proporsional dan ukuran tombol tetap penuh sesuai standar baris ke-4.
 
 
