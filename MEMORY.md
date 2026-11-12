@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.95 / build 95)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.96 / build 96)
 
 ---
 
@@ -584,13 +584,14 @@
     2. **Perbaikan Spasi Peang ke Atas (100% Symmetrical Natural Ratio)**:
        - *Root Cause*: Tuts spasi di layar memiliki tinggi 126px, sedangkan base 9-patch sebelumnya dibuat 92px sehingga Android menarik vertikal (+41%) menyebabkan teks dan karakter One Piece melar/lonjong/peang ke atas.
        - *Solusi*: Base height 9-patch dinaikkan tepat setinggi tuts (126px). Stretch vertikal dikunci HANYA pada padding atas dan bawah (bukan di dalam gambar), dan stretch horizontal pada pelat kayu polos kiri/kanan. Teks "ONE PIECE" dan karakter kru kini 100% simetris, proporsional murni tanpa distorsi.
-  - **Koreksi Presisi Tombol Emoji Luffy Fit-Center & Spasi 100% Sempurna Anti-Squish (Release v1.0.95)**:
-    1. **Tombol Emoji Luffy Fit-Center Murni Tanpa Potongan 9-Patch (`btn_onepiece_emoji.xml`)**:
-       - Tombol emoji mode One Piece beralih menggunakan `ImageView.ScaleType.FIT_CENTER` dengan aset mandiri `ic_onepiece_emoji_normal.png` dan `ic_onepiece_emoji_pressed.png` beresolusi tajam.
-       - Menghilangkan artefak garis potong 9-patch yang sebelumnya melintasi wajah Luffy; wajah Luffy, topi jerami, dan bingkai kayu kini tampil 100% utuh, tajam, dan simetris.
-    2. **Solusi Mutlak Spasi Peang / Lebar ke Atas (True Natural 3.54:1 Proportion & Symmetrical Baseline)**:
-       - *Root Cause*: Base width 9-patch sebelumnya (485px) lebih lebar dari tuts spasi layar ponsel portrait dengan dikte aktif (407px). Android terpaksa memampatkan (squish) gambar secara horizontal (-16%) sementara tingginya tetap atau melar (+8%), menghasilkan efek "peang ke atas" (+28.5% rasio vertikal). Ditambah tinggi tuts 124px tidak simetris dengan tuts 123 dan Return (96px).
-       - *Solusi Tuntas*: Base width 9-patch dikalibrasi ke ukuran ramping 376px (inner) dengan tinggi 110px persis seimbang dengan `key_onepiece_normal` (112px). Tinggi karya seni tombol dikunci pada 84px dengan aspect ratio karakter dan teks "ONE PIECE" 100.0% akurat murni sesuai gambar asli user (3.54:1). Titik stretch horizontal hanya berada pada pelat kayu polos kiri dan kanan, serta stretch vertikal hanya pada padding margin atas dan bawah.
-       - Hasil: Tombol spasi selalu mengembang (stretch out) secara alami di semua resolusi HP tanpa pernah termampatkan. Seluruh karakter kru, tulisan "ONE PIECE", dan ketinggian tombol kini 100% simetris sejajar dengan tuts 123, emoji, dan return.
+  - **Restorasi Standar Penuh Tombol Emoji Luffy & Spasi 1:1 Full-Height (Release v1.0.96)**:
+    1. **Restorasi Standar Penuh Tombol Emoji Luffy (`key_bg_onepiece_emoji.xml`)**:
+       - *Root Cause "Kecil Tidak Sesuai Standar"*: Pada v1.0.95, tombol emoji dijadikan `ImageView` tanpa background (`background = null`) dengan canvas berpadding transparan besar (165px) sehingga ukuran tombol menyusut dan tampak mengambang kecil di tengah baris tuts.
+       - *Solusi Sesuai Standar*: Mengembalikan `key_bg_onepiece_emoji` sebagai 9-patch berukuran inner 80x96 px (persis 1:1 dengan `key_onepiece_special_normal` 78x96 px pada tombol 123 dan Return) dengan `bbox = (0, 0, 80, 96)` tanpa padding transparan buatan. Stretch marks dikunci 100% pada border bingkai kayu terluar (x=3..8 & 72..77, y=3..8 & 88..93).
+       - Hasil: Tombol emoji Luffy kini berukuran penuh, padat, dan sejajar simetris dari ujung ke ujung dengan tombol 123 dan Return.
+    2. **Restorasi Ketinggian Penuh Spasi Standar (Full Key Height & Natural Proportions)**:
+       - *Root Cause*: Pada v1.0.95, spasi diberi padding transparan atas dan bawah (total 26px) sehingga badan tombol spasi menyusut menjadi strip tipis setinggi 84px saja, terlihat menciut dibanding tuts lain.
+       - *Solusi*: Tuts spasi dikalibrasi ke ukuran standar penuh 393x96 px (`inner bbox: 0, 0, 393, 96`), mengisi 100% ketinggian baris tuts tanpa celah transparan. Titik stretch vertikal diletakkan pada balok kayu atas (y=3..18) dan balok kayu bawah (y=74..93), sementara karakter kru dan teks "ONE PIECE" di zona tengah terlindungi penuh dari distorsi peregangan.
+       - Hasil: Seluruh tombol di baris ke-4 (123, Emoji Luffy, Spasi One Piece, Return) kini memiliki tinggi identik 96px, penuh, tegap, dan 100% sesuai standar keyboard fisik.
 
 
