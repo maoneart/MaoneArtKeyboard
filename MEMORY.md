@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.91 / build 91)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.92 / build 92)
 
 ---
 
@@ -563,5 +563,14 @@
     2. **Crop Background Murni Sesuai Rasio & Tinggi Asli Keyboard**:
        - `Bacground.jpg` asli (2400x1792) di-crop presisi pada rasio 1.547 : 1 (lebar 2400 x tinggi 1551 px, membuang langit atas yang berlebih) lalu di-render ke ukuran tepat keyboard fisik `(1080, 698)`.
        - Menghilangkan pembengkakan tinggi keyboard secara total (`keyboardContainer` 210dp + `topToolbar` 38dp = ~248dp) tanpa distorsi, menghadirkan pemandangan Luffy & Thousand Sunny yang luas dan jernih.
+  - **Tombol Spasi Fleksibel Anti-Gepeng AI Master & Background 20% Darkened (Release v1.0.92)**:
+    1. **Tombol Spasi Fleksibel Anti-Gepeng AI Master (Protected Logo Area)**:
+       - Membedah kontur dan profil visual tombol spasi referensi user: Cap Kiri (40px) + Zona Stretch Pelat Kiri (20px) + Logo One Piece Utuh Proporsional (303px, rasio 2.45:1 murni) + Zona Stretch Pelat Kanan (20px) + Cap Kanan (40px).
+       - Titik stretch horizontal 9-patch dikunci secara absolut HANYA pada kedua zona pelat kayu polos di kiri dan kanan logo. Logo One Piece di tengah terlindungi 100% dari distorsi/gepeng baik saat tuts memanjang di landscape/tablet maupun saat di layar ponsel portrait.
+       - Menyimpan master preview PNG ke `/sdcard/Download/Bug/spasi_master_made_by_ai.png`.
+    2. **Pencahayaan Background Dikurangi 20% (Darkened 20% / Brightness 0.80)**:
+       - Background `onepiece_bg.jpg` (Luffy & Thousand Sunny) diturunkan pencahayaannya sebesar 20% menggunakan `ImageEnhance.Brightness(0.80)`.
+       - Tuts huruf semi-transparan, aksen emas gading bajak laut, dan seluruh teks keyboard menjadi jauh lebih kontras, tajam, dan tidak silau di mata.
+       - Menyimpan preview ke `/sdcard/Download/Bug/onepiece_bg_darkened_preview.jpg`.
 
 
