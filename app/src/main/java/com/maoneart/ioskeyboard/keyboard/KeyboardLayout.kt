@@ -524,11 +524,11 @@ class KeyboardLayout(private val context: Context) {
         val btnEmoji = ImageButton(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, specialKeyBg)
             if (isOnePiece) {
-                setImageResource(R.drawable.ic_onepiece_luffy)
-                clearColorFilter()
+                background = ContextCompat.getDrawable(context, R.drawable.key_bg_onepiece_emoji)
+                setImageDrawable(null)
             } else {
+                background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_emoji_smile)
                 setColorFilter(textColor)
             }
@@ -930,11 +930,11 @@ class KeyboardLayout(private val context: Context) {
         val btnEmoji = ImageButton(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
-            background = ContextCompat.getDrawable(context, specialKeyBg)
             if (isOnePiece) {
-                setImageResource(R.drawable.ic_onepiece_luffy)
-                clearColorFilter()
+                background = ContextCompat.getDrawable(context, R.drawable.key_bg_onepiece_emoji)
+                setImageDrawable(null)
             } else {
+                background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_emoji_smile)
                 setColorFilter(textColor)
             }

@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.93 / build 93)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.94 / build 94)
 
 ---
 
@@ -577,5 +577,12 @@
        - *Root Cause*: Pada v1.0.92, tombol spasi dipecah menjadi 5 segmen terpisah (slice cap, plate, logo) lalu disambung kembali. Sambungan di batas logo emas menghasilkan garis vertikal tajam (seam cut line) yang menutupi teks "ONE PIECE" dan karakter kru bajak laut.
        - *Solusi Murni*: Gambar asli `button_spasi.png` digunakan secara utuh (100% untouched) tanpa dipotong-potong. Titik stretch 9-patch diletakkan langsung pada zona kayu polos murni di kiri (x=50..84) dan kanan (x=398..431).
        - Menghilangkan seluruh garis patahan/sambungan. Teks "ONE PIECE", karakter kru Topi Jerami, serta ornamen emas bajak laut kini tampil 100% mulus, tajam, utuh, dan alami persis sesuai gambar asli dari user.
+  - **Tombol Emoji Luffy Baru & Spasi Anti-Peang ke Atas 100% Simetris (Release v1.0.94)**:
+    1. **Integrasi Tombol Emoji Luffy Otentik (`luffy_button_emoji.png`)**:
+       - Mengadopsi aset tombol emoji Luffy utuh berbingkai kayu bajak laut (`luffy_button_emoji.png`) dari user ke dalam 9-patch beresolusi tinggi `key_onepiece_emoji_normal.9.png` dan `key_onepiece_emoji_pressed.9.png` (`key_bg_onepiece_emoji.xml`).
+       - Dikalibrasi presisi 1:1 terhadap tuts keyboard (~106 x 124 px). Di `KeyboardLayout.kt`, tombol emoji mode One Piece kini langsung menampilkan tuts Luffy utuh bersih tanpa ikon Smiley/kemudi lama yang menimpa.
+    2. **Perbaikan Spasi Peang ke Atas (100% Symmetrical Natural Ratio)**:
+       - *Root Cause*: Tuts spasi di layar memiliki tinggi 126px, sedangkan base 9-patch sebelumnya dibuat 92px sehingga Android menarik vertikal (+41%) menyebabkan teks dan karakter One Piece melar/lonjong/peang ke atas.
+       - *Solusi*: Base height 9-patch dinaikkan tepat setinggi tuts (126px). Stretch vertikal dikunci HANYA pada padding atas dan bawah (bukan di dalam gambar), dan stretch horizontal pada pelat kayu polos kiri/kanan. Teks "ONE PIECE" dan karakter kru kini 100% simetris, proporsional murni tanpa distorsi.
 
 
