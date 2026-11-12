@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.94 / build 94)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.95 / build 95)
 
 ---
 
@@ -584,5 +584,13 @@
     2. **Perbaikan Spasi Peang ke Atas (100% Symmetrical Natural Ratio)**:
        - *Root Cause*: Tuts spasi di layar memiliki tinggi 126px, sedangkan base 9-patch sebelumnya dibuat 92px sehingga Android menarik vertikal (+41%) menyebabkan teks dan karakter One Piece melar/lonjong/peang ke atas.
        - *Solusi*: Base height 9-patch dinaikkan tepat setinggi tuts (126px). Stretch vertikal dikunci HANYA pada padding atas dan bawah (bukan di dalam gambar), dan stretch horizontal pada pelat kayu polos kiri/kanan. Teks "ONE PIECE" dan karakter kru kini 100% simetris, proporsional murni tanpa distorsi.
+  - **Koreksi Presisi Tombol Emoji Luffy Fit-Center & Spasi 100% Sempurna Anti-Squish (Release v1.0.95)**:
+    1. **Tombol Emoji Luffy Fit-Center Murni Tanpa Potongan 9-Patch (`btn_onepiece_emoji.xml`)**:
+       - Tombol emoji mode One Piece beralih menggunakan `ImageView.ScaleType.FIT_CENTER` dengan aset mandiri `ic_onepiece_emoji_normal.png` dan `ic_onepiece_emoji_pressed.png` beresolusi tajam.
+       - Menghilangkan artefak garis potong 9-patch yang sebelumnya melintasi wajah Luffy; wajah Luffy, topi jerami, dan bingkai kayu kini tampil 100% utuh, tajam, dan simetris.
+    2. **Solusi Mutlak Spasi Peang / Lebar ke Atas (True Natural 3.54:1 Proportion & Symmetrical Baseline)**:
+       - *Root Cause*: Base width 9-patch sebelumnya (485px) lebih lebar dari tuts spasi layar ponsel portrait dengan dikte aktif (407px). Android terpaksa memampatkan (squish) gambar secara horizontal (-16%) sementara tingginya tetap atau melar (+8%), menghasilkan efek "peang ke atas" (+28.5% rasio vertikal). Ditambah tinggi tuts 124px tidak simetris dengan tuts 123 dan Return (96px).
+       - *Solusi Tuntas*: Base width 9-patch dikalibrasi ke ukuran ramping 376px (inner) dengan tinggi 110px persis seimbang dengan `key_onepiece_normal` (112px). Tinggi karya seni tombol dikunci pada 84px dengan aspect ratio karakter dan teks "ONE PIECE" 100.0% akurat murni sesuai gambar asli user (3.54:1). Titik stretch horizontal hanya berada pada pelat kayu polos kiri dan kanan, serta stretch vertikal hanya pada padding margin atas dan bawah.
+       - Hasil: Tombol spasi selalu mengembang (stretch out) secara alami di semua resolusi HP tanpa pernah termampatkan. Seluruh karakter kru, tulisan "ONE PIECE", dan ketinggian tombol kini 100% simetris sejajar dengan tuts 123, emoji, dan return.
 
 

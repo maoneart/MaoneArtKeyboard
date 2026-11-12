@@ -520,19 +520,20 @@ class KeyboardLayout(private val context: Context) {
         }
         r4Layout.addView(btn123)
 
-        // Emoji Button (Apple iOS Outline Smiley Icon or One Piece Luffy Helm)
+        // Emoji Button (Apple iOS Outline Smiley Icon or One Piece Luffy Button)
         val btnEmoji = ImageButton(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             if (isOnePiece) {
-                background = ContextCompat.getDrawable(context, R.drawable.key_bg_onepiece_emoji)
-                setImageDrawable(null)
+                background = null
+                setImageResource(R.drawable.btn_onepiece_emoji)
+                clearColorFilter()
             } else {
                 background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_emoji_smile)
                 setColorFilter(textColor)
             }
-            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
@@ -931,14 +932,15 @@ class KeyboardLayout(private val context: Context) {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 1.0f else 1.15f)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
             if (isOnePiece) {
-                background = ContextCompat.getDrawable(context, R.drawable.key_bg_onepiece_emoji)
-                setImageDrawable(null)
+                background = null
+                setImageResource(R.drawable.btn_onepiece_emoji)
+                clearColorFilter()
             } else {
                 background = ContextCompat.getDrawable(context, specialKeyBg)
                 setImageResource(R.drawable.ic_emoji_smile)
                 setColorFilter(textColor)
             }
-            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             isClickable = true
             isFocusable = false
             setupInstantTouch(this) { onKeyAction("ACTION_EMOJI") }
