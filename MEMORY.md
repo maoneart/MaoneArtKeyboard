@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.92 / build 92)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.93 / build 93)
 
 ---
 
@@ -572,5 +572,10 @@
        - Background `onepiece_bg.jpg` (Luffy & Thousand Sunny) diturunkan pencahayaannya sebesar 20% menggunakan `ImageEnhance.Brightness(0.80)`.
        - Tuts huruf semi-transparan, aksen emas gading bajak laut, dan seluruh teks keyboard menjadi jauh lebih kontras, tajam, dan tidak silau di mata.
        - Menyimpan preview ke `/sdcard/Download/Bug/onepiece_bg_darkened_preview.jpg`.
+  - **Pembersihan Tuntas Garis Potongan Spasi & Pemulihan Karya Seni Utuh Asli (Release v1.0.93)**:
+    1. **Pembersihan Garis Sambungan (Zero Seams / Untouched Artwork Integration)**:
+       - *Root Cause*: Pada v1.0.92, tombol spasi dipecah menjadi 5 segmen terpisah (slice cap, plate, logo) lalu disambung kembali. Sambungan di batas logo emas menghasilkan garis vertikal tajam (seam cut line) yang menutupi teks "ONE PIECE" dan karakter kru bajak laut.
+       - *Solusi Murni*: Gambar asli `button_spasi.png` digunakan secara utuh (100% untouched) tanpa dipotong-potong. Titik stretch 9-patch diletakkan langsung pada zona kayu polos murni di kiri (x=50..84) dan kanan (x=398..431).
+       - Menghilangkan seluruh garis patahan/sambungan. Teks "ONE PIECE", karakter kru Topi Jerami, serta ornamen emas bajak laut kini tampil 100% mulus, tajam, utuh, dan alami persis sesuai gambar asli dari user.
 
 
