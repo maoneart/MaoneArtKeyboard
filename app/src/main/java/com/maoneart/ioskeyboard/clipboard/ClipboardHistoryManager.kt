@@ -278,9 +278,10 @@ class ClipboardHistoryManager(private val context: Context) {
                 } catch (_: Throwable) {}
             }
 
-            if (latestScreenshotFile != null && latestScreenshotFile.exists()) {
-                val path = latestScreenshotFile.absolutePath
-                val mime = if (latestScreenshotFile.extension.equals("jpg", true) || latestScreenshotFile.extension.equals("jpeg", true)) "image/jpeg" else "image/png"
+            val targetFile = latestScreenshotFile
+            if (targetFile != null && targetFile.exists()) {
+                val path = targetFile.absolutePath
+                val mime = if (targetFile.extension.equals("jpg", true) || targetFile.extension.equals("jpeg", true)) "image/jpeg" else "image/png"
 
                 val existing = items.find { it.isImage && it.imagePath == path }
                 if (existing != null) {

@@ -2096,7 +2096,7 @@ class KeyboardLayout(private val context: Context) {
         items: List<com.maoneart.ioskeyboard.clipboard.ClipboardItem>,
         currentViewMode: String = "card",
         onPasteAction: (String) -> Unit,
-        onPasteItemAction: ((com.maoneart.ioskeyboard.clipboard.ClipboardItem) -> Unit)? = null,
+        onPasteImageAction: ((com.maoneart.ioskeyboard.clipboard.ClipboardItem) -> Unit)? = null,
         onTogglePinAction: (String) -> Unit,
         onDeleteAction: (String) -> Unit,
         onClearUnpinnedAction: () -> Unit,
@@ -2466,8 +2466,8 @@ class KeyboardLayout(private val context: Context) {
                             isFocusable = false
 
                             setOnClickListener {
-                                if (item.isImage && onPasteItemAction != null) {
-                                    onPasteItemAction(item)
+                                if (item.isImage && onPasteImageAction != null) {
+                                    onPasteImageAction(item)
                                 } else {
                                     onPasteAction(item.text)
                                 }
@@ -2546,8 +2546,8 @@ class KeyboardLayout(private val context: Context) {
                         isFocusable = false
 
                         setOnClickListener {
-                            if (item.isImage && onPasteItemAction != null) {
-                                onPasteItemAction(item)
+                            if (item.isImage && onPasteImageAction != null) {
+                                onPasteImageAction(item)
                             } else {
                                 onPasteAction(item.text)
                             }
