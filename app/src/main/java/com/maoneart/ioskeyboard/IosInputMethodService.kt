@@ -431,12 +431,15 @@ class IosInputMethodService : InputMethodService() {
                 candidate3?.text = ""
             } else {
                 clipboardManager.fetchCurrentClip()
+                clipboardManager.scanRecentScreenshots()
                 suggestionHandler.postDelayed({
                     clipboardManager.fetchCurrentClip()
+                    clipboardManager.scanRecentScreenshots()
                     updateSuggestions(immediate = true)
                 }, 120L)
                 suggestionHandler.postDelayed({
                     clipboardManager.fetchCurrentClip()
+                    clipboardManager.scanRecentScreenshots()
                 }, 350L)
             }
 
@@ -484,8 +487,10 @@ class IosInputMethodService : InputMethodService() {
             // Ensure Android 10+ clipboard is captured the exact moment IME window is shown & focused
             if (!isTerminalOrRawInput()) {
                 clipboardManager.fetchCurrentClip()
+                clipboardManager.scanRecentScreenshots()
                 suggestionHandler.postDelayed({
                     clipboardManager.fetchCurrentClip()
+                    clipboardManager.scanRecentScreenshots()
                     updateSuggestions(immediate = true)
                 }, 150L)
             }
@@ -573,6 +578,8 @@ class IosInputMethodService : InputMethodService() {
                 topToolbar?.setBackgroundColor(Color.parseColor("#E6261108"))
                 translatePanel?.setBackgroundColor(Color.parseColor("#F02A140A"))
                 scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_onepiece)
+                btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_onepiece_action)
+                btnTranslateSend?.setTextColor(Color.WHITE)
                 tvTranslateInputBox?.background = null
                 tvTranslateInputBox?.setTextColor(textColor)
             } else if (isWoody) {
@@ -581,6 +588,8 @@ class IosInputMethodService : InputMethodService() {
                 topToolbar?.setBackgroundColor(Color.parseColor("#4D1A0E08"))
                 translatePanel?.setBackgroundColor(Color.parseColor("#661A0E08"))
                 scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_woody)
+                btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_woody_action)
+                btnTranslateSend?.setTextColor(Color.WHITE)
                 tvTranslateInputBox?.background = null
                 tvTranslateInputBox?.setTextColor(textColor)
             } else {
@@ -592,6 +601,8 @@ class IosInputMethodService : InputMethodService() {
                     this@IosInputMethodService,
                     if (isDark) R.drawable.input_bg_apple_translate_dark else R.drawable.input_bg_apple_translate
                 )
+                btnTranslateSend?.setBackgroundResource(R.drawable.btn_apple_translate_send)
+                btnTranslateSend?.setTextColor(Color.WHITE)
                 tvTranslateInputBox?.background = null
                 tvTranslateInputBox?.setTextColor(textColor)
             }
@@ -862,13 +873,19 @@ class IosInputMethodService : InputMethodService() {
                 )
                 if (isOnePiece) {
                     scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_onepiece)
+                    btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_onepiece_action)
+                    btnTranslateSend?.setTextColor(Color.WHITE)
                 } else if (isWoody) {
                     scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_woody)
+                    btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_woody_action)
+                    btnTranslateSend?.setTextColor(Color.WHITE)
                 } else {
                     scrollTranslateInput?.background = ContextCompat.getDrawable(
                         this@IosInputMethodService,
                         if (isDark) R.drawable.input_bg_apple_translate_dark else R.drawable.input_bg_apple_translate
                     )
+                    btnTranslateSend?.setBackgroundResource(R.drawable.btn_apple_translate_send)
+                    btnTranslateSend?.setTextColor(Color.WHITE)
                 }
                 tvTranslateInputBox?.background = null
                 val textColor = if (isOnePiece || isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
@@ -1008,6 +1025,10 @@ class IosInputMethodService : InputMethodService() {
                     currentViewMode = prefs.clipboardViewMode,
                     onPasteAction = { text ->
                         commitDirectText(text)
+                        switchMode(Mode.QWERTY)
+                    },
+                    onPasteImageAction = { item ->
+                        sendClipboardImage(item)
                         switchMode(Mode.QWERTY)
                     },
                     onTogglePinAction = { id ->
@@ -1767,6 +1788,35 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    private fun sendClipboardImage(item: com.maoneart.ioskeyboard.clipboard.ClipboardItem): Boolean {
+        return try {
+            val path = item.imagePath ?: return false
+            val file = java.io.File(path)
+            if (!file.exists()) return false
+
+            audioHaptic.playClickSound()
+            audioHaptic.triggerHapticFeedback()
+
+            val success = stickerManager.sendImage(
+                currentInputConnection,
+                currentInputEditorInfo,
+                file,
+                item.mimeType
+            )
+
+            if (!success) {
+                android.widget.Toast.makeText(
+                    this,
+                    "Aplikasi ini tidak mendukung kirim gambar langsung",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            success
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     private fun openStickerUploadScreen() {
         try {
             audioHaptic.playClickSound()
@@ -1924,7 +1974,16 @@ class IosInputMethodService : InputMethodService() {
                 return
             }
 
-            // 0B. iOS 18 Smart Paste / OTP Autofill Pill when input is empty or at word boundary & fresh clip exists
+            // 0B. Gboard-style Recent Screenshot Pill when input is empty & fresh screenshot exists
+            val freshScreenshot = if (currentWord.isEmpty() && !isTerminalOrRawInput()) clipboardManager.getRecentScreenshot() else null
+            if (freshScreenshot != null) {
+                candidate1?.text = "📸 Screenshot Baru"
+                candidate2?.text = "📸 Kirim Screenshot"
+                candidate3?.text = "✕"
+                return
+            }
+
+            // 0C. iOS 18 Smart Paste / OTP Autofill Pill when input is empty or at word boundary & fresh clip exists
             val freshClip = if (currentWord.isEmpty()) clipboardManager.getRecentFreshClip() else null
             if (!freshClip.isNullOrEmpty()) {
                 val cleanSingleLine = freshClip.replace("\n", " ").trim()
@@ -2013,6 +2072,26 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.triggerHapticFeedback()
 
             var cleanCandidate = candidate.trim()
+
+            // Handle Recent Screenshot Pill ("📸 ...")
+            if (cleanCandidate.startsWith("📸 ")) {
+                val sc = clipboardManager.getRecentScreenshot()
+                if (sc != null) {
+                    val sent = sendClipboardImage(sc)
+                    if (sent) {
+                        clipboardManager.consumeRecentScreenshot()
+                    }
+                }
+                updateSuggestions(immediate = true)
+                return
+            }
+
+            // Dismiss Screenshot / Smart Paste pill ("✕")
+            if (cleanCandidate == "✕" && clipboardManager.getRecentScreenshot() != null) {
+                clipboardManager.consumeRecentScreenshot()
+                updateSuggestions(immediate = true)
+                return
+            }
 
             // Handle iOS 18 Smart Paste Pill ("📋 ...")
             if (cleanCandidate.startsWith("📋 ")) {

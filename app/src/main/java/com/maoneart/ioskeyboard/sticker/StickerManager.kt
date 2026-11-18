@@ -101,23 +101,29 @@ class StickerManager(private val context: Context) {
     }
 
     /**
-     * Sends the sticker directly to WhatsApp or host chat app via Android CommitContent API
+     * Sends an image or screenshot directly to host chat app via Android CommitContent API
      */
-    fun sendSticker(
+    fun sendImage(
         inputConnection: InputConnection?,
         editorInfo: EditorInfo?,
-        stickerFile: File
+        imageFile: File,
+        customMime: String? = null
     ): Boolean {
-        if (inputConnection == null || editorInfo == null || !stickerFile.exists()) {
+        if (inputConnection == null || editorInfo == null || !imageFile.exists()) {
             return false
         }
 
         return try {
             val authority = "${context.packageName}.fileprovider"
-            val contentUri: Uri = FileProvider.getUriForFile(context, authority, stickerFile)
+            val contentUri: Uri = FileProvider.getUriForFile(context, authority, imageFile)
 
-            val mimeType = if (stickerFile.extension.equals("png", ignoreCase = true)) "image/png" else "image/webp"
-            val description = ClipDescription("WhatsApp Sticker", arrayOf(mimeType, "image/webp", "image/png"))
+            val mimeType = customMime ?: when (imageFile.extension.lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "png" -> "image/png"
+                "webp" -> "image/webp"
+                else -> "image/png"
+            }
+            val description = ClipDescription("Image Content", arrayOf(mimeType, "image/jpeg", "image/png", "image/webp"))
 
             val inputContentInfo = InputContentInfoCompat(contentUri, description, null)
 
@@ -130,5 +136,16 @@ class StickerManager(private val context: Context) {
         } catch (_: Throwable) {
             false
         }
+    }
+
+    /**
+     * Sends the sticker directly to WhatsApp or host chat app via Android CommitContent API
+     */
+    fun sendSticker(
+        inputConnection: InputConnection?,
+        editorInfo: EditorInfo?,
+        stickerFile: File
+    ): Boolean {
+        return sendImage(inputConnection, editorInfo, stickerFile, if (stickerFile.extension.equals("png", ignoreCase = true)) "image/png" else "image/webp")
     }
 }

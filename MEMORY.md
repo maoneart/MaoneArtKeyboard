@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.00 / build 100)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.01 / build 101)
 
 ---
 
@@ -632,3 +632,12 @@
           2. Menerapkan mekanisme **Auto-Scroll to Cursor** (`scrollTranslateBoxToCursor`): setiap kali huruf diketik, backspace ditekan, trackpad digeser, atau rekomendasi kata dipilih, viewport otomatis bergeser ke kanan mengikuti posisi kursor secara instan dengan margin visual 28dp yang nyaman.
           3. Dukungan gestur ganda: ketuk (tap) langsung menaruh kursor di huruf tujuan, geser (drag/swipe) menggulir kalimat panjang ke kiri-kanan, dan Spacebar Trackpad tetap presisi meluncurkan kursor antar kata.
           4. Tampilan hint placeholder elegan saat kotak kosong: `│ Ketik kalimat di sini...`.
+   - **Auto-Detect Screenshot Papan Klip (ala Gboard) & Tombol Kirim Translate One Piece (Release v1.1.01 / Build 101)**:
+     1. **Otomatis Deteksi Screenshot Baru Masuk Papan Klip**:
+        - *Fitur Cerdas ala Gboard*: Saat pengguna mengambil screenshot (tangkapan layar), sistem otomatis mendeteksi file tangkapan layar terbaru dari direktori `/sdcard/DCIM/Screenshots`, `/sdcard/Pictures/Screenshots`, maupun query `MediaStore`.
+        - *Smart Suggestion Chip*: Pada bilah saran/toolbar muncul chip `📸 Kirim Screenshot` yang dapat ditekan 1-tap untuk langsung mengirim gambar screenshot ke obrolan WhatsApp/chat via `InputConnectionCompat.commitContent` + `FileProvider` tanpa perlu membuka galeri foto. Tombol `✕` disediakan untuk menutup chip rekomendasi.
+        - *Thumbnail Preview di Papan Klip*: Pada laci Papan Klip (`Mode.CLIPBOARD`), screenshot tersimpan dengan thumbnail preview foto yang rapi (pada Card Mode maupun List Mode) disertai badge waktu. Mengetuk kartu langsung mengirim screenshot, sedangkan long-press membuka modal konfirmasi sematkan (📌) atau hapus (🗑️).
+        - *Dukungan Salin Gambar Sistem*: Menyalin gambar/screenshot dari peramban atau popup Android kini otomatis di-cache dan masuk ke riwayat clipboard.
+     2. **Harmonisasi Tombol Kirim Terjemahan Tema One Piece & Woody**:
+        - Tombol "Kirim ➔" (`btnTranslateSend`) pada panel terjemahan kini menggunakan tema One Piece otentik: 9-patch kayu amber/gold action key (`key_bg_onepiece_action.xml`) dengan teks putih tegas.
+        - Pada tema Woody, tombol kirim otomatis menggunakan tuts kayu walnut gelap (`key_bg_woody_action.xml`).

@@ -16,6 +16,8 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.ImageView
+import android.graphics.Bitmap
 import androidx.core.content.ContextCompat
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
@@ -2065,6 +2067,28 @@ class KeyboardLayout(private val context: Context) {
     }
 
 
+    private fun decodeSampledBitmap(path: String, reqWidth: Int, reqHeight: Int): Bitmap? {
+        return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, options)
+            var inSampleSize = 1
+            if (options.outHeight > reqHeight || options.outWidth > reqWidth) {
+                val halfHeight = options.outHeight / 2
+                val halfWidth = options.outWidth / 2
+                while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                    inSampleSize *= 2
+                }
+            }
+            val decodeOptions = BitmapFactory.Options().apply {
+                this.inSampleSize = inSampleSize.coerceAtLeast(1)
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
+            BitmapFactory.decodeFile(path, decodeOptions)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     // --- 4. CLIPBOARD HISTORY VIEW (Card & List Mode + Pin/Delete Glassmorphic Action Modal) ---
     fun createClipboardView(
         isDark: Boolean,
@@ -2072,6 +2096,7 @@ class KeyboardLayout(private val context: Context) {
         items: List<com.maoneart.ioskeyboard.clipboard.ClipboardItem>,
         currentViewMode: String = "card",
         onPasteAction: (String) -> Unit,
+        onPasteItemAction: ((com.maoneart.ioskeyboard.clipboard.ClipboardItem) -> Unit)? = null,
         onTogglePinAction: (String) -> Unit,
         onDeleteAction: (String) -> Unit,
         onClearUnpinnedAction: () -> Unit,
@@ -2305,16 +2330,41 @@ class KeyboardLayout(private val context: Context) {
                 isClickable = true
             }
 
-            // Preview snippet
-            val tvPreview = TextView(context).apply {
-                text = item.text
-                maxLines = 3
-                textSize = 13.5f
-                setTextColor(textColor)
-                setPadding(dp(10), dp(8), dp(10), dp(10))
-                background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+            // Preview snippet or screenshot image
+            if (item.isImage && item.imagePath != null) {
+                val ivPreview = ImageView(context).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(110)
+                    ).apply { setMargins(0, 0, 0, dp(4)) }
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                    background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+                    try {
+                        val bm = decodeSampledBitmap(item.imagePath, dp(240), dp(110))
+                        if (bm != null) setImageBitmap(bm)
+                    } catch (_: Throwable) {}
+                }
+                dialogCard.addView(ivPreview)
+
+                val tvLabel = TextView(context).apply {
+                    text = "📸 Tangkapan Layar (Screenshot)"
+                    textSize = 12f
+                    setTextColor(subtextColor)
+                    gravity = Gravity.CENTER
+                    setPadding(0, dp(2), 0, dp(6))
+                }
+                dialogCard.addView(tvLabel)
+            } else {
+                val tvPreview = TextView(context).apply {
+                    text = item.text
+                    maxLines = 3
+                    textSize = 13.5f
+                    setTextColor(textColor)
+                    setPadding(dp(10), dp(8), dp(10), dp(10))
+                    background = ContextCompat.getDrawable(context, if (isWoody) R.drawable.key_bg_woody_special else if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+                }
+                dialogCard.addView(tvPreview)
             }
-            dialogCard.addView(tvPreview)
 
             // Symmetrical 2-Column Action Grid (MaoneArt Rule)
             val btnRow = LinearLayout(context).apply {
@@ -2416,7 +2466,11 @@ class KeyboardLayout(private val context: Context) {
                             isFocusable = false
 
                             setOnClickListener {
-                                onPasteAction(item.text)
+                                if (item.isImage && onPasteItemAction != null) {
+                                    onPasteItemAction(item)
+                                } else {
+                                    onPasteAction(item.text)
+                                }
                             }
                             setOnLongClickListener {
                                 performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
@@ -2425,14 +2479,36 @@ class KeyboardLayout(private val context: Context) {
                             }
                         }
 
-                        val tvText = TextView(context).apply {
-                            layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
-                            text = item.text
-                            maxLines = 3
-                            textSize = 12.5f
-                            setTextColor(textColor)
+                        if (item.isImage && item.imagePath != null) {
+                            val ivThumb = ImageView(context).apply {
+                                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                                scaleType = ImageView.ScaleType.CENTER_CROP
+                                try {
+                                    val bm = decodeSampledBitmap(item.imagePath, dp(140), dp(76))
+                                    if (bm != null) setImageBitmap(bm)
+                                } catch (_: Throwable) {}
+                            }
+                            card.addView(ivThumb)
+
+                            val badgeLabel = TextView(context).apply {
+                                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM)
+                                text = "📸 Screenshot"
+                                textSize = 10f
+                                setTextColor(Color.WHITE)
+                                setBackgroundColor(Color.parseColor("#99000000"))
+                                setPadding(dp(6), dp(2), dp(6), dp(2))
+                            }
+                            card.addView(badgeLabel)
+                        } else {
+                            val tvText = TextView(context).apply {
+                                layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+                                text = item.text
+                                maxLines = 3
+                                textSize = 12.5f
+                                setTextColor(textColor)
+                            }
+                            card.addView(tvText)
                         }
-                        card.addView(tvText)
 
                         if (item.isPinned) {
                             val pinBadge = TextView(context).apply {
@@ -2470,7 +2546,11 @@ class KeyboardLayout(private val context: Context) {
                         isFocusable = false
 
                         setOnClickListener {
-                            onPasteAction(item.text)
+                            if (item.isImage && onPasteItemAction != null) {
+                                onPasteItemAction(item)
+                            } else {
+                                onPasteAction(item.text)
+                            }
                         }
                         setOnLongClickListener {
                             performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
@@ -2493,9 +2573,23 @@ class KeyboardLayout(private val context: Context) {
                         rowLayout.addView(pinTv)
                     }
 
+                    if (item.isImage && item.imagePath != null) {
+                        val ivThumb = ImageView(context).apply {
+                            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44)).apply {
+                                setMargins(0, 0, dp(10), 0)
+                            }
+                            scaleType = ImageView.ScaleType.CENTER_CROP
+                            try {
+                                val bm = decodeSampledBitmap(item.imagePath, dp(44), dp(44))
+                                if (bm != null) setImageBitmap(bm)
+                            } catch (_: Throwable) {}
+                        }
+                        rowLayout.addView(ivThumb)
+                    }
+
                     val snippetView = TextView(context).apply {
                         layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
-                        text = item.text
+                        text = if (item.isImage) "📸 Screenshot (${item.text})" else item.text
                         maxLines = 2
                         textSize = 13.5f
                         setTextColor(textColor)
