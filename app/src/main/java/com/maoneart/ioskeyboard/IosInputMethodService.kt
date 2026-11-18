@@ -23,6 +23,7 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
@@ -103,6 +104,7 @@ class IosInputMethodService : InputMethodService() {
     private var layoutTranslateLangs: LinearLayout? = null
     private var tvTranslateLangPair: TextView? = null
     private var tvTranslateStatus: TextView? = null
+    private var scrollTranslateInput: HorizontalScrollView? = null
     private var tvTranslateInputBox: TextView? = null
     private var btnTranslateSend: TextView? = null
     private var btnCloseTranslate: TextView? = null
@@ -182,26 +184,54 @@ class IosInputMethodService : InputMethodService() {
             layoutTranslateLangs = view.findViewById(R.id.layoutTranslateLangs)
             tvTranslateLangPair = view.findViewById(R.id.tvTranslateLangPair)
             tvTranslateStatus = view.findViewById(R.id.tvTranslateStatus)
+            scrollTranslateInput = view.findViewById(R.id.scrollTranslateInput)
             tvTranslateInputBox = view.findViewById(R.id.tvTranslateInputBox)
             btnTranslateSend = view.findViewById(R.id.btnTranslateSend)
             btnCloseTranslate = view.findViewById(R.id.btnCloseTranslate)
 
-            // Interactive Cursor Touch Listener ("buat di geser-geser")
-            tvTranslateInputBox?.setOnTouchListener { _, event ->
-                if (event.action == MotionEvent.ACTION_DOWN || event.action == MotionEvent.ACTION_MOVE) {
-                    val layout = tvTranslateInputBox?.layout
-                    if (layout != null && translatePanelBuffer.isNotEmpty()) {
-                        val x = event.x - (tvTranslateInputBox?.totalPaddingLeft ?: 0) + (tvTranslateInputBox?.scrollX ?: 0)
-                        val y = event.y - (tvTranslateInputBox?.totalPaddingTop ?: 0) + (tvTranslateInputBox?.scrollY ?: 0)
-                        val line = layout.getLineForVertical(y.toInt().coerceIn(0, (layout.lineCount - 1).coerceAtLeast(0)))
-                        val offset = layout.getOffsetForHorizontal(line, x)
-                        translateCursorPosition = offset.coerceIn(0, translatePanelBuffer.length)
-                        updateTranslateInputBoxVisual()
-                        audioHaptic.triggerHapticFeedback()
+            // Interactive Cursor Touch Listener ("tap to place cursor, drag to scroll")
+            var downX = 0f
+            var downY = 0f
+            var isDragging = false
+            val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
+
+            tvTranslateInputBox?.setOnTouchListener { v, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        downX = event.x
+                        downY = event.y
+                        isDragging = false
+                        true
                     }
-                    true
-                } else {
-                    false
+                    MotionEvent.ACTION_MOVE -> {
+                        val dx = Math.abs(event.x - downX)
+                        val dy = Math.abs(event.y - downY)
+                        if (dx > touchSlop || dy > touchSlop) {
+                            isDragging = true
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (!isDragging) {
+                            val layout = tvTranslateInputBox?.layout
+                            if (layout != null && translatePanelBuffer.isNotEmpty()) {
+                                val x = event.x - (tvTranslateInputBox?.totalPaddingLeft ?: 0)
+                                val y = event.y - (tvTranslateInputBox?.totalPaddingTop ?: 0)
+                                val line = layout.getLineForVertical(y.toInt().coerceIn(0, (layout.lineCount - 1).coerceAtLeast(0)))
+                                val offset = layout.getOffsetForHorizontal(line, x)
+                                translateCursorPosition = offset.coerceIn(0, translatePanelBuffer.length)
+                                updateTranslateInputBoxVisual()
+                                audioHaptic.triggerHapticFeedback()
+                            }
+                            v.performClick()
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        isDragging = false
+                        true
+                    }
+                    else -> false
                 }
             }
 
@@ -389,8 +419,8 @@ class IosInputMethodService : InputMethodService() {
                 Mode.QWERTY
             }
 
-            // Auto-Close translate panel when opening a new chat/input session
-            if (isTranslatePanelOpen) {
+            // Auto-Close translate panel ONLY when opening a completely new input field (NOT restarting)
+            if (isTranslatePanelOpen && !restarting) {
                 closeTranslatePanel()
             }
 
@@ -542,21 +572,27 @@ class IosInputMethodService : InputMethodService() {
                 keyboardRoot?.minimumHeight = 0
                 topToolbar?.setBackgroundColor(Color.parseColor("#E6261108"))
                 translatePanel?.setBackgroundColor(Color.parseColor("#F02A140A"))
-                tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_onepiece)
+                scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_onepiece)
+                tvTranslateInputBox?.background = null
                 tvTranslateInputBox?.setTextColor(textColor)
             } else if (isWoody) {
                 keyboardRoot?.setBackgroundResource(R.drawable.theme_woody_bg)
                 keyboardRoot?.minimumHeight = 0
                 topToolbar?.setBackgroundColor(Color.parseColor("#4D1A0E08"))
                 translatePanel?.setBackgroundColor(Color.parseColor("#661A0E08"))
-                tvTranslateInputBox?.setBackgroundResource(R.drawable.key_bg_woody)
+                scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_woody)
+                tvTranslateInputBox?.background = null
                 tvTranslateInputBox?.setTextColor(textColor)
             } else {
                 keyboardRoot?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_bg_dark else R.color.ios_bg_light))
                 keyboardRoot?.minimumHeight = 0
                 topToolbar?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
                 translatePanel?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_toolbar_dark else R.color.ios_toolbar_light))
-                tvTranslateInputBox?.setBackgroundResource(if (isDark) R.drawable.key_bg_ios_dark else R.drawable.key_bg_ios_light)
+                scrollTranslateInput?.background = ContextCompat.getDrawable(
+                    this@IosInputMethodService,
+                    if (isDark) R.drawable.input_bg_apple_translate_dark else R.drawable.input_bg_apple_translate
+                )
+                tvTranslateInputBox?.background = null
                 tvTranslateInputBox?.setTextColor(textColor)
             }
 
@@ -607,6 +643,7 @@ class IosInputMethodService : InputMethodService() {
         isTranslatePanelOpen = false
         translatePanelBuffer.clear()
         translateCursorPosition = 0
+        scrollTranslateInput?.scrollTo(0, 0)
         if (currentMode != Mode.QWERTY) {
             switchMode(Mode.QWERTY)
         }
@@ -647,17 +684,20 @@ class IosInputMethodService : InputMethodService() {
         prefs.saveAppShortcuts(current)
     }
 
-    // Render movable iOS blue cursor ('│') in Translate Input Box
+    // Render movable iOS blue cursor ('│') in Translate Input Box and auto-scroll to follow cursor
     private fun updateTranslateInputBoxVisual() {
         try {
             val box = tvTranslateInputBox ?: return
             if (!isTranslatePanelOpen) return
 
             if (translatePanelBuffer.isEmpty()) {
-                val ssb = SpannableStringBuilder("│")
+                val ssb = SpannableStringBuilder("│ Ketik kalimat di sini...")
                 ssb.setSpan(ForegroundColorSpan(Color.parseColor("#007AFF")), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 ssb.setSpan(StyleSpan(Typeface.BOLD), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                val hintColor = if (isDarkMode()) Color.parseColor("#636366") else Color.parseColor("#AEAEB2")
+                ssb.setSpan(ForegroundColorSpan(hintColor), 2, ssb.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 box.text = ssb
+                scrollTranslateInput?.scrollTo(0, 0)
                 return
             }
 
@@ -667,7 +707,37 @@ class IosInputMethodService : InputMethodService() {
             ssb.setSpan(ForegroundColorSpan(Color.parseColor("#007AFF")), pos, pos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             ssb.setSpan(StyleSpan(Typeface.BOLD), pos, pos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             box.text = ssb
+            scrollTranslateBoxToCursor()
         } catch (_: Throwable) {}
+    }
+
+    private fun scrollTranslateBoxToCursor() {
+        val box = tvTranslateInputBox ?: return
+        val scrollView = scrollTranslateInput ?: return
+        box.post {
+            try {
+                if (translatePanelBuffer.isEmpty()) {
+                    scrollView.scrollTo(0, 0)
+                    return@post
+                }
+                val layout = box.layout ?: return@post
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                val safeOffset = pos.coerceIn(0, (layout.text?.length ?: 0))
+                val cursorX = layout.getPrimaryHorizontal(safeOffset).toInt() + box.totalPaddingLeft
+                val scrollX = scrollView.scrollX
+                val viewportWidth = scrollView.width
+                if (viewportWidth <= 0) return@post
+
+                val margin = dp(28)
+                if (cursorX > scrollX + viewportWidth - margin) {
+                    val targetScrollX = cursorX - viewportWidth + margin + dp(24)
+                    scrollView.scrollTo(targetScrollX.coerceAtLeast(0), 0)
+                } else if (cursorX < scrollX + margin) {
+                    val targetScrollX = (cursorX - margin).coerceAtLeast(0)
+                    scrollView.scrollTo(targetScrollX, 0)
+                }
+            } catch (_: Throwable) {}
+        }
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
@@ -784,15 +854,25 @@ class IosInputMethodService : InputMethodService() {
             if (isTranslatePanelOpen) {
                 translatePanel?.visibility = View.VISIBLE
                 val isDark = isDarkMode()
+                val isWoody = (prefs.themeMode == "woody")
+                val isOnePiece = (prefs.themeMode == "onepiece")
                 translatePanel?.background = ContextCompat.getDrawable(
                     this@IosInputMethodService,
                     if (isDark) R.drawable.panel_bg_apple_translate_dark else R.drawable.panel_bg_apple_translate
                 )
-                tvTranslateInputBox?.background = ContextCompat.getDrawable(
-                    this@IosInputMethodService,
-                    if (isDark) R.drawable.input_bg_apple_translate_dark else R.drawable.input_bg_apple_translate
-                )
-                tvTranslateInputBox?.setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+                if (isOnePiece) {
+                    scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_onepiece)
+                } else if (isWoody) {
+                    scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_woody)
+                } else {
+                    scrollTranslateInput?.background = ContextCompat.getDrawable(
+                        this@IosInputMethodService,
+                        if (isDark) R.drawable.input_bg_apple_translate_dark else R.drawable.input_bg_apple_translate
+                    )
+                }
+                tvTranslateInputBox?.background = null
+                val textColor = if (isOnePiece || isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+                tvTranslateInputBox?.setTextColor(textColor)
 
                 val src = prefs.translateSourceLang.uppercase()
                 val tgt = prefs.translateTargetLang.uppercase()
@@ -809,6 +889,7 @@ class IosInputMethodService : InputMethodService() {
                 translatePanel?.visibility = View.GONE
                 translatePanelBuffer.clear()
                 translateCursorPosition = 0
+                scrollTranslateInput?.scrollTo(0, 0)
                 tvTranslateInputBox?.text = ""
             }
         } catch (_: Throwable) {}
@@ -830,11 +911,14 @@ class IosInputMethodService : InputMethodService() {
                     prefs.translateSourceLang,
                     prefs.translateTargetLang
                 )
-                // Commit translated sentence directly into the host app (WhatsApp, etc.)
-                currentInputConnection?.commitText("$translated ", 1)
-
-                // Auto-Close translate panel immediately after sending!
-                closeTranslatePanel()
+                // Commit translated sentence directly into host app (WhatsApp, etc.)
+                val ic = currentInputConnection ?: getCurrentInputConnection()
+                if (ic != null) {
+                    ic.commitText("$translated ", 1)
+                    closeTranslatePanel()
+                } else {
+                    tvTranslateStatus?.text = "Gagal mengirim ke chat (fokus hilang)"
+                }
             } catch (_: Throwable) {
                 tvTranslateStatus?.text = "Gagal menerjemahkan (periksa koneksi)"
             }

@@ -208,21 +208,32 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/tvTranslateInputBox"
+            <HorizontalScrollView
+                android:id="@+id/scrollTranslateInput"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:gravity="center_vertical|start"
-                android:background="@drawable/input_bg_apple_translate"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:hint="Ketik kalimat di sini..."
-                android:textColorHint="#AEAEB2"
-                android:textColor="#000000"
-                android:textSize="14sp"
-                android:maxLines="1"
-                android:ellipsize="end" />
+                android:scrollbars="none"
+                android:fillViewport="true"
+                android:overScrollMode="never"
+                android:clipToOutline="true"
+                android:background="@drawable/input_bg_apple_translate">
+
+                <TextView
+                    android:id="@+id/tvTranslateInputBox"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:gravity="center_vertical|start"
+                    android:background="@null"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:hint="Ketik kalimat di sini..."
+                    android:textColorHint="#AEAEB2"
+                    android:textColor="#000000"
+                    android:textSize="14sp"
+                    android:maxLines="1"
+                    android:singleLine="true" />
+            </HorizontalScrollView>
 
             <TextView
                 android:id="@+id/btnTranslateSend"

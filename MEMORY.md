@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.0.99 / build 99)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.00 / build 100)
 
 ---
 
@@ -616,3 +616,19 @@
        - Hasil: Tuts 'X' kini 100% otentik katana Roronoa Zoro, sangat gagah, tajam, dan membentuk huruf 'X' yang jelas serta mudah dikenali saat mengetik.
 
 
+   - **Perbaikan Terjemahan Teks Panjang & Auto-Scroll Kursor Horizontal (Release v1.1.00 / Build 100)**:
+     1. **Eliminasi Masalah Teks Terjemahan Hilang (`onStartInputView` Guard & HTTP POST)**:
+        - *Root Cause Teks Tiba-Tiba Hilang*:
+          1. Pada `onStartInputView`, saat aplikasi chat (seperti WhatsApp) memicu input restart (`restarting == true`) di tengah pengetikan kalimat panjang (untuk auto-save draft/spellcheck), panel terjemahan sebelumnya langsung ditutup secara paksa dan `translatePanelBuffer` dihapus bersih.
+          2. Endpoint Google Translate lama (`client=gtx` via GET) dibatasi oleh Google dengan HTTP 429 dan URL query param `?q=...` terbatas panjangnya sehingga teks panjang terpotong.
+        - *Solusi Presisi*:
+          1. `onStartInputView` kini memproteksi buffer: panel terjemahan HANYA ditutup saat sesi input benar-benar baru (`!restarting`), kalimat panjang aman dari penghapusan mendadak saat mengetik.
+          2. `LiveTranslateManager` kini menggunakan **HTTP POST** dengan `FormBody` (`q=text`), menembus batas panjang URL query parameter tanpa batas karakter dan tanpa truncation.
+          3. Multi-client fallback (`dict-chrome-ex` ➔ `at` ➔ `gtx`) dengan safe JSON segment parser menjamin terjemahan kalimat panjang selalu 100% sukses.
+     2. **Auto-Scroll Kursor ke Kanan & Eliminasi `ellipsize="end"` pada Kotak Terjemahan**:
+        - *Root Cause Teks Paling Akhir Tersembunyi*: `tvTranslateInputBox` sebelumnya menggunakan `android:ellipsize="end"` tanpa kontainer scroll horizontal. Ketika kalimat lebih panjang dari lebar kotak, huruf di ujung kanan langsung dipotong menjadi `...` dan kursor tidak terlihat sehingga pengguna tidak tahu apa yang sedang diketik.
+        - *Solusi Presisi*:
+          1. Membungkus `tvTranslateInputBox` ke dalam `scrollTranslateInput` (`HorizontalScrollView`) dengan `fillViewport="true"`, `overScrollMode="never"`, `clipToOutline="true"`, dan menghapus `ellipsize="end"`.
+          2. Menerapkan mekanisme **Auto-Scroll to Cursor** (`scrollTranslateBoxToCursor`): setiap kali huruf diketik, backspace ditekan, trackpad digeser, atau rekomendasi kata dipilih, viewport otomatis bergeser ke kanan mengikuti posisi kursor secara instan dengan margin visual 28dp yang nyaman.
+          3. Dukungan gestur ganda: ketuk (tap) langsung menaruh kursor di huruf tujuan, geser (drag/swipe) menggulir kalimat panjang ke kiri-kanan, dan Spacebar Trackpad tetap presisi meluncurkan kursor antar kata.
+          4. Tampilan hint placeholder elegan saat kotak kosong: `│ Ketik kalimat di sini...`.
