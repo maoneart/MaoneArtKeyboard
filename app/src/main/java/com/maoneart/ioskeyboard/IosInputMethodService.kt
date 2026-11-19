@@ -1715,7 +1715,8 @@ class IosInputMethodService : InputMethodService() {
             val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
             if (pos > 0) translatePanelBuffer.substring(0, pos) else ""
         } else {
-            currentInputConnection?.getTextBeforeCursor(8, 0)?.toString() ?: ""
+            val fromIc = currentInputConnection?.getTextBeforeCursor(12, 0)?.toString() ?: ""
+            if (fromIc.isNotEmpty()) fromIc else composingWord.toString()
         }
         if (textBefore.isEmpty()) return null
 
@@ -1729,10 +1730,21 @@ class IosInputMethodService : InputMethodService() {
             return Pair(2, "…")
         }
 
-        // 3. Arrows: "->" -> "➔", "<-" -> "←", "=>" -> "⇒"
-        if (charStr == ">" && textBefore.endsWith("-")) return Pair(1, "➔")
-        if (charStr == "-" && textBefore.endsWith("<")) return Pair(1, "←")
-        if (charStr == ">" && textBefore.endsWith("=")) return Pair(1, "⇒")
+        // 3. Arrows: "->" or "- >" or "-->" -> "➔", "<-" -> "←", "=>" -> "⇒"
+        if (charStr == ">") {
+            if (textBefore.endsWith("-->")) return Pair(3, "➔")
+            if (textBefore.endsWith("--")) return Pair(2, "➔")
+            if (textBefore.endsWith("- ") || textBefore.endsWith("- ")) return Pair(2, "➔")
+            if (textBefore.endsWith("-")) return Pair(1, "➔")
+            if (textBefore.endsWith("= ") || textBefore.endsWith("= ")) return Pair(2, "⇒")
+            if (textBefore.endsWith("==")) return Pair(2, "⇒")
+            if (textBefore.endsWith("=")) return Pair(1, "⇒")
+        }
+        if (charStr == "-") {
+            if (textBefore.endsWith("< -") || textBefore.endsWith("< -")) return Pair(3, "←")
+            if (textBefore.endsWith("<-")) return Pair(2, "←")
+            if (textBefore.endsWith("<")) return Pair(1, "←")
+        }
 
         // 4. Comparison & Math: "!=" -> "≠", ">=" -> "≥", "<=" -> "≤", "+-" -> "±"
         if (charStr == "=" && textBefore.endsWith("!")) return Pair(1, "≠")
@@ -1767,6 +1779,52 @@ class IosInputMethodService : InputMethodService() {
         return null
     }
 
+    private fun applySmartReplacement(deleteCount: Int, replacement: String) {
+        try {
+            audioHaptic.playClickSound()
+            audioHaptic.triggerHapticFeedback()
+
+            if (isTranslatePanelOpen) {
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                if (pos >= deleteCount) {
+                    translatePanelBuffer.delete(pos - deleteCount, pos)
+                    translateCursorPosition = pos - deleteCount
+                }
+                translatePanelBuffer.insert(translateCursorPosition, replacement)
+                translateCursorPosition += replacement.length
+                updateTranslateInputBoxVisual()
+                updateSuggestions(immediate = false)
+                return
+            }
+
+            val ic = currentInputConnection ?: return
+            ic.beginBatchEdit()
+            try {
+                var deleted = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    try {
+                        deleted = ic.deleteSurroundingTextInCodePoints(deleteCount, 0)
+                    } catch (_: Throwable) {}
+                }
+                if (!deleted) {
+                    try {
+                        deleted = ic.deleteSurroundingText(deleteCount, 0)
+                    } catch (_: Throwable) {}
+                }
+                if (!deleted) {
+                    repeat(deleteCount) {
+                        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                    }
+                }
+                ic.commitText(replacement, 1)
+            } finally {
+                ic.endBatchEdit()
+            }
+            composingWord.clear()
+            updateSuggestions(immediate = false)
+        } catch (_: Throwable) {}
+    }
+
     private fun handleCharacterInput(charStr: String) {
         try {
             if (voiceDictationManager.isListening) {
@@ -1778,22 +1836,7 @@ class IosInputMethodService : InputMethodService() {
             val smartPunct = checkSmartPunctuation(charStr)
             if (smartPunct != null) {
                 val (deleteCount, replacement) = smartPunct
-                if (isTranslatePanelOpen) {
-                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
-                    if (pos >= deleteCount) {
-                        translatePanelBuffer.delete(pos - deleteCount, pos)
-                        translateCursorPosition = pos - deleteCount
-                    }
-                    translatePanelBuffer.insert(translateCursorPosition, replacement)
-                    translateCursorPosition += replacement.length
-                    updateTranslateInputBoxVisual()
-                    updateSuggestions(immediate = false)
-                } else {
-                    currentInputConnection?.deleteSurroundingText(deleteCount, 0)
-                    currentInputConnection?.commitText(replacement, 1)
-                    composingWord.clear()
-                    updateSuggestions(immediate = false)
-                }
+                applySmartReplacement(deleteCount, replacement)
 
                 val isAllCapField = (currentInputEditorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) ?: 0) != 0
                 if (isShifted && !isCapsLock && !isAllCapField) {
@@ -1952,6 +1995,50 @@ class IosInputMethodService : InputMethodService() {
                 composingWord.clear()
                 updateSuggestions()
                 return
+            }
+
+            // 0. Smart Punctuation on Space (e.g. "->" -> "➔ ", "--" -> "— ", "1/2" -> "½ ")
+            if (prefs.isSmartPunctuationEnabled) {
+                val textBeforeForSpace = if (isTranslatePanelOpen) {
+                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                    if (pos > 0) translatePanelBuffer.substring(0, pos) else ""
+                } else {
+                    currentInputConnection?.getTextBeforeCursor(12, 0)?.toString() ?: ""
+                }
+
+                val spaceReplacement: Pair<Int, String>? = when {
+                    textBeforeForSpace.endsWith("-->") -> Pair(3, "➔ ")
+                    textBeforeForSpace.endsWith("->") -> Pair(2, "➔ ")
+                    textBeforeForSpace.endsWith("- >") -> Pair(3, "➔ ")
+                    textBeforeForSpace.endsWith("==>") -> Pair(3, "⇒ ")
+                    textBeforeForSpace.endsWith("=>") -> Pair(2, "⇒ ")
+                    textBeforeForSpace.endsWith("= >") -> Pair(3, "⇒ ")
+                    textBeforeForSpace.endsWith("<--") -> Pair(3, "← ")
+                    textBeforeForSpace.endsWith("<-") -> Pair(2, "← ")
+                    textBeforeForSpace.endsWith("< -") -> Pair(3, "← ")
+                    textBeforeForSpace.endsWith("!=") -> Pair(2, "≠ ")
+                    textBeforeForSpace.endsWith(">=") -> Pair(2, "≥ ")
+                    textBeforeForSpace.endsWith("<=") -> Pair(2, "≤ ")
+                    textBeforeForSpace.endsWith("+-") -> Pair(2, "± ")
+                    textBeforeForSpace.endsWith("--") -> Pair(2, "— ")
+                    textBeforeForSpace.endsWith("...") -> Pair(3, "… ")
+                    textBeforeForSpace.endsWith("1/2") -> Pair(3, "½ ")
+                    textBeforeForSpace.endsWith("1/4") -> Pair(3, "¼ ")
+                    textBeforeForSpace.endsWith("3/4") -> Pair(3, "¾ ")
+                    textBeforeForSpace.endsWith("1/3") -> Pair(3, "⅓ ")
+                    textBeforeForSpace.endsWith("2/3") -> Pair(3, "⅔ ")
+                    textBeforeForSpace.endsWith("(c)", true) -> Pair(3, "© ")
+                    textBeforeForSpace.endsWith("(r)", true) -> Pair(3, "® ")
+                    textBeforeForSpace.endsWith("(tm)", true) -> Pair(4, "™ ")
+                    textBeforeForSpace.endsWith("(p)", true) -> Pair(3, "℗ ")
+                    else -> null
+                }
+
+                if (spaceReplacement != null) {
+                    val (delLen, repStr) = spaceReplacement
+                    applySmartReplacement(delLen, repStr)
+                    return
+                }
             }
 
             val (activeWord, _) = getTypingContext()

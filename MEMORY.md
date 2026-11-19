@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.07 / build 107)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.08 / build 108)
 
 ---
 
@@ -699,3 +699,11 @@
      2. **Isolasi Aman Terminal & Sakelar Pengaturan**:
         - *Proteksi Command Line*: Pada Termux, SSH, dan Terminal PTY (`isTerminalOrRawInput()`), Smart Punctuation otomatis nonaktif sehingga argumen bash (`--help`, `--exit-status`) dan operator kode (`->`) tidak akan berubah.
         - *Pengaturan Kustom*: Dilengkapi sakelar on/off `switchSmartPunctuation` di menu Pengaturan keyboard.
+   - **Penyempurnaan Dual-Trigger Smart Punctuation & WhatsApp Batch Edit Fix (Release v1.1.08 / Build 108)**:
+     1. **Dual-Trigger Mode (Ketik Langsung & Spasi)**:
+        - *Instant Key Trigger*: Mengetik `>` setelah `-` (`->`), `- >`, atau `-->` langsung seketika berubah menjadi `➔` tanpa jeda.
+        - *Space Trigger Fallback*: Jika pengguna mengetik `->` lalu menekan tombol spasi, sistem otomatis mendeteksi dan mentransformasikan menjadi `➔ `.
+        - *Dukungan Variasi Spasi*: Menangani input dengan spasi di tengah (`- >`, `= >`, `< -`).
+     2. **Robust WhatsApp & Third-Party IPC Deletion Engine**:
+        - Menggunakan `ic.beginBatchEdit()`, `deleteSurroundingTextInCodePoints`, fallback `deleteSurroundingText`, serta `KEYCODE_DEL` hardware fallback untuk menjamin teks sebelumnya terhapus 100% di WhatsApp, Telegram, dan Chrome.
+        - Ditambah getaran haptik feedback dan efek suara klik saat simbol terpilih berhasil dikonversi.
