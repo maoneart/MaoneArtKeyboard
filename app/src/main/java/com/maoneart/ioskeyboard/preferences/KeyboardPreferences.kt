@@ -82,6 +82,10 @@ class KeyboardPreferences(context: Context) {
         get() = prefs.getBoolean("auto_capitalization_enabled", true)
         set(value) = prefs.edit().putBoolean("auto_capitalization_enabled", value).apply()
 
+    var isSmartPunctuationEnabled: Boolean
+        get() = prefs.getBoolean("smart_punctuation_enabled", true)
+        set(value) = prefs.edit().putBoolean("smart_punctuation_enabled", value).apply()
+
     var appShortcutsJson: String
         get() = prefs.getString("app_shortcuts_json", "") ?: ""
         set(value) = prefs.edit().putString("app_shortcuts_json", value).apply()

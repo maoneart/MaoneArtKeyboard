@@ -187,6 +187,10 @@ class SettingsActivity : AppCompatActivity() {
             prefs.isDoubleSpacePeriodEnabled = isChecked
         }
 
+        findViewById<SwitchMaterial>(R.id.switchSmartPunctuation)?.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isSmartPunctuationEnabled = isChecked
+        }
+
         rowDownloadLanguages.setOnClickListener {
             startActivity(Intent(this, LanguageDownloadActivity::class.java))
         }
@@ -246,6 +250,7 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<SwitchMaterial>(R.id.switchAutoCapitalization)?.isChecked = prefs.isAutoCapitalizationEnabled
         findViewById<SwitchMaterial>(R.id.switchAutoCorrect).isChecked = prefs.isAutoCorrectEnabled
         findViewById<SwitchMaterial>(R.id.switchDoubleSpace).isChecked = prefs.isDoubleSpacePeriodEnabled
+        findViewById<SwitchMaterial>(R.id.switchSmartPunctuation)?.isChecked = prefs.isSmartPunctuationEnabled
         findViewById<SwitchMaterial>(R.id.switchPredictiveText)?.isChecked = prefs.isPredictiveTextEnabled
         findViewById<SwitchMaterial>(R.id.switchSwipeTyping)?.isChecked = prefs.isSwipeTypingEnabled
         findViewById<SwitchMaterial>(R.id.switchSpaceTrackpad)?.isChecked = prefs.isSpaceTrackpadEnabled

@@ -1706,12 +1706,104 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    // --- Apple iOS Smart Punctuation Engine (-- -> —, ... -> …, 1/2 -> ½, (c) -> ©) ---
+    private fun checkSmartPunctuation(charStr: String): Pair<Int, String>? {
+        if (!prefs.isSmartPunctuationEnabled) return null
+        if (isTerminalOrRawInput()) return null
+
+        val textBefore = if (isTranslatePanelOpen) {
+            val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+            if (pos > 0) translatePanelBuffer.substring(0, pos) else ""
+        } else {
+            currentInputConnection?.getTextBeforeCursor(8, 0)?.toString() ?: ""
+        }
+        if (textBefore.isEmpty()) return null
+
+        // 1. Double dash "--" -> em-dash "—"
+        if (charStr == "-" && textBefore.endsWith("-") && !textBefore.endsWith("--")) {
+            return Pair(1, "—")
+        }
+
+        // 2. Triple dot "..." -> single ellipsis "…"
+        if (charStr == "." && textBefore.endsWith("..") && !textBefore.endsWith("...")) {
+            return Pair(2, "…")
+        }
+
+        // 3. Arrows: "->" -> "➔", "<-" -> "←", "=>" -> "⇒"
+        if (charStr == ">" && textBefore.endsWith("-")) return Pair(1, "➔")
+        if (charStr == "-" && textBefore.endsWith("<")) return Pair(1, "←")
+        if (charStr == ">" && textBefore.endsWith("=")) return Pair(1, "⇒")
+
+        // 4. Comparison & Math: "!=" -> "≠", ">=" -> "≥", "<=" -> "≤", "+-" -> "±"
+        if (charStr == "=" && textBefore.endsWith("!")) return Pair(1, "≠")
+        if (charStr == "=" && textBefore.endsWith(">")) return Pair(1, "≥")
+        if (charStr == "=" && textBefore.endsWith("<")) return Pair(1, "≤")
+        if (charStr == "-" && textBefore.endsWith("+")) return Pair(1, "±")
+
+        // 5. Fractions: "1/2" -> "½", "1/4" -> "¼", "3/4" -> "¾", "1/3" -> "⅓", "2/3" -> "⅔"
+        if (charStr == "2" && textBefore.endsWith("1/")) return Pair(2, "½")
+        if (charStr == "4" && textBefore.endsWith("1/")) return Pair(2, "¼")
+        if (charStr == "4" && textBefore.endsWith("3/")) return Pair(2, "¾")
+        if (charStr == "3" && textBefore.endsWith("1/")) return Pair(2, "⅓")
+        if (charStr == "3" && textBefore.endsWith("2/")) return Pair(2, "⅔")
+        if (charStr == "8" && textBefore.endsWith("1/")) return Pair(2, "⅛")
+        if (charStr == "8" && textBefore.endsWith("3/")) return Pair(2, "⅜")
+        if (charStr == "8" && textBefore.endsWith("5/")) return Pair(2, "⅝")
+        if (charStr == "8" && textBefore.endsWith("7/")) return Pair(2, "⅞")
+
+        // 6. Special symbols in parentheses: (c) -> ©, (r) -> ®, (tm) -> ™, (p) -> ℗
+        if (charStr == ")") {
+            if (textBefore.endsWith("(c", ignoreCase = true)) return Pair(2, "©")
+            if (textBefore.endsWith("(r", ignoreCase = true)) return Pair(2, "®")
+            if (textBefore.endsWith("(tm", ignoreCase = true)) return Pair(3, "™")
+            if (textBefore.endsWith("(p", ignoreCase = true)) return Pair(2, "℗")
+        }
+
+        // 7. Degree symbol: "^o" or "^0" -> "°"
+        if ((charStr == "o" || charStr == "O" || charStr == "0") && textBefore.endsWith("^")) {
+            return Pair(1, "°")
+        }
+
+        return null
+    }
+
     private fun handleCharacterInput(charStr: String) {
         try {
             if (voiceDictationManager.isListening) {
                 voiceDictationManager.stopListening()
             }
             lastKeyTypingTime = System.currentTimeMillis()
+
+            // 1. Apple iOS Smart Punctuation (-- -> —, ... -> …, 1/2 -> ½, (c) -> ©)
+            val smartPunct = checkSmartPunctuation(charStr)
+            if (smartPunct != null) {
+                val (deleteCount, replacement) = smartPunct
+                if (isTranslatePanelOpen) {
+                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                    if (pos >= deleteCount) {
+                        translatePanelBuffer.delete(pos - deleteCount, pos)
+                        translateCursorPosition = pos - deleteCount
+                    }
+                    translatePanelBuffer.insert(translateCursorPosition, replacement)
+                    translateCursorPosition += replacement.length
+                    updateTranslateInputBoxVisual()
+                    updateSuggestions(immediate = false)
+                } else {
+                    currentInputConnection?.deleteSurroundingText(deleteCount, 0)
+                    currentInputConnection?.commitText(replacement, 1)
+                    composingWord.clear()
+                    updateSuggestions(immediate = false)
+                }
+
+                val isAllCapField = (currentInputEditorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) ?: 0) != 0
+                if (isShifted && !isCapsLock && !isAllCapField) {
+                    isShifted = false
+                    layoutEngine.updateShiftState(false)
+                    layoutEngine.updateShiftButtonVisual(false, false, isDarkMode(), prefs.themeMode)
+                }
+                return
+            }
+
             val finalStr = if (FancyFontManager.currentStyle != FancyFontManager.FancyStyle.NORMAL && !isTranslatePanelOpen && charStr.length == 1) {
                 FancyFontManager.transformChar(charStr[0])
             } else {

@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.06 / build 106)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.07 / build 107)
 
 ---
 
@@ -689,3 +689,13 @@
         - *Deteksi Cerdas Format Field*: Mendukung TYPE_TEXT_FLAG_CAP_CHARACTERS (semua huruf kapital) dan TYPE_TEXT_FLAG_CAP_WORDS (kapitalisasi tiap kata untuk nama kontak/judul).
         - *Sinkronisasi Multi-View*: Perpindahan dari keyboard simbol (123 / #+=) kembali ke huruf ABC otomatis memeriksa konteks teks dan menyalakan Shift jika berada di awal kalimat baru.
         - *Transisi Huruf Halus*: Huruf pertama diketik otomatis kapital, dan tuts keyboard seketika kembali ke huruf kecil secara mulus persis Apple iOS.
+   - **Smart Punctuation ala Apple iOS 18 (Release v1.1.07 / Build 107)**:
+     1. **Transformasi Tanda Baca Pintar Real-Time**:
+        - *Strip Panjang Em-Dash*: Mengetik dua strip `--` otomatis berubah menjadi tanda hubung em-dash `—` khas tipografi Apple.
+        - *Ellipsis Resmi*: Mengetik tiga titik `...` otomatis digabung menjadi satu karakter Unicode ellipsis `…`.
+        - *Pecahan Tipografi*: Mengetik pecahan seperti `1/2` ➔ `½`, `1/4` ➔ `¼`, `3/4` ➔ `¾`, `1/3` ➔ `⅓`, `2/3` ➔ `⅔`, `1/8` ➔ `⅛`.
+        - *Hak Cipta & Merek*: Mengetik `(c)` ➔ `©`, `(r)` ➔ `®`, `(tm)` ➔ `™`, `(p)` ➔ `℗`.
+        - *Panah & Simbol Matematika*: Mengetik `->` ➔ `➔`, `<-` ➔ `←`, `=>` ➔ `⇒`, `!=` ➔ `≠`, `>=` ➔ `≥`, `<=` ➔ `≤`, `+-` ➔ `±`, `^o` ➔ `°`.
+     2. **Isolasi Aman Terminal & Sakelar Pengaturan**:
+        - *Proteksi Command Line*: Pada Termux, SSH, dan Terminal PTY (`isTerminalOrRawInput()`), Smart Punctuation otomatis nonaktif sehingga argumen bash (`--help`, `--exit-status`) dan operator kode (`->`) tidak akan berubah.
+        - *Pengaturan Kustom*: Dilengkapi sakelar on/off `switchSmartPunctuation` di menu Pengaturan keyboard.
