@@ -47,6 +47,19 @@
             android:src="@drawable/ic_apps_grid"
             android:contentDescription="Pintasan Aplikasi" />
 
+        <!-- Fancy Fonts Styler Button -->
+        <TextView
+            android:id="@+id/btnQuickFonts"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:gravity="center"
+            android:background="@drawable/btn_icon_ripple"
+            android:text="𝓕"
+            android:textColor="@color/ios_key_text_light"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:contentDescription="Fancy Fonts Estetik" />
+
         <!-- Candidate Suggestions Row -->
         <LinearLayout
             android:id="@+id/candidatesRow"
@@ -116,6 +129,47 @@
             android:textColor="@color/ios_key_text_light"
             android:textSize="11.5sp"
             android:textStyle="bold" />
+    </LinearLayout>
+
+    <!-- Fancy Fonts Selection Bar (Hidden by default, toggled via btnQuickFonts) -->
+    <LinearLayout
+        android:id="@+id/fontsPanel"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone"
+        android:background="@color/ios_toolbar_light"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp">
+
+        <HorizontalScrollView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+            <LinearLayout
+                android:id="@+id/layoutFontChips"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/btnCloseFontsPanel"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:gravity="center"
+            android:background="@drawable/btn_icon_ripple"
+            android:text="✕"
+            android:textColor="#8E8E93"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="false" />
     </LinearLayout>
 
     <!-- Apple Intelligence / iOS 18 Style Modern Glassmorphic Live Translate Panel -->

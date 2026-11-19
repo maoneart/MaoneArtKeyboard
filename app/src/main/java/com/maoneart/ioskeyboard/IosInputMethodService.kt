@@ -37,6 +37,7 @@ import androidx.core.content.ContextCompat
 import com.maoneart.ioskeyboard.audio.AudioHapticManager
 import com.maoneart.ioskeyboard.clipboard.ClipboardHistoryManager
 import com.maoneart.ioskeyboard.correction.SmartCorrectionEngine
+import com.maoneart.ioskeyboard.fonts.FancyFontManager
 import com.maoneart.ioskeyboard.keyboard.KeyboardLayout
 import com.maoneart.ioskeyboard.preferences.KeyboardPreferences
 import com.maoneart.ioskeyboard.settings.SettingsActivity
@@ -113,6 +114,13 @@ class IosInputMethodService : InputMethodService() {
     private var candidate3: TextView? = null
     private var badgeLanguage: TextView? = null
     private var btnQuickApps: ImageButton? = null
+    private var btnQuickFonts: TextView? = null
+
+    // Fancy Fonts Styler Panel Views
+    private var fontsPanel: LinearLayout? = null
+    private var layoutFontChips: LinearLayout? = null
+    private var btnCloseFontsPanel: TextView? = null
+    private var isFontsPanelOpen = false
 
     // Translate Panel Views
     private var translatePanel: LinearLayout? = null
@@ -213,6 +221,24 @@ class IosInputMethodService : InputMethodService() {
 
             // Setup App Shortcuts Button
             btnQuickApps = view.findViewById<ImageButton>(R.id.btnQuickApps)
+
+            // Setup Fancy Fonts Styler Button & Panel
+            btnQuickFonts = view.findViewById<TextView>(R.id.btnQuickFonts)
+            fontsPanel = view.findViewById(R.id.fontsPanel)
+            layoutFontChips = view.findViewById(R.id.layoutFontChips)
+            btnCloseFontsPanel = view.findViewById(R.id.btnCloseFontsPanel)
+
+            btnQuickFonts?.setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                toggleFontsPanel()
+            }
+
+            btnCloseFontsPanel?.setOnClickListener {
+                audioHaptic.playClickSound(it)
+                audioHaptic.triggerHapticFeedback(it)
+                closeFontsPanel()
+            }
 
             // Setup Translate Panel
             translatePanel = view.findViewById(R.id.translatePanel)
@@ -509,6 +535,11 @@ class IosInputMethodService : InputMethodService() {
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
+            if (isFontsPanelOpen) {
+                closeFontsPanel()
+            }
+            FancyFontManager.currentStyle = FancyFontManager.FancyStyle.NORMAL
+            updateQuickFontsButtonVisual()
             if (voiceDictationManager.isListening) {
                 voiceDictationManager.stopListening()
                 layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
@@ -542,6 +573,11 @@ class IosInputMethodService : InputMethodService() {
             if (isTranslatePanelOpen) {
                 closeTranslatePanel()
             }
+            if (isFontsPanelOpen) {
+                closeFontsPanel()
+            }
+            FancyFontManager.currentStyle = FancyFontManager.FancyStyle.NORMAL
+            updateQuickFontsButtonVisual()
             if (voiceDictationManager.isListening) {
                 voiceDictationManager.stopListening()
                 layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
@@ -660,7 +696,94 @@ class IosInputMethodService : InputMethodService() {
             btnClipboard?.setColorFilter(if (isClipboardActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
             btnApps?.setColorFilter(if (isAppsActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
             badgeLanguage?.setTextColor(iconTint)
+            val toolbarBg = when {
+                isOnePiece -> Color.parseColor("#F02A140A")
+                isWoody -> Color.parseColor("#661A0E08")
+                isDark -> ContextCompat.getColor(this, R.color.ios_toolbar_dark)
+                else -> ContextCompat.getColor(this, R.color.ios_toolbar_light)
+            }
+            fontsPanel?.setBackgroundColor(toolbarBg)
+            btnCloseFontsPanel?.setTextColor(if (isDark) Color.parseColor("#8E8E93") else Color.parseColor("#636366"))
+            updateQuickFontsButtonVisual()
         } catch (_: Throwable) {}
+    }
+
+    private fun toggleFontsPanel() {
+        isFontsPanelOpen = !isFontsPanelOpen
+        if (isFontsPanelOpen) {
+            if (isTranslatePanelOpen) {
+                closeTranslatePanel()
+            }
+            fontsPanel?.visibility = View.VISIBLE
+            populateFontChips()
+        } else {
+            fontsPanel?.visibility = View.GONE
+        }
+        updateQuickFontsButtonVisual()
+    }
+
+    private fun closeFontsPanel() {
+        isFontsPanelOpen = false
+        fontsPanel?.visibility = View.GONE
+        updateQuickFontsButtonVisual()
+    }
+
+    private fun updateQuickFontsButtonVisual() {
+        try {
+            val isDark = isDarkMode()
+            val isCustomTheme = (prefs.themeMode == "onepiece" || prefs.themeMode == "woody")
+            val defaultColor = if (isCustomTheme) {
+                if (prefs.themeMode == "onepiece") Color.parseColor("#4A2E18") else Color.parseColor("#3E2723")
+            } else {
+                if (isDark) Color.WHITE else Color.BLACK
+            }
+
+            val isActive = (FancyFontManager.currentStyle != FancyFontManager.FancyStyle.NORMAL) || isFontsPanelOpen
+            btnQuickFonts?.setTextColor(if (isActive) Color.parseColor("#007AFF") else defaultColor)
+        } catch (_: Throwable) {}
+    }
+
+    private fun populateFontChips() {
+        val container = layoutFontChips ?: return
+        container.removeAllViews()
+        val isDark = isDarkMode()
+        val density = resources.displayMetrics.density
+
+        for (style in FancyFontManager.FancyStyle.values()) {
+            val chip = TextView(this).apply {
+                text = style.previewName
+                textSize = 13f
+                gravity = Gravity.CENTER
+                setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
+                val lp = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    (28 * density).toInt()
+                ).apply {
+                    rightMargin = (6 * density).toInt()
+                }
+                layoutParams = lp
+
+                val isSelected = (style == FancyFontManager.currentStyle)
+                if (isSelected) {
+                    setBackgroundResource(R.drawable.btn_bg_pill_blue)
+                    setTextColor(Color.WHITE)
+                    setTypeface(null, Typeface.BOLD)
+                } else {
+                    setBackgroundResource(R.drawable.chip_bg_language_pill)
+                    setTextColor(if (isDark) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E"))
+                    setTypeface(null, Typeface.NORMAL)
+                }
+
+                setOnClickListener {
+                    audioHaptic.playClickSound(it)
+                    audioHaptic.triggerHapticFeedback(it)
+                    FancyFontManager.currentStyle = style
+                    populateFontChips()
+                    updateQuickFontsButtonVisual()
+                }
+            }
+            container.addView(chip)
+        }
     }
 
     private fun updateLanguageBadge() {
@@ -673,6 +796,9 @@ class IosInputMethodService : InputMethodService() {
     private fun toggleTranslatePanel() {
         isTranslatePanelOpen = !isTranslatePanelOpen
         if (isTranslatePanelOpen) {
+            if (isFontsPanelOpen) {
+                closeFontsPanel()
+            }
             translateCursorPosition = translatePanelBuffer.length
             if (currentMode != Mode.QWERTY) {
                 switchMode(Mode.QWERTY)
@@ -1519,6 +1645,12 @@ class IosInputMethodService : InputMethodService() {
     private fun handleCharacterInput(charStr: String) {
         try {
             lastKeyTypingTime = System.currentTimeMillis()
+            val finalStr = if (FancyFontManager.currentStyle != FancyFontManager.FancyStyle.NORMAL && !isTranslatePanelOpen && charStr.length == 1) {
+                FancyFontManager.transformChar(charStr[0])
+            } else {
+                charStr
+            }
+
             if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
                 translatePanelBuffer.insert(pos, charStr)
@@ -1527,7 +1659,7 @@ class IosInputMethodService : InputMethodService() {
                 tvTranslateStatus?.text = "Kalimat siap (${prefs.translateSourceLang.uppercase()} ➔ ${prefs.translateTargetLang.uppercase()})"
                 updateSuggestions(immediate = false)
             } else {
-                currentInputConnection?.commitText(charStr, 1)
+                currentInputConnection?.commitText(finalStr, 1)
                 if (charStr.length == 1 && !charStr[0].isLetterOrDigit() && charStr[0] != '\'' && charStr[0] != '-') {
                     composingWord.clear()
                 } else {
@@ -1691,7 +1823,7 @@ class IosInputMethodService : InputMethodService() {
             }
 
             // 2. Apple Auto-Correction on Spacebar (replaces typo with center candidate)
-            if (prefs.isAutoCorrectEnabled && activeWord.length >= 3) {
+            if (FancyFontManager.currentStyle == FancyFontManager.FancyStyle.NORMAL && prefs.isAutoCorrectEnabled && activeWord.length >= 3) {
                 var centerCandidate = candidate2?.text?.toString()?.trim() ?: ""
                 if (centerCandidate.startsWith("⚡ ")) centerCandidate = centerCandidate.removePrefix("⚡ ").trim()
                 if (centerCandidate.startsWith("✦ ")) centerCandidate = centerCandidate.removePrefix("✦ ").trim()
@@ -2304,6 +2436,10 @@ class IosInputMethodService : InputMethodService() {
             }
             if (cleanCandidate.startsWith("✦ ")) {
                 cleanCandidate = cleanCandidate.removePrefix("✦ ").trim()
+            }
+
+            if (FancyFontManager.currentStyle != FancyFontManager.FancyStyle.NORMAL && !isTranslatePanelOpen) {
+                cleanCandidate = FancyFontManager.transformText(cleanCandidate)
             }
 
             val ic = currentInputConnection

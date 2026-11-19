@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.02 / build 102)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.03 / build 103)
 
 ---
 
@@ -652,3 +652,11 @@
         - *Audio & Haptic Feedback Otentik*: Memainkan nada suara start beep dan stop ack khas Apple Dictation via `ToneGenerator` serta getaran haptik berirama.
         - *Live Waveform Visualizer*: Bilah toolbar menampilkan animasi gelombang suara equalizer yang berdenyut dinamis saat mendengarkan ucapan (`🎙️ ılı.lıllılı. Mendengarkan...`) dan menampilkan teks suara parsial secara live.
         - *Responsivitas Bebas Hambatan*: Menghilangkan pembatasan sentuh mic saat `composingWord` aktif (otomatis menyelesaikan kata terlebih dahulu) dan memperluas rentang deteksi sentuh 20ms–1200ms dengan efek denyut/zoom merah Apple Dictation `#FF3B30`.
+    - **Fancy Fonts Estetik Unicode Styler Langsung di Keyboard (Release v1.1.03 / Build 103)**:
+      1. **10 Gaya Huruf Fancy Unicode Instan (`FancyFontManager.kt`)**:
+         - *Gaya Huruf Estetik Lengkap*: Menyediakan transformasi instan langsung saat mengetik untuk berbagai gaya populer: `Normal`, `𝓒𝓾𝓻𝓼𝓲𝓿𝓮` (Huruf Sambung Cursive), `𝕲𝖔𝖙𝖍𝖎𝖈` (Gothic Fraktur), `🅒🅘🅡🅒🅛🅔` (Circled Hitam), `Ⓒⓘⓡⓒⓛⓔ` (Circled Putih), `🄱🄾🅇` (Squared Kotak), `𝙼𝚘𝚗𝚘` (Monospace Mesin Ketik), `sᴍᴀʟʟ` (Small Caps), `𝔹𝕠𝕝𝕕` (Outline Double Struck), `𝐼𝑡𝑎𝑙𝑖𝑐` (Italic Serif), dan `𝗕𝗼𝗹𝗱` (Bold Sans).
+         - *Dukungan Surrogate Pair O(1)*: Karakter Unicode matematika di atas U+FFFF ditangani secara presisi dengan surrogate pair (`Character.toChars`), aman dari pemotongan karakter atau visual tanda tanya (?).
+      2. **Bilah Pemilih Font Cepat di Toolbar Atas (`btnQuickFonts` & `fontsPanel`)**:
+         - *Akses 1-Tap Cepat*: Tombol `𝓕` estetik di bilah toolbar atas membuka bilah chip pilihan font scrollable horizontal (`fontsPanel`).
+         - *Active Highlight & Auto-Theming*: Chip gaya font yang aktif ditandai dengan pill biru iOS Apple (`#007AFF`) dan teks tebal putih. Panel otomatis menyesuaikan warna latar belakang tema aktif (Dark, Light, One Piece, maupun Woody Sony Xperia).
+         - *Proteksi & Pengetikan Nyaman*: Auto-correction dinonaktifkan saat mode Fancy Font aktif agar teks estetik (username IG, bio, quote) tidak diubah paksa oleh kamus. Mengetuk kandidat QuickType tetap otomatis ditransformasi ke gaya font yang sedang aktif. Panel otomatis tertutup dan kembali ke Normal saat keyboard ditutup untuk menjaga keamanan pengetikan sehari-hari.
