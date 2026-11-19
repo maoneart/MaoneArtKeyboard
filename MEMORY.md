@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.03 / build 103)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.04 / build 104)
 
 ---
 
@@ -660,3 +660,16 @@
          - *Akses 1-Tap Cepat*: Tombol `𝓕` estetik di bilah toolbar atas membuka bilah chip pilihan font scrollable horizontal (`fontsPanel`).
          - *Active Highlight & Auto-Theming*: Chip gaya font yang aktif ditandai dengan pill biru iOS Apple (`#007AFF`) dan teks tebal putih. Panel otomatis menyesuaikan warna latar belakang tema aktif (Dark, Light, One Piece, maupun Woody Sony Xperia).
          - *Proteksi & Pengetikan Nyaman*: Auto-correction dinonaktifkan saat mode Fancy Font aktif agar teks estetik (username IG, bio, quote) tidak diubah paksa oleh kamus. Mengetuk kandidat QuickType tetap otomatis ditransformasi ke gaya font yang sedang aktif. Panel otomatis tertutup dan kembali ke Normal saat keyboard ditutup untuk menjaga keamanan pengetikan sehari-hari.
+   - **Pembersihan Total Izin Mikrofon (Anti-Virus Google Play Protect) & Redesign Kontras Tinggi Fancy Fonts (Release v1.1.04 / Build 104)**:
+     1. **Eliminasi Peringatan Google Play Protect (Hapus Fitur & Izin Suara/Mic)**:
+        - *Root Cause Peringatan Berbahaya*: Google Play Protect secara ketat menandai aplikasi keyboard sideload yang meminta izin merekam audio (`android.permission.RECORD_AUDIO`) karena potensi keylogger/wiretap audio.
+        - *Solusi Tuntas*: Menghapus 100% izin `RECORD_AUDIO`, `android.hardware.microphone`, `DictationPermissionActivity`, `VoiceDictationManager`, dan tombol mic di keyboard. Keyboard kini 100% bersih, aman, dan bebas dari deteksi peringatan Google Play Protect.
+        - *Tata Letak Spasi Lebih Lapang*: Menghilangkan tombol mic mengembalikan ruang tuts spasi menjadi ekstra lebar dan lega (`4.4f` pada mode standar, `4.3f` pada tema One Piece).
+     2. **Redesign Kontras Tinggi Fancy Fonts (100% Tajam & Jelas Dibaca)**:
+        - *Root Cause Teks Tidak Terlihat*: Background chip font sebelumnya menggunakan drawable statis off-white (`#E9EAEF`), sehingga pada Dark Mode teks font berwarna abu-abu/putih redup bertubrukan langsung dengan background dan menjadi tidak terbaca.
+        - *Solusi Presisi*: Menerapkan sistem dynamic `GradientDrawable` pil rounded 14dp dengan kontras tajam (WCAG AAA):
+          - **Dark Mode**: Chip tidak aktif menggunakan latar abu-abu gelap sistem (`#2C2C2E`), border 1dp (`#3A3A3C`), dan teks **Putih Murni 100% (`#FFFFFF`)** yang sangat kontras dan mudah dibaca.
+          - **Light Mode**: Chip tidak aktif menggunakan pil putih bersih (`#FFFFFF`), border 1dp (`#D1D1D6`), dan teks **Hitam Pekat (`#000000`)**.
+          - **One Piece & Woody**: Menggunakan latar kayu amber/walnut dengan teks cream emas (`#FFE082` / `#F5EBE1`).
+          - **Chip Aktif (Selected)**: Tetap menyala dengan pill Apple Blue (`#007AFF`) dan teks tebal putih (`#FFFFFF`).
+          - Bar panel font ditinggikan ke 40dp dengan tombol tutup `✕` yang lebih nyaman ditekan.

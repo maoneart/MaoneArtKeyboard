@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Handler
@@ -69,7 +70,6 @@ class IosInputMethodService : InputMethodService() {
     private lateinit var stickerManager: com.maoneart.ioskeyboard.sticker.StickerManager
     private lateinit var layoutEngine: KeyboardLayout
     private lateinit var textReplacementManager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager
-    private lateinit var voiceDictationManager: com.maoneart.ioskeyboard.dictation.VoiceDictationManager
     private lateinit var quickPathEngine: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathEngine
 
     private var currentMode = Mode.QWERTY
@@ -91,15 +91,6 @@ class IosInputMethodService : InputMethodService() {
     // Apple iOS Live Emoji Search State
     private var isEmojiSearchMode = false
     private val emojiSearchQuery = StringBuilder()
-
-    // Broadcast receiver for Voice Dictation runtime audio permission
-    private val dictationPermissionReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == com.maoneart.ioskeyboard.dictation.DictationPermissionActivity.ACTION_PERMISSION_GRANTED) {
-                handleDictationAction()
-            }
-        }
-    }
 
     // 0.2ms View-Cache for QWERTY Layout to eliminate view inflation overhead when toggling 123 ⇄ ABC
     private var cachedQwertyView: View? = null
@@ -159,46 +150,6 @@ class IosInputMethodService : InputMethodService() {
             }
             textReplacementManager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
             quickPathEngine = com.maoneart.ioskeyboard.keyboard.swipe.QuickPathEngine(correctionEngine)
-            voiceDictationManager = com.maoneart.ioskeyboard.dictation.VoiceDictationManager(
-                this,
-                onPartialResult = { partial ->
-                    candidate2?.text = "🎙️ $partial..."
-                },
-                onFinalResult = { text ->
-                    currentInputConnection?.commitText("$text ", 1)
-                    updateSuggestions()
-                },
-                onStatusChange = { isListening, statusMsg ->
-                    layoutEngine.updateDictationVisual(isListening, isDarkMode(), prefs.themeMode)
-                    if (isListening) {
-                        candidate2?.text = "🎙️ ılı.lıllılı. Mendengarkan..."
-                    } else if (statusMsg.isNotEmpty() && statusMsg != "Selesai") {
-                        candidate2?.text = statusMsg
-                    } else {
-                        updateSuggestions()
-                    }
-                },
-                onAudioRmsChanged = { rms ->
-                    if (voiceDictationManager.isListening) {
-                        val wave = when {
-                            rms > 6f -> "🎙️ ılılllıııl"
-                            rms > 3f -> "🎙️ ı.lıllılı."
-                            rms > 1f -> "🎙️ ılı.lıll."
-                            else -> "🎙️ ıl..ıl..."
-                        }
-                        candidate2?.text = "$wave Mendengarkan..."
-                    }
-                }
-            )
-
-            try {
-                val filter = IntentFilter(com.maoneart.ioskeyboard.dictation.DictationPermissionActivity.ACTION_PERMISSION_GRANTED)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    registerReceiver(dictationPermissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-                } else {
-                    registerReceiver(dictationPermissionReceiver, filter)
-                }
-            } catch (_: Throwable) {}
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in onCreate", t)
         }
@@ -540,10 +491,6 @@ class IosInputMethodService : InputMethodService() {
             }
             FancyFontManager.currentStyle = FancyFontManager.FancyStyle.NORMAL
             updateQuickFontsButtonVisual()
-            if (voiceDictationManager.isListening) {
-                voiceDictationManager.stopListening()
-                layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
-            }
         } catch (_: Throwable) {}
     }
 
@@ -578,10 +525,6 @@ class IosInputMethodService : InputMethodService() {
             }
             FancyFontManager.currentStyle = FancyFontManager.FancyStyle.NORMAL
             updateQuickFontsButtonVisual()
-            if (voiceDictationManager.isListening) {
-                voiceDictationManager.stopListening()
-                layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
-            }
         } catch (_: Throwable) {}
     }
 
@@ -696,14 +639,14 @@ class IosInputMethodService : InputMethodService() {
             btnClipboard?.setColorFilter(if (isClipboardActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
             btnApps?.setColorFilter(if (isAppsActive) ContextCompat.getColor(this, R.color.ios_blue) else iconTint)
             badgeLanguage?.setTextColor(iconTint)
-            val toolbarBg = when {
-                isOnePiece -> Color.parseColor("#F02A140A")
-                isWoody -> Color.parseColor("#661A0E08")
-                isDark -> ContextCompat.getColor(this, R.color.ios_toolbar_dark)
-                else -> ContextCompat.getColor(this, R.color.ios_toolbar_light)
+            val fontsPanelBg = when {
+                isOnePiece -> Color.parseColor("#4A2814")
+                isWoody -> Color.parseColor("#3B2215")
+                isDark -> Color.parseColor("#1C1C1E")
+                else -> Color.parseColor("#E5E5EA")
             }
-            fontsPanel?.setBackgroundColor(toolbarBg)
-            btnCloseFontsPanel?.setTextColor(if (isDark) Color.parseColor("#8E8E93") else Color.parseColor("#636366"))
+            fontsPanel?.setBackgroundColor(fontsPanelBg)
+            btnCloseFontsPanel?.setTextColor(if (isDark || isOnePiece || isWoody) Color.parseColor("#E5E5EA") else Color.parseColor("#3C3C43"))
             updateQuickFontsButtonVisual()
         } catch (_: Throwable) {}
     }
@@ -733,13 +676,18 @@ class IosInputMethodService : InputMethodService() {
             val isDark = isDarkMode()
             val isCustomTheme = (prefs.themeMode == "onepiece" || prefs.themeMode == "woody")
             val defaultColor = if (isCustomTheme) {
-                if (prefs.themeMode == "onepiece") Color.parseColor("#4A2E18") else Color.parseColor("#3E2723")
+                if (prefs.themeMode == "onepiece") Color.parseColor("#FFE082") else Color.parseColor("#FFF3E0")
             } else {
                 if (isDark) Color.WHITE else Color.BLACK
             }
 
             val isActive = (FancyFontManager.currentStyle != FancyFontManager.FancyStyle.NORMAL) || isFontsPanelOpen
             btnQuickFonts?.setTextColor(if (isActive) Color.parseColor("#007AFF") else defaultColor)
+            if (isActive) {
+                btnQuickFonts?.setTypeface(null, Typeface.BOLD)
+            } else {
+                btnQuickFonts?.setTypeface(null, Typeface.NORMAL)
+            }
         } catch (_: Throwable) {}
     }
 
@@ -747,12 +695,54 @@ class IosInputMethodService : InputMethodService() {
         val container = layoutFontChips ?: return
         container.removeAllViews()
         val isDark = isDarkMode()
+        val isOnePiece = (prefs.themeMode == "onepiece")
+        val isWoody = (prefs.themeMode == "woody")
         val density = resources.displayMetrics.density
 
         for (style in FancyFontManager.FancyStyle.values()) {
+            val isSelected = (style == FancyFontManager.currentStyle)
+
+            val chipDrawable = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 14 * density
+                if (isSelected) {
+                    setColor(Color.parseColor("#007AFF")) // Apple iOS Blue
+                } else {
+                    when {
+                        isOnePiece -> {
+                            setColor(Color.parseColor("#5A361E"))
+                            setStroke((1 * density).toInt(), Color.parseColor("#8B5A34"))
+                        }
+                        isWoody -> {
+                            setColor(Color.parseColor("#422A1A"))
+                            setStroke((1 * density).toInt(), Color.parseColor("#6B472F"))
+                        }
+                        isDark -> {
+                            setColor(Color.parseColor("#2C2C2E")) // iOS Dark Surface
+                            setStroke((1 * density).toInt(), Color.parseColor("#3A3A3C"))
+                        }
+                        else -> {
+                            setColor(Color.parseColor("#FFFFFF")) // Pure White Pill in light mode
+                            setStroke((1 * density).toInt(), Color.parseColor("#D1D1D6"))
+                        }
+                    }
+                }
+            }
+
+            val chipTextColor = if (isSelected) {
+                Color.WHITE
+            } else {
+                when {
+                    isOnePiece -> Color.parseColor("#FFE082") // Golden Cream
+                    isWoody -> Color.parseColor("#F5EBE1")    // Warm Ivory
+                    isDark -> Color.parseColor("#FFFFFF")     // 100% Crisp Pure White
+                    else -> Color.parseColor("#000000")       // Deep Solid Black
+                }
+            }
+
             val chip = TextView(this).apply {
                 text = style.previewName
-                textSize = 13f
+                textSize = 13.5f
                 gravity = Gravity.CENTER
                 setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
                 val lp = LinearLayout.LayoutParams(
@@ -762,17 +752,9 @@ class IosInputMethodService : InputMethodService() {
                     rightMargin = (6 * density).toInt()
                 }
                 layoutParams = lp
-
-                val isSelected = (style == FancyFontManager.currentStyle)
-                if (isSelected) {
-                    setBackgroundResource(R.drawable.btn_bg_pill_blue)
-                    setTextColor(Color.WHITE)
-                    setTypeface(null, Typeface.BOLD)
-                } else {
-                    setBackgroundResource(R.drawable.chip_bg_language_pill)
-                    setTextColor(if (isDark) Color.parseColor("#E5E5EA") else Color.parseColor("#1C1C1E"))
-                    setTypeface(null, Typeface.NORMAL)
-                }
+                background = chipDrawable
+                setTextColor(chipTextColor)
+                setTypeface(null, if (isSelected) Typeface.BOLD else Typeface.NORMAL)
 
                 setOnClickListener {
                     audioHaptic.playClickSound(it)
@@ -1119,7 +1101,7 @@ class IosInputMethodService : InputMethodService() {
             val contentView = when (currentMode) {
                 Mode.QWERTY -> {
                     val orientation = resources.configuration.orientation
-                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|${prefs.isDictationEnabled}|$orientation"
+                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|$orientation"
                     val existing = cachedQwertyView
                     if (existing != null && cachedQwertyKeySignature == sig) {
                         (existing.parent as? android.view.ViewGroup)?.removeView(existing)
@@ -1134,7 +1116,6 @@ class IosInputMethodService : InputMethodService() {
                             activeLanguage = prefs.activeLanguage,
                             isSwipeEnabled = prefs.isSwipeTypingEnabled,
                             isKeyPopupEnabled = prefs.isKeyPopupEnabled,
-                            isDictationEnabled = prefs.isDictationEnabled,
                             onKeyAction = { handleKeyAction(it) },
                             onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) },
                             onSwipeComplete = { handleSwipeComplete(it) },
@@ -1156,7 +1137,6 @@ class IosInputMethodService : InputMethodService() {
                     isMoreSymbols = false,
                     isDark = isDark,
                     themeMode = prefs.themeMode,
-                    isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) }
                 )
@@ -1164,7 +1144,6 @@ class IosInputMethodService : InputMethodService() {
                     isMoreSymbols = true,
                     isDark = isDark,
                     themeMode = prefs.themeMode,
-                    isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) }
                 )
@@ -1436,34 +1415,6 @@ class IosInputMethodService : InputMethodService() {
         }
     }
 
-    private fun handleDictationAction() {
-        try {
-            if (!prefs.isDictationEnabled) return
-            if (composingWord.isNotEmpty()) {
-                currentInputConnection?.finishComposingText()
-                composingWord.clear()
-            }
-            if (androidx.core.content.ContextCompat.checkSelfPermission(
-                    this,
-                    android.Manifest.permission.RECORD_AUDIO
-                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
-            ) {
-                val intent = Intent(this, com.maoneart.ioskeyboard.dictation.DictationPermissionActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(intent)
-                candidate2?.text = "🎙️ Meminta izin mikrofon..."
-                return
-            }
-            audioHaptic.triggerHapticFeedback()
-            if (voiceDictationManager.isListening) {
-                voiceDictationManager.stopListening()
-            } else {
-                voiceDictationManager.startListening(prefs.activeLanguage)
-            }
-        } catch (_: Throwable) {}
-    }
-
     private fun handleKeyAction(action: String) {
         try {
             audioHaptic.playClickSound()
@@ -1538,9 +1489,6 @@ class IosInputMethodService : InputMethodService() {
                 }
                 "ACTION_EMOJI" -> {
                     switchMode(Mode.EMOJI)
-                }
-                "ACTION_DICTATION" -> {
-                    handleDictationAction()
                 }
                 "ACTION_RETURN" -> {
                     handleReturn()
@@ -2701,12 +2649,8 @@ class IosInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         try {
-            try {
-                unregisterReceiver(dictationPermissionReceiver)
-            } catch (_: Throwable) {}
             suggestionHandler.removeCallbacksAndMessages(null)
             clipboardManager.destroy()
-            voiceDictationManager.destroy()
             audioHaptic.destroy()
             correctionEngine.destroy()
             serviceScope.cancel()

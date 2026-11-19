@@ -207,10 +207,6 @@ class SettingsActivity : AppCompatActivity() {
             prefs.isSpaceTrackpadEnabled = isChecked
         }
 
-        findViewById<SwitchMaterial>(R.id.switchDictation)?.setOnCheckedChangeListener { _, isChecked ->
-            prefs.isDictationEnabled = isChecked
-        }
-
         switchLiveTranslate.setOnCheckedChangeListener { _, isChecked ->
             prefs.isLiveTranslateEnabled = isChecked
         }
@@ -249,7 +245,6 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<SwitchMaterial>(R.id.switchPredictiveText)?.isChecked = prefs.isPredictiveTextEnabled
         findViewById<SwitchMaterial>(R.id.switchSwipeTyping)?.isChecked = prefs.isSwipeTypingEnabled
         findViewById<SwitchMaterial>(R.id.switchSpaceTrackpad)?.isChecked = prefs.isSpaceTrackpadEnabled
-        findViewById<SwitchMaterial>(R.id.switchDictation)?.isChecked = prefs.isDictationEnabled
         findViewById<SwitchMaterial>(R.id.switchLiveTranslate).isChecked = prefs.isLiveTranslateEnabled
         findViewById<SwitchMaterial>(R.id.switchCalculator)?.isChecked = prefs.isCalculatorEnabled
     }
