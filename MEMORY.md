@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.04 / build 104)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.05 / build 105)
 
 ---
 
@@ -673,3 +673,13 @@
           - **One Piece & Woody**: Menggunakan latar kayu amber/walnut dengan teks cream emas (`#FFE082` / `#F5EBE1`).
           - **Chip Aktif (Selected)**: Tetap menyala dengan pill Apple Blue (`#007AFF`) dan teks tebal putih (`#FFFFFF`).
           - Bar panel font ditinggikan ke 40dp dengan tombol tutup `✕` yang lebih nyaman ditekan.
+   - **Pembersihan Total Izin Berisiko Tinggi (QUERY_ALL_PACKAGES & Storage) dan Signature Scheme v3 (Release v1.1.05 / Build 105)**:
+     1. **Eliminasi Izin Berisiko Tinggi Play Protect**:
+        - *Root Cause Play Protect Masih Waspada*: Google Play Protect menandai keyboard yang meminta izin `QUERY_ALL_PACKAGES` (melihat semua aplikasi HP) bersamaan dengan `INTERNET`, serta izin pembacaan penyimpanan (`READ_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`) dan pemindaian folder Camera.
+        - *Solusi Tuntas*:
+          - Menghapus izin `QUERY_ALL_PACKAGES` dari `AndroidManifest.xml` (daftar aplikasi launcher tetap bekerja normal via blok `<queries>` resmi).
+          - Menghapus izin penyimpanan `READ_MEDIA_IMAGES` dan `READ_EXTERNAL_STORAGE`.
+          - Menghapus path pemindaian `/sdcard/DCIM/Camera` di `ClipboardHistoryManager.kt`.
+          - Izin keyboard kini 100% murni izin dasar (hanya `VIBRATE`, `INTERNET`, `ACCESS_NETWORK_STATE`), tanpa izin berbahaya/runtime sama sekali.
+     2. **Peningkatan Skema Tanda Tangan APK v3 (`v3SigningEnabled true`)**:
+        - Mengaktifkan APK Signature Scheme v3 untuk validasi integritas sertifikat keystore permanen pada Android 12, 13, dan 14.

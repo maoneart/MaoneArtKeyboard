@@ -210,7 +210,6 @@ class ClipboardHistoryManager(private val context: Context) {
             val screenshotDirs = listOf(
                 File("/sdcard/DCIM/Screenshots"),
                 File("/sdcard/Pictures/Screenshots"),
-                File("/sdcard/DCIM/Camera"),
                 File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "Screenshots"),
                 File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Screenshots")
             )
