@@ -249,11 +249,21 @@ class KeyboardLayout(private val context: Context) {
         micButtonRef?.let { btn ->
             if (isListening) {
                 btn.setColorFilter(Color.parseColor("#FF3B30")) // Distinct Apple Red recording indicator
+                btn.animate()
+                    .scaleX(1.15f)
+                    .scaleY(1.15f)
+                    .setDuration(160L)
+                    .start()
             } else {
                 val isWoody = (themeMode == "woody")
                 val isOnePiece = (themeMode == "onepiece")
                 val normalColor = if (isOnePiece) Color.parseColor("#FFE082") else if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
                 btn.setColorFilter(normalColor)
+                btn.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(150L)
+                    .start()
             }
         }
     }
@@ -1243,7 +1253,8 @@ class KeyboardLayout(private val context: Context) {
         onEmojiAction: (String) -> Unit,
         onStickerAction: (java.io.File) -> Unit,
         onAddStickerAction: () -> Unit,
-        onBackAction: () -> Unit
+        onBackAction: () -> Unit,
+        onStartEmojiSearchAction: (() -> Unit)? = null
     ): View {
         val root = FrameLayout(context).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -1829,7 +1840,12 @@ class KeyboardLayout(private val context: Context) {
                 applySlideTransition(scroll, direction)
             } else {
                 // Render Emojis for selected category using 120 FPS Hardware-Recycled Grid (Butter-smooth transitions)
-                val emojiList = EmojiBoardManager.emojis[selectedCategory] ?: emptyList()
+                val emojiList = if (selectedCategory.startsWith("FILTER:")) {
+                    val query = selectedCategory.removePrefix("FILTER:")
+                    com.maoneart.ioskeyboard.emoji.EmojiSearchEngine.searchEmojis(query, 80)
+                } else {
+                    EmojiBoardManager.emojis[selectedCategory] ?: emptyList()
+                }
 
                 val recyclerView = androidx.recyclerview.widget.RecyclerView(context).apply {
                     layoutParams = FrameLayout.LayoutParams(
@@ -2015,6 +2031,101 @@ class KeyboardLayout(private val context: Context) {
         }
 
         tabsScroll.addView(tabsLayout)
+
+        // Top Apple iOS Emoji Search Bar & Instant Quick-Tags
+        val searchHeader = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setBackgroundColor(if (isDark) ContextCompat.getColor(context, R.color.ios_toolbar_dark) else ContextCompat.getColor(context, R.color.ios_toolbar_light))
+            setPadding(dp(8), dp(4), dp(8), dp(2))
+        }
+
+        val searchBarCapsule = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(32)
+            ).apply { setMargins(0, 0, 0, dp(3)) }
+            background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+            setPadding(dp(10), 0, dp(10), 0)
+            isClickable = true
+            isFocusable = false
+            setupInstantTouch(this) {
+                onStartEmojiSearchAction?.invoke()
+            }
+        }
+
+        val ivSearchIcon = TextView(context).apply {
+            text = "🔍"
+            textSize = 12f
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(dp(20), LinearLayout.LayoutParams.WRAP_CONTENT)
+        }
+        searchBarCapsule.addView(ivSearchIcon)
+
+        val tvSearchPlaceholder = TextView(context).apply {
+            text = "Cari Emoji (Ketik kata kunci)..."
+            textSize = 12.5f
+            setTextColor(if (isDark) Color.parseColor("#8E8E93") else Color.parseColor("#6C6C70"))
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
+            setPadding(dp(6), 0, 0, 0)
+        }
+        searchBarCapsule.addView(tvSearchPlaceholder)
+
+        val tvTapToType = TextView(context).apply {
+            text = "Ketik ➔"
+            textSize = 11.5f
+            setTextColor(Color.parseColor("#007AFF"))
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        searchBarCapsule.addView(tvTapToType)
+        searchHeader.addView(searchBarCapsule)
+
+        val filterScroll = android.widget.HorizontalScrollView(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(28)
+            )
+            isHorizontalScrollBarEnabled = false
+        }
+
+        val filterLayout = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        for (tag in com.maoneart.ioskeyboard.emoji.EmojiSearchEngine.quickFilterTags) {
+            val chip = TextView(context).apply {
+                text = tag.first
+                textSize = 11.5f
+                setTextColor(if (isDark) Color.WHITE else Color.BLACK)
+                background = ContextCompat.getDrawable(context, if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light)
+                setPadding(dp(9), dp(3), dp(9), dp(3))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 0, dp(5), 0) }
+                isClickable = true
+                isFocusable = false
+                setupInstantTouch(this) {
+                    val filtered = com.maoneart.ioskeyboard.emoji.EmojiSearchEngine.searchEmojis(tag.second, 72)
+                    if (filtered.isNotEmpty()) {
+                        activeCat = "FILTER:${tag.second}"
+                        updateTabStyles()
+                        renderContent(activeCat, 0)
+                    }
+                }
+            }
+            filterLayout.addView(chip)
+        }
+        filterScroll.addView(filterLayout)
+        searchHeader.addView(filterScroll)
+
+        mainLayout.addView(searchHeader)
         mainLayout.addView(tabsScroll)
 
         // Initial content render
@@ -3117,7 +3228,7 @@ class KeyboardLayout(private val context: Context) {
                     if (isEligibleDown) {
                         val inBounds = event.x in 0f..v.width.toFloat() && event.y in 0f..v.height.toFloat()
                         val duration = System.currentTimeMillis() - downTime
-                        if (inBounds && duration in 40L..1200L) {
+                        if (inBounds && duration in 20L..1200L) {
                             try {
                                 v.performHapticFeedback(
                                     android.view.HapticFeedbackConstants.KEYBOARD_TAP,

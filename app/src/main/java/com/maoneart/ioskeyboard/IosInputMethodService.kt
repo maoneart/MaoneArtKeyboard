@@ -1,7 +1,9 @@
 package com.maoneart.ioskeyboard
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
@@ -85,6 +87,19 @@ class IosInputMethodService : InputMethodService() {
     private val suggestionHandler = Handler(Looper.getMainLooper())
     private var suggestionRunnable: Runnable? = null
 
+    // Apple iOS Live Emoji Search State
+    private var isEmojiSearchMode = false
+    private val emojiSearchQuery = StringBuilder()
+
+    // Broadcast receiver for Voice Dictation runtime audio permission
+    private val dictationPermissionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == com.maoneart.ioskeyboard.dictation.DictationPermissionActivity.ACTION_PERMISSION_GRANTED) {
+                handleDictationAction()
+            }
+        }
+    }
+
     // 0.2ms View-Cache for QWERTY Layout to eliminate view inflation overhead when toggling 123 ⇄ ABC
     private var cachedQwertyView: View? = null
     private var cachedQwertyKeySignature: String = ""
@@ -148,14 +163,34 @@ class IosInputMethodService : InputMethodService() {
                 onStatusChange = { isListening, statusMsg ->
                     layoutEngine.updateDictationVisual(isListening, isDarkMode(), prefs.themeMode)
                     if (isListening) {
-                        candidate2?.text = "🎙️ $statusMsg"
+                        candidate2?.text = "🎙️ ılı.lıllılı. Mendengarkan..."
                     } else if (statusMsg.isNotEmpty() && statusMsg != "Selesai") {
                         candidate2?.text = statusMsg
                     } else {
                         updateSuggestions()
                     }
+                },
+                onAudioRmsChanged = { rms ->
+                    if (voiceDictationManager.isListening) {
+                        val wave = when {
+                            rms > 6f -> "🎙️ ılılllıııl"
+                            rms > 3f -> "🎙️ ı.lıllılı."
+                            rms > 1f -> "🎙️ ılı.lıll."
+                            else -> "🎙️ ıl..ıl..."
+                        }
+                        candidate2?.text = "$wave Mendengarkan..."
+                    }
                 }
             )
+
+            try {
+                val filter = IntentFilter(com.maoneart.ioskeyboard.dictation.DictationPermissionActivity.ACTION_PERMISSION_GRANTED)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(dictationPermissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                } else {
+                    registerReceiver(dictationPermissionReceiver, filter)
+                }
+            } catch (_: Throwable) {}
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in onCreate", t)
         }
@@ -1016,7 +1051,8 @@ class IosInputMethodService : InputMethodService() {
                     onAddStickerAction = {
                         openStickerUploadScreen()
                     },
-                    onBackAction = { switchMode(Mode.QWERTY) }
+                    onBackAction = { switchMode(Mode.QWERTY) },
+                    onStartEmojiSearchAction = { startEmojiSearch() }
                 )
                 Mode.CLIPBOARD -> layoutEngine.createClipboardView(
                     isDark = isDark,
@@ -1246,14 +1282,54 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    private fun startEmojiSearch() {
+        isEmojiSearchMode = true
+        emojiSearchQuery.clear()
+        switchMode(Mode.QWERTY)
+        updateEmojiSearchCandidates()
+    }
+
+    private fun exitEmojiSearch() {
+        isEmojiSearchMode = false
+        emojiSearchQuery.clear()
+        updateSuggestions()
+    }
+
+    private fun updateEmojiSearchCandidates() {
+        if (!isEmojiSearchMode) return
+        val query = emojiSearchQuery.toString().trim()
+        if (query.isEmpty()) {
+            candidate1?.text = "🔍 Cari..."
+            candidate2?.text = "Ketik: cinta, api, kopi..."
+            candidate3?.text = "✕ Keluar"
+        } else {
+            val results = com.maoneart.ioskeyboard.emoji.EmojiSearchEngine.searchEmojis(query, 10)
+            candidate1?.text = "🔍 $query"
+            candidate2?.text = results.getOrNull(0) ?: "🔍"
+            candidate3?.text = results.getOrNull(1) ?: (if (results.isEmpty()) "✕" else results.getOrNull(2) ?: "✕")
+        }
+    }
+
     private fun handleDictationAction() {
         try {
             if (!prefs.isDictationEnabled) return
-            val now = System.currentTimeMillis()
-            // Anti-Accidental Touch Guard: Ignore if user was actively typing or word is in-progress
-            if (now - lastKeyTypingTime < 280L || composingWord.isNotEmpty()) {
+            if (composingWord.isNotEmpty()) {
+                currentInputConnection?.finishComposingText()
+                composingWord.clear()
+            }
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.RECORD_AUDIO
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                val intent = Intent(this, com.maoneart.ioskeyboard.dictation.DictationPermissionActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                candidate2?.text = "🎙️ Meminta izin mikrofon..."
                 return
             }
+            audioHaptic.triggerHapticFeedback()
             if (voiceDictationManager.isListening) {
                 voiceDictationManager.stopListening()
             } else {
@@ -1266,6 +1342,44 @@ class IosInputMethodService : InputMethodService() {
         try {
             audioHaptic.playClickSound()
             audioHaptic.triggerHapticFeedback()
+
+            if (isEmojiSearchMode) {
+                when (action) {
+                    "ACTION_BACKSPACE" -> {
+                        if (emojiSearchQuery.isNotEmpty()) {
+                            emojiSearchQuery.deleteCharAt(emojiSearchQuery.length - 1)
+                            updateEmojiSearchCandidates()
+                        } else {
+                            exitEmojiSearch()
+                        }
+                        return
+                    }
+                    "ACTION_RETURN", "ACTION_HIDE_KEYBOARD" -> {
+                        exitEmojiSearch()
+                        return
+                    }
+                    "ACTION_EMOJI" -> {
+                        exitEmojiSearch()
+                        switchMode(Mode.EMOJI)
+                        return
+                    }
+                    "ACTION_ABC", "ACTION_SYMBOLS", "ACTION_MORE_SYMBOLS", "ACTION_NUMPAD" -> {
+                        exitEmojiSearch()
+                    }
+                    " " -> {
+                        emojiSearchQuery.append(" ")
+                        updateEmojiSearchCandidates()
+                        return
+                    }
+                    else -> {
+                        if (action.length == 1 && !action.startsWith("ACTION_")) {
+                            emojiSearchQuery.append(action.lowercase())
+                            updateEmojiSearchCandidates()
+                            return
+                        }
+                    }
+                }
+            }
 
             when (action) {
                 "ACTION_SHIFT" -> {
@@ -1933,6 +2047,11 @@ class IosInputMethodService : InputMethodService() {
 
     private fun executeSuggestionUpdate() {
         try {
+            if (isEmojiSearchMode) {
+                updateEmojiSearchCandidates()
+                return
+            }
+
             if (isTerminalOrRawInput()) {
                 candidate1?.text = ""
                 candidate2?.text = ""
@@ -2028,6 +2147,25 @@ class IosInputMethodService : InputMethodService() {
             val refWord = if (currentWord.isNotEmpty()) currentWord else ""
             val shouldCapNext = currentWord.isEmpty() && shouldAutoCapitalize()
 
+            // Contextual Emoji Prediction Engine:
+            val contextualEmojis = com.maoneart.ioskeyboard.emoji.EmojiSearchEngine.getContextualEmojis(
+                if (currentWord.isNotEmpty()) currentWord else previousWord
+            )
+
+            if (contextualEmojis.isNotEmpty()) {
+                val emo = contextualEmojis[0]
+                candidate3?.text = emo
+                if (suggestions.isNotEmpty()) {
+                    candidate2?.text = formatCandidateCase(suggestions[0], refWord, shouldCapNext)
+                }
+                if (suggestions.size >= 2) {
+                    candidate1?.text = formatCandidateCase(suggestions[1], refWord, shouldCapNext)
+                } else if (suggestions.size == 1) {
+                    candidate1?.text = formatCandidateCase(suggestions[0], refWord, shouldCapNext)
+                }
+                return
+            }
+
             if (suggestions.size == 1) {
                 candidate1?.text = ""
                 candidate2?.text = formatCandidateCase(suggestions[0], refWord, shouldCapNext)
@@ -2065,6 +2203,14 @@ class IosInputMethodService : InputMethodService() {
         return candidate
     }
 
+    private fun isEmojiCandidate(str: String): Boolean {
+        val t = str.trim()
+        if (t.isEmpty()) return false
+        val cp = t.codePointAt(0)
+        return (Character.charCount(cp) == t.length || t.length <= 4) &&
+               (cp in 0x1F300..0x1FAFF || cp in 0x2600..0x27BF || cp in 0x1F600..0x1F64F || cp in 0x1F900..0x1F9FF)
+    }
+
     private fun selectCandidate(candidate: String?) {
         try {
             if (candidate.isNullOrBlank()) return
@@ -2072,6 +2218,34 @@ class IosInputMethodService : InputMethodService() {
             audioHaptic.triggerHapticFeedback()
 
             var cleanCandidate = candidate.trim()
+
+            if (isEmojiSearchMode) {
+                if (cleanCandidate == "✕ Keluar" || cleanCandidate == "✕") {
+                    exitEmojiSearch()
+                    return
+                }
+                if (cleanCandidate.startsWith("🔍") || cleanCandidate.startsWith("Ketik:")) {
+                    return
+                }
+                commitDirectText(cleanCandidate)
+                audioHaptic.triggerHapticFeedback()
+                return
+            }
+
+            if (isEmojiCandidate(cleanCandidate)) {
+                val ic = currentInputConnection
+                if (isTranslatePanelOpen) {
+                    val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                    translatePanelBuffer.insert(pos, " $cleanCandidate ")
+                    translateCursorPosition += cleanCandidate.length + 2
+                    updateTranslateInputBoxVisual()
+                } else if (ic != null) {
+                    ic.commitText(" $cleanCandidate ", 1)
+                }
+                composingWord.clear()
+                updateSuggestions()
+                return
+            }
 
             // Handle Recent Screenshot Pill ("📸 ...")
             if (cleanCandidate.startsWith("📸 ")) {
@@ -2391,6 +2565,9 @@ class IosInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         try {
+            try {
+                unregisterReceiver(dictationPermissionReceiver)
+            } catch (_: Throwable) {}
             suggestionHandler.removeCallbacksAndMessages(null)
             clipboardManager.destroy()
             voiceDictationManager.destroy()

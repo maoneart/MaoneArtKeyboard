@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.01 / build 101)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.02 / build 102)
 
 ---
 
@@ -641,3 +641,14 @@
      2. **Harmonisasi Tombol Kirim Terjemahan Tema One Piece & Woody**:
         - Tombol "Kirim ➔" (`btnTranslateSend`) pada panel terjemahan kini menggunakan tema One Piece otentik: 9-patch kayu amber/gold action key (`key_bg_onepiece_action.xml`) dengan teks putih tegas.
         - Pada tema Woody, tombol kirim otomatis menggunakan tuts kayu walnut gelap (`key_bg_woody_action.xml`).
+   - **Pencarian Emoji, Prediksi Emoji Kontekstual & Tombol Mic Dikte ala iOS (Release v1.1.02 / Build 102)**:
+     1. **Pencarian Emoji & Prediksi Emoji Kontekstual (`EmojiSearchEngine.kt`)**:
+        - *Prediksi Emoji Kontekstual*: Keyboard otomatis menganalisis konteks kata yang sedang diketik atau diselesaikan (misalnya `keren`, `makasih`, `kopi`, `cinta`, `lucu`, `semangat`, `makan`, `uang`, `tidur`, dll) dan secara cerdas menyematkan emoji yang relevan (`🔥`, `🙏`, `☕`, `❤️`, `😂`, `💪`, `🍜`, `💰`, `😴`) langsung di QuickType candidate bar. Mengetuk kandidat emoji langsung menyematkan emoji secara instan tanpa perlu membuka papan emoji.
+        - *Search Header di Papan Emoji*: Di bagian atas papan emoji (`createEmojiView`), disematkan search bar kapsul melengkung khas Apple `[ 🔍 Cari Emoji (Ketik kata kunci)... ]` disertai baris scrollable chip pencarian cepat (`🔥 Populer`, `❤️ Cinta`, `😂 Tertawa`, `👍 Jempol`, `🙏 Doa`, `☕ Kopi`, `🍜 Makan`, `🐱 Hewan`, `🚗 Jalan`, `🎉 Pesta`, `🇮🇩 Indonesia`). Mengetuk chip langsung memfilter tampilan ratusan emoji secara instan.
+        - *Mode Ketik Pencarian Emoji (`isEmojiSearchMode`)*: Mengetuk search bar beralih ke mode pencarian interaktif: keyboard QWERTY tetap aktif di bawah untuk mengetik kata kunci pencarian, sementara toolbar atas secara live menampilkan emoji-emoji yang cocok secara real-time. Mengetuk emoji langsung mengirimkannya ke dokumen input.
+     2. **Tombol Mic Dikte ala iOS (Voice Dictation Perfection)**:
+        - *Perizinan Runtime Microphone (`DictationPermissionActivity.kt`)*: Mengatasi masalah silent error mikrofon dengan activity transparan yang meminta runtime permission `android.permission.RECORD_AUDIO`, dan otomatis melanjutkan dikte begitu izin disetujui tanpa perlu menekan tombol mic ulang.
+        - *Desain Icon Apple Dictation (`ic_mic_ios.xml`)*: Mengganti ikon standar menjadi vector mikrofon kapsul retro khas Apple iOS Dictation.
+        - *Audio & Haptic Feedback Otentik*: Memainkan nada suara start beep dan stop ack khas Apple Dictation via `ToneGenerator` serta getaran haptik berirama.
+        - *Live Waveform Visualizer*: Bilah toolbar menampilkan animasi gelombang suara equalizer yang berdenyut dinamis saat mendengarkan ucapan (`🎙️ ılı.lıllılı. Mendengarkan...`) dan menampilkan teks suara parsial secara live.
+        - *Responsivitas Bebas Hambatan*: Menghilangkan pembatasan sentuh mic saat `composingWord` aktif (otomatis menyelesaikan kata terlebih dahulu) dan memperluas rentang deteksi sentuh 20ms–1200ms dengan efek denyut/zoom merah Apple Dictation `#FF3B30`.

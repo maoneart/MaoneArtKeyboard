@@ -2,6 +2,8 @@ package com.maoneart.ioskeyboard.dictation
 
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -12,12 +14,33 @@ class VoiceDictationManager(
     private val context: Context,
     private val onPartialResult: (String) -> Unit,
     private val onFinalResult: (String) -> Unit,
-    private val onStatusChange: (Boolean, String) -> Unit
+    private val onStatusChange: (Boolean, String) -> Unit,
+    private val onAudioRmsChanged: ((Float) -> Unit)? = null
 ) {
 
     private var speechRecognizer: SpeechRecognizer? = null
+    private var toneGenerator: ToneGenerator? = null
+
     var isListening: Boolean = false
         private set
+
+    init {
+        try {
+            toneGenerator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 85)
+        } catch (_: Throwable) {}
+    }
+
+    private fun playStartTone() {
+        try {
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
+        } catch (_: Throwable) {}
+    }
+
+    private fun playStopTone() {
+        try {
+            toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 70)
+        } catch (_: Throwable) {}
+    }
 
     fun isAvailable(): Boolean {
         return SpeechRecognizer.isRecognitionAvailable(context)
@@ -35,32 +58,36 @@ class VoiceDictationManager(
                 setRecognitionListener(object : RecognitionListener {
                     override fun onReadyForSpeech(params: Bundle?) {
                         isListening = true
-                        onStatusChange(true, "Mendengarkan suara...")
+                        playStartTone()
+                        onStatusChange(true, "Mendengarkan...")
                     }
 
                     override fun onBeginningOfSpeech() {
-                        onStatusChange(true, "Merekam ucapan...")
+                        onStatusChange(true, "Merekam...")
                     }
 
-                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onRmsChanged(rmsdB: Float) {
+                        onAudioRmsChanged?.invoke(rmsdB)
+                    }
 
                     override fun onBufferReceived(buffer: ByteArray?) {}
 
                     override fun onEndOfSpeech() {
-                        onStatusChange(false, "Memproses ucapan...")
+                        onStatusChange(false, "Memproses...")
                     }
 
                     override fun onError(error: Int) {
                         isListening = false
+                        playStopTone()
                         val errorMsg = when (error) {
-                            SpeechRecognizer.ERROR_AUDIO -> "Masalah audio mic"
+                            SpeechRecognizer.ERROR_AUDIO -> "Audio mikrofon sibuk"
                             SpeechRecognizer.ERROR_CLIENT -> "Klien suara sibuk"
                             SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Izin mikrofon belum aktif"
-                            SpeechRecognizer.ERROR_NETWORK -> "Periksa koneksi internet"
+                            SpeechRecognizer.ERROR_NETWORK -> "Koneksi internet bermasalah"
                             SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Koneksi suara timeout"
-                            SpeechRecognizer.ERROR_NO_MATCH -> "Tidak ada suara terdeteksi"
+                            SpeechRecognizer.ERROR_NO_MATCH -> ""
                             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Layanan suara sibuk"
-                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Waktu bicara habis"
+                            SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> ""
                             else -> "Gagal merekam suara"
                         }
                         onStatusChange(false, errorMsg)
@@ -68,11 +95,12 @@ class VoiceDictationManager(
 
                     override fun onResults(results: Bundle?) {
                         isListening = false
+                        playStopTone()
                         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                         if (!matches.isNullOrEmpty()) {
                             val recognized = matches[0]
                             onFinalResult(recognized)
-                            onStatusChange(false, "Selesai")
+                            onStatusChange(false, "")
                         } else {
                             onStatusChange(false, "")
                         }
@@ -106,7 +134,9 @@ class VoiceDictationManager(
     }
 
     fun stopListening() {
+        if (!isListening) return
         try {
+            playStopTone()
             speechRecognizer?.stopListening()
         } catch (_: Throwable) {}
         isListening = false
@@ -117,6 +147,8 @@ class VoiceDictationManager(
         try {
             speechRecognizer?.destroy()
             speechRecognizer = null
+            toneGenerator?.release()
+            toneGenerator = null
         } catch (_: Throwable) {}
         isListening = false
     }

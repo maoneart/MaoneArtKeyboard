@@ -61,6 +61,11 @@
             android:label="Tambah Stiker WhatsApp"
             android:theme="@style/Theme.IosKeyboard.Settings" />
 
+        <activity
+            android:name=".dictation.DictationPermissionActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
