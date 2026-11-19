@@ -521,6 +521,13 @@ class IosInputMethodService : InputMethodService() {
             layoutEngine.updateShiftState(isShifted || isCapsLock)
             layoutEngine.updateReturnButton(info, themeMode = prefs.themeMode, isDark = isDarkMode())
             layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode(), prefs.themeMode)
+
+            // Re-verify after Android binds the target field / cursor position
+            keyboardContainer?.postDelayed({
+                if (!isCapsLock) {
+                    updateAutoCapitalization()
+                }
+            }, 60L)
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error onStartInputView", t)
         }
@@ -592,10 +599,12 @@ class IosInputMethodService : InputMethodService() {
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        // Reset composingWord and update capitalization only when cursor jumps, selects range, or resets to 0
+        // Reset composingWord only when cursor jumps, selects range, or resets to 0
         if ((newSelStart == 0 && newSelEnd == 0) || newSelStart != newSelEnd || Math.abs(newSelStart - oldSelStart) > 1) {
             composingWord.clear()
             updateSuggestions(immediate = false)
+        }
+        if (!isCapsLock) {
             updateAutoCapitalization()
         }
     }
@@ -1145,8 +1154,15 @@ class IosInputMethodService : InputMethodService() {
 
     private fun switchMode(mode: Mode) {
         currentMode = mode
+        if (mode == Mode.QWERTY && !isCapsLock) {
+            isShifted = shouldAutoCapitalize()
+        }
         rootView?.let { applyThemeStyling(it) }
         renderCurrentLayout()
+        if (mode == Mode.QWERTY) {
+            layoutEngine.updateShiftState(isShifted || isCapsLock)
+            layoutEngine.updateShiftButtonVisual(isShifted, isCapsLock, isDarkMode(), prefs.themeMode)
+        }
     }
 
     private fun renderCurrentLayout() {
@@ -1622,6 +1638,13 @@ class IosInputMethodService : InputMethodService() {
             return false
         }
 
+        // Support ALL CAPS fields (misal nomor plat, kode voucher, dsb)
+        if ((inputType and InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) != 0) {
+            return true
+        }
+
+        val isCapWords = (inputType and InputType.TYPE_TEXT_FLAG_CAP_WORDS) != 0
+
         // 1. Periksa buffer panel terjemahan jika terbuka
         if (isTranslatePanelOpen) {
             if (translateCursorPosition == 0 || translatePanelBuffer.isEmpty()) {
@@ -1629,15 +1652,14 @@ class IosInputMethodService : InputMethodService() {
                 return true
             }
             val textBefore = translatePanelBuffer.substring(0, translateCursorPosition.coerceIn(0, translatePanelBuffer.length))
-            if (textBefore.trim().isEmpty()) {
+            if (textBefore.trim().isEmpty() || textBefore.endsWith("\n") || textBefore.endsWith("\r")) {
                 composingWord.clear()
                 return true
             }
-            if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) {
-                composingWord.clear()
+            if (isCapWords && textBefore.endsWith(" ")) {
                 return true
             }
-            if (Regex("""[.!?]\s+$""").containsMatchIn(textBefore)) {
+            if (Regex("""[.!?…][’”"'\)\]]*\s+$""").containsMatchIn(textBefore)) {
                 composingWord.clear()
                 return true
             }
@@ -1646,23 +1668,25 @@ class IosInputMethodService : InputMethodService() {
 
         // 2. Inspeksi teks sebelum kursor dari InputConnection
         val ic = currentInputConnection ?: return false
-        val textBefore = ic.getTextBeforeCursor(32, 0)?.toString()
+        val textBefore = ic.getTextBeforeCursor(48, 0)?.toString()
 
         // Jika benar-benar kosong atau hanya spasi awal -> awal kalimat pertama / pesan baru (misal setelah kirim WA)
         if (textBefore.isNullOrEmpty() || textBefore.trim().isEmpty()) {
-            composingWord.clear()
             return true
         }
 
         // Jika berada tepat setelah baris baru (Enter)
         if (textBefore.endsWith("\n") || textBefore.endsWith("\r")) {
-            composingWord.clear()
             return true
         }
 
-        // HANYA aktif jika teks berakhiran tanda baca (.!?) diikuti spasi (misal ". ", "? ", "! ")
-        if (Regex("""[.!?]\s+$""").containsMatchIn(textBefore)) {
-            composingWord.clear()
+        // Jika field meminta kapitalisasi tiap kata (CAP_WORDS) dan kursor setelah spasi
+        if (isCapWords && textBefore.endsWith(" ")) {
+            return true
+        }
+
+        // HANYA aktif jika teks berakhiran tanda baca (.!?…) diikuti spasi (misal ". ", "? ", "! ", "… ", atau '." ')
+        if (Regex("""[.!?…][’”"'\)\]]*\s+$""").containsMatchIn(textBefore)) {
             return true
         }
 
@@ -1711,7 +1735,8 @@ class IosInputMethodService : InputMethodService() {
                 updateSuggestions(immediate = false)
             }
 
-            if (isShifted && !isCapsLock) {
+            val isAllCapField = (currentInputEditorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) ?: 0) != 0
+            if (isShifted && !isCapsLock && !isAllCapField) {
                 isShifted = false
                 layoutEngine.updateShiftState(false)
                 layoutEngine.updateShiftButtonVisual(false, false, isDarkMode(), prefs.themeMode)
@@ -1900,6 +1925,22 @@ class IosInputMethodService : InputMethodService() {
                 correctionEngine.recordWordUsage(activeWord, 1)
             }
 
+            val preSpaceText = if (isTranslatePanelOpen) {
+                val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                if (pos > 0) translatePanelBuffer.substring(0, pos) else ""
+            } else {
+                currentInputConnection?.getTextBeforeCursor(4, 0)?.toString() ?: ""
+            }
+            val isSentenceEndingBeforeSpace = preSpaceText.isNotEmpty() && (
+                preSpaceText.endsWith(".") || preSpaceText.endsWith("?") ||
+                preSpaceText.endsWith("!") || preSpaceText.endsWith("…") ||
+                preSpaceText.endsWith(".\"") || preSpaceText.endsWith("?\"") ||
+                preSpaceText.endsWith("!\"") || preSpaceText.endsWith(".\'") ||
+                preSpaceText.endsWith("?\'") || preSpaceText.endsWith("!\'") ||
+                preSpaceText.endsWith(".)") || preSpaceText.endsWith("?)") ||
+                preSpaceText.endsWith("!)")
+            )
+
             if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
                 val now = System.currentTimeMillis()
@@ -1909,16 +1950,26 @@ class IosInputMethodService : InputMethodService() {
                     translateCursorPosition = pos + 1
                     lastSpacePressTime = 0
                     updateTranslateInputBoxVisual()
+                    if (!isCapsLock && prefs.isAutoCapitalizationEnabled) {
+                        isShifted = true
+                        layoutEngine.updateShiftState(true)
+                        layoutEngine.updateShiftButtonVisual(true, false, isDarkMode(), prefs.themeMode)
+                    }
                     updateSuggestions()
-                    updateAutoCapitalization()
                     return
                 }
                 lastSpacePressTime = now
                 translatePanelBuffer.insert(pos, " ")
                 translateCursorPosition = pos + 1
                 updateTranslateInputBoxVisual()
+                if (isSentenceEndingBeforeSpace && !isCapsLock && prefs.isAutoCapitalizationEnabled) {
+                    isShifted = true
+                    layoutEngine.updateShiftState(true)
+                    layoutEngine.updateShiftButtonVisual(true, false, isDarkMode(), prefs.themeMode)
+                } else {
+                    updateAutoCapitalization()
+                }
                 updateSuggestions()
-                updateAutoCapitalization()
                 return
             }
 
@@ -1928,16 +1979,26 @@ class IosInputMethodService : InputMethodService() {
                 currentInputConnection?.deleteSurroundingText(1, 0)
                 currentInputConnection?.commitText(". ", 1)
                 lastSpacePressTime = 0
+                if (!isCapsLock && prefs.isAutoCapitalizationEnabled) {
+                    isShifted = true
+                    layoutEngine.updateShiftState(true)
+                    layoutEngine.updateShiftButtonVisual(true, false, isDarkMode(), prefs.themeMode)
+                }
                 updateSuggestions()
-                updateAutoCapitalization()
                 return
             }
 
             lastSpacePressTime = now
             currentInputConnection?.commitText(" ", 1)
             composingWord.clear()
+            if (isSentenceEndingBeforeSpace && !isCapsLock && prefs.isAutoCapitalizationEnabled) {
+                isShifted = true
+                layoutEngine.updateShiftState(true)
+                layoutEngine.updateShiftButtonVisual(true, false, isDarkMode(), prefs.themeMode)
+            } else {
+                updateAutoCapitalization()
+            }
             updateSuggestions()
-            updateAutoCapitalization()
         } catch (_: Throwable) {}
     }
 
@@ -2039,7 +2100,13 @@ class IosInputMethodService : InputMethodService() {
             }
 
             updateSuggestions()
-            updateAutoCapitalization()
+            if ((isMultiLine || (!isSearchAction && !isTerminalOrRawInput())) && !isCapsLock && prefs.isAutoCapitalizationEnabled) {
+                isShifted = true
+                layoutEngine.updateShiftState(true)
+                layoutEngine.updateShiftButtonVisual(true, false, isDarkMode(), prefs.themeMode)
+            } else {
+                updateAutoCapitalization()
+            }
         } catch (_: Throwable) {}
     }
 
@@ -2597,7 +2664,14 @@ class IosInputMethodService : InputMethodService() {
             composingWord.clear()
             // Immediately chain to the next word prediction! ("Nulis Otomatis")
             updateSuggestions()
-            updateAutoCapitalization()
+            val isCapWords = (currentInputEditorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_CAP_WORDS) ?: 0) != 0
+            if (isCapWords && !isCapsLock && prefs.isAutoCapitalizationEnabled) {
+                isShifted = true
+                layoutEngine.updateShiftState(true)
+                layoutEngine.updateShiftButtonVisual(true, false, isDarkMode(), prefs.themeMode)
+            } else {
+                updateAutoCapitalization()
+            }
         } catch (_: Throwable) {}
     }
 

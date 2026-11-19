@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.05 / build 105)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.06 / build 106)
 
 ---
 
@@ -682,3 +682,10 @@
         - Izin berbahaya `QUERY_ALL_PACKAGES` (membaca semua aplikasi) dan izin storage (`READ_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`) tetap dihapus bersih 100%.
         - Keyboard kini hanya meminta `RECORD_AUDIO` (standar untuk dikte suara Android/Gboard) dan `INTERNET` (terjemahan), tanpa izin mengintip aplikasi lain ataupun galeri kamera.
      3. **Perbaikan Build Gradle**: Memperbaiki konfigurasi signing APK release dengan skema v1 dan v2 yang kompatibel penuh dengan Android Gradle Plugin.
+   - **Auto-Capitalization Otomatis ala Apple iOS 18 (Release v1.1.06 / Build 106)**:
+     1. **Presisi Auto-Kapitalisasi Kalimat Baru**:
+        - *Root Cause Masalah Shift Sebelumnya*: Asinkronitas IPC commitText pada tombol spasi membuat getTextBeforeCursor membaca buffer sebelum spasi diterapkan, serta filter onUpdateSelection memblokir update bergeser 1 karakter.
+        - *Zero-Latency Instant Shift*: Mengetuk spasi setelah tanda baca (., ?, !, …, .", ?", !", .), ?), !)) atau menekan spasi dua kali (. ) langsung mengaktifkan tombol Shift secara instan (0ms) tanpa menunggu respon IPC Android.
+        - *Deteksi Cerdas Format Field*: Mendukung TYPE_TEXT_FLAG_CAP_CHARACTERS (semua huruf kapital) dan TYPE_TEXT_FLAG_CAP_WORDS (kapitalisasi tiap kata untuk nama kontak/judul).
+        - *Sinkronisasi Multi-View*: Perpindahan dari keyboard simbol (123 / #+=) kembali ke huruf ABC otomatis memeriksa konteks teks dan menyalakan Shift jika berada di awal kalimat baru.
+        - *Transisi Huruf Halus*: Huruf pertama diketik otomatis kapital, dan tuts keyboard seketika kembali ke huruf kecil secara mulus persis Apple iOS.
