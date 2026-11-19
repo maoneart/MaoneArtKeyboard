@@ -70,6 +70,7 @@ class IosInputMethodService : InputMethodService() {
     private lateinit var stickerManager: com.maoneart.ioskeyboard.sticker.StickerManager
     private lateinit var layoutEngine: KeyboardLayout
     private lateinit var textReplacementManager: com.maoneart.ioskeyboard.shortcut.TextReplacementManager
+    private lateinit var voiceDictationManager: com.maoneart.ioskeyboard.dictation.VoiceDictationManager
     private lateinit var quickPathEngine: com.maoneart.ioskeyboard.keyboard.swipe.QuickPathEngine
 
     private var currentMode = Mode.QWERTY
@@ -91,6 +92,15 @@ class IosInputMethodService : InputMethodService() {
     // Apple iOS Live Emoji Search State
     private var isEmojiSearchMode = false
     private val emojiSearchQuery = StringBuilder()
+
+    // Broadcast receiver for Voice Dictation runtime audio permission
+    private val dictationPermissionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == com.maoneart.ioskeyboard.dictation.DictationPermissionActivity.ACTION_PERMISSION_GRANTED) {
+                handleDictationAction()
+            }
+        }
+    }
 
     // 0.2ms View-Cache for QWERTY Layout to eliminate view inflation overhead when toggling 123 ⇄ ABC
     private var cachedQwertyView: View? = null
@@ -150,6 +160,46 @@ class IosInputMethodService : InputMethodService() {
             }
             textReplacementManager = com.maoneart.ioskeyboard.shortcut.TextReplacementManager(this)
             quickPathEngine = com.maoneart.ioskeyboard.keyboard.swipe.QuickPathEngine(correctionEngine)
+            voiceDictationManager = com.maoneart.ioskeyboard.dictation.VoiceDictationManager(
+                this,
+                onPartialResult = { partial ->
+                    candidate2?.text = "🎙️ $partial..."
+                },
+                onFinalResult = { text ->
+                    currentInputConnection?.commitText("$text ", 1)
+                    updateSuggestions()
+                },
+                onStatusChange = { isListening, statusMsg ->
+                    layoutEngine.updateDictationVisual(isListening, isDarkMode(), prefs.themeMode)
+                    if (isListening) {
+                        candidate2?.text = "🎙️ ılı.lıllılı. Mendengarkan..."
+                    } else if (statusMsg.isNotEmpty() && statusMsg != "Selesai") {
+                        candidate2?.text = statusMsg
+                    } else {
+                        updateSuggestions()
+                    }
+                },
+                onAudioRmsChanged = { rms ->
+                    if (voiceDictationManager.isListening) {
+                        val wave = when {
+                            rms > 6f -> "🎙️ ılılllıııl"
+                            rms > 3f -> "🎙️ ı.lıllılı."
+                            rms > 1f -> "🎙️ ılı.lıll."
+                            else -> "🎙️ ıl..ıl..."
+                        }
+                        candidate2?.text = "$wave Mendengarkan..."
+                    }
+                }
+            )
+
+            try {
+                val filter = IntentFilter(com.maoneart.ioskeyboard.dictation.DictationPermissionActivity.ACTION_PERMISSION_GRANTED)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    registerReceiver(dictationPermissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                } else {
+                    registerReceiver(dictationPermissionReceiver, filter)
+                }
+            } catch (_: Throwable) {}
         } catch (t: Throwable) {
             Log.e("IosInputMethodService", "Error in onCreate", t)
         }
@@ -491,6 +541,10 @@ class IosInputMethodService : InputMethodService() {
             }
             FancyFontManager.currentStyle = FancyFontManager.FancyStyle.NORMAL
             updateQuickFontsButtonVisual()
+            if (voiceDictationManager.isListening) {
+                voiceDictationManager.stopListening()
+                layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
+            }
         } catch (_: Throwable) {}
     }
 
@@ -525,6 +579,10 @@ class IosInputMethodService : InputMethodService() {
             }
             FancyFontManager.currentStyle = FancyFontManager.FancyStyle.NORMAL
             updateQuickFontsButtonVisual()
+            if (voiceDictationManager.isListening) {
+                voiceDictationManager.stopListening()
+                layoutEngine.updateDictationVisual(false, isDarkMode(), prefs.themeMode)
+            }
         } catch (_: Throwable) {}
     }
 
@@ -1101,7 +1159,7 @@ class IosInputMethodService : InputMethodService() {
             val contentView = when (currentMode) {
                 Mode.QWERTY -> {
                     val orientation = resources.configuration.orientation
-                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|$orientation"
+                    val sig = "$isDark|${prefs.themeMode}|${prefs.activeLanguage}|${prefs.isSwipeTypingEnabled}|${prefs.isKeyPopupEnabled}|${prefs.isDictationEnabled}|$orientation"
                     val existing = cachedQwertyView
                     if (existing != null && cachedQwertyKeySignature == sig) {
                         (existing.parent as? android.view.ViewGroup)?.removeView(existing)
@@ -1116,6 +1174,7 @@ class IosInputMethodService : InputMethodService() {
                             activeLanguage = prefs.activeLanguage,
                             isSwipeEnabled = prefs.isSwipeTypingEnabled,
                             isKeyPopupEnabled = prefs.isKeyPopupEnabled,
+                            isDictationEnabled = prefs.isDictationEnabled,
                             onKeyAction = { handleKeyAction(it) },
                             onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) },
                             onSwipeComplete = { handleSwipeComplete(it) },
@@ -1137,6 +1196,7 @@ class IosInputMethodService : InputMethodService() {
                     isMoreSymbols = false,
                     isDark = isDark,
                     themeMode = prefs.themeMode,
+                    isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) }
                 )
@@ -1144,6 +1204,7 @@ class IosInputMethodService : InputMethodService() {
                     isMoreSymbols = true,
                     isDark = isDark,
                     themeMode = prefs.themeMode,
+                    isDictationEnabled = prefs.isDictationEnabled,
                     onKeyAction = { handleKeyAction(it) },
                     onCursorMove = { dx, dy, isSelecting -> moveCursor2D(dx, dy, isSelecting) }
                 )
@@ -1387,6 +1448,34 @@ class IosInputMethodService : InputMethodService() {
         } catch (_: Throwable) {}
     }
 
+    private fun handleDictationAction() {
+        try {
+            if (!prefs.isDictationEnabled) return
+            if (composingWord.isNotEmpty()) {
+                currentInputConnection?.finishComposingText()
+                composingWord.clear()
+            }
+            if (androidx.core.content.ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.RECORD_AUDIO
+                ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                val intent = Intent(this, com.maoneart.ioskeyboard.dictation.DictationPermissionActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(intent)
+                candidate2?.text = "🎙️ Meminta izin mikrofon..."
+                return
+            }
+            audioHaptic.triggerHapticFeedback()
+            if (voiceDictationManager.isListening) {
+                voiceDictationManager.stopListening()
+            } else {
+                voiceDictationManager.startListening(prefs.activeLanguage)
+            }
+        } catch (_: Throwable) {}
+    }
+
     private fun startEmojiSearch() {
         isEmojiSearchMode = true
         emojiSearchQuery.clear()
@@ -1490,6 +1579,9 @@ class IosInputMethodService : InputMethodService() {
                 "ACTION_EMOJI" -> {
                     switchMode(Mode.EMOJI)
                 }
+                "ACTION_DICTATION" -> {
+                    handleDictationAction()
+                }
                 "ACTION_RETURN" -> {
                     handleReturn()
                 }
@@ -1592,6 +1684,9 @@ class IosInputMethodService : InputMethodService() {
 
     private fun handleCharacterInput(charStr: String) {
         try {
+            if (voiceDictationManager.isListening) {
+                voiceDictationManager.stopListening()
+            }
             lastKeyTypingTime = System.currentTimeMillis()
             val finalStr = if (FancyFontManager.currentStyle != FancyFontManager.FancyStyle.NORMAL && !isTranslatePanelOpen && charStr.length == 1) {
                 FancyFontManager.transformChar(charStr[0])
@@ -2649,8 +2744,12 @@ class IosInputMethodService : InputMethodService() {
 
     override fun onDestroy() {
         try {
+            try {
+                unregisterReceiver(dictationPermissionReceiver)
+            } catch (_: Throwable) {}
             suggestionHandler.removeCallbacksAndMessages(null)
             clipboardManager.destroy()
+            voiceDictationManager.destroy()
             audioHaptic.destroy()
             correctionEngine.destroy()
             serviceScope.cancel()

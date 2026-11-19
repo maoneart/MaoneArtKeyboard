@@ -243,6 +243,31 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
+    private var micButtonRef: ImageButton? = null
+
+    fun updateDictationVisual(isListening: Boolean, isDark: Boolean, themeMode: String = "auto") {
+        micButtonRef?.let { btn ->
+            if (isListening) {
+                btn.setColorFilter(Color.parseColor("#FF3B30")) // Distinct Apple Red recording indicator
+                btn.animate()
+                    .scaleX(1.15f)
+                    .scaleY(1.15f)
+                    .setDuration(160L)
+                    .start()
+            } else {
+                val isWoody = (themeMode == "woody")
+                val isOnePiece = (themeMode == "onepiece")
+                val normalColor = if (isOnePiece) Color.parseColor("#FFE082") else if (isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+                btn.setColorFilter(normalColor)
+                btn.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(150L)
+                    .start()
+            }
+        }
+    }
+
 
     // Update letter cases in 0.1ms without rebuilding views
     fun updateShiftState(isShifted: Boolean) {
@@ -356,6 +381,7 @@ class KeyboardLayout(private val context: Context) {
         activeLanguage: String,
         isSwipeEnabled: Boolean = true,
         isKeyPopupEnabled: Boolean = true,
+        isDictationEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int, Boolean) -> Unit = { _, _, _ -> },
         onSwipeComplete: (List<Char>) -> Unit = {},
@@ -550,7 +576,11 @@ class KeyboardLayout(private val context: Context) {
         val spaceWeight = if (isLandscape) {
             2.5f
         } else {
-            if (isOnePiece) 4.3f else 4.4f
+            if (isOnePiece) {
+                if (isDictationEnabled) 3.5f else 4.3f
+            } else {
+                if (isDictationEnabled) 3.6f else 4.4f
+            }
         }
         val spaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
         val btnSpace = TextView(context).apply {
@@ -587,6 +617,25 @@ class KeyboardLayout(private val context: Context) {
                 setupLetterKeyTouch(this) { onKeyAction(".") }
             }
             r4Layout.addView(btnPeriod)
+        }
+
+        // Dictation Microphone Button (Apple iOS Monochrome Mic) with Anti-Accidental Touch
+        if (isDictationEnabled) {
+            val btnMic = ImageButton(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 0.85f else 0.95f)
+                    .apply { setMargins(dp(2), 0, dp(2), 0) }
+                background = ContextCompat.getDrawable(context, specialKeyBg)
+                setImageResource(R.drawable.ic_mic_ios)
+                setColorFilter(specialTextColor)
+                scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+                isClickable = true
+                isFocusable = false
+                setupDictationKeyTouch(this) { onKeyAction("ACTION_DICTATION") }
+            }
+            micButtonRef = btnMic
+            r4Layout.addView(btnMic)
+        } else {
+            micButtonRef = null
         }
 
         // Return / Enter Action Button (return / Dead Center Search Icon)
@@ -743,6 +792,7 @@ class KeyboardLayout(private val context: Context) {
         isMoreSymbols: Boolean,
         isDark: Boolean,
         themeMode: String = "auto",
+        isDictationEnabled: Boolean = true,
         onKeyAction: (String) -> Unit,
         onCursorMove: (Int, Int, Boolean) -> Unit = { _, _, _ -> }
     ): View {
@@ -936,7 +986,11 @@ class KeyboardLayout(private val context: Context) {
         val spaceWeight = if (isLandscape) {
             2.5f
         } else {
-            if (isOnePiece) 4.3f else 4.4f
+            if (isOnePiece) {
+                if (isDictationEnabled) 3.5f else 4.3f
+            } else {
+                if (isDictationEnabled) 3.6f else 4.4f
+            }
         }
         val symSpaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
         val symSpaceLabel = if (isOnePiece) "" else "spasi"
@@ -974,6 +1028,25 @@ class KeyboardLayout(private val context: Context) {
                 setupLetterKeyTouch(this) { onKeyAction(".") }
             }
             r4.addView(btnPeriod)
+        }
+
+        // Dictation Microphone Button (Apple iOS Monochrome Mic) with Anti-Accidental Touch
+        if (isDictationEnabled) {
+            val btnMic = ImageButton(context).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, if (isLandscape) 0.85f else 0.95f)
+                    .apply { setMargins(dp(2), 0, dp(2), 0) }
+                background = ContextCompat.getDrawable(context, specialKeyBg)
+                setImageResource(R.drawable.ic_mic_ios)
+                setColorFilter(specialTextColor)
+                scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+                isClickable = true
+                isFocusable = false
+                setupDictationKeyTouch(this) { onKeyAction("ACTION_DICTATION") }
+            }
+            micButtonRef = btnMic
+            r4.addView(btnMic)
+        } else {
+            micButtonRef = null
         }
 
         // Return / Enter Action Button (return / Dead Center Search Icon)
@@ -3102,6 +3175,83 @@ class KeyboardLayout(private val context: Context) {
         }
     }
 
+    // Anti-Accidental Touch Dictation Key Listener:
+    // Requires deliberate single-pointer tap-and-release within view bounds.
+    // Strictly ignores multi-touch ACTION_POINTER_DOWN during fast two-thumb typing.
+    private fun setupDictationKeyTouch(view: View, onTrigger: () -> Unit) {
+        view.isHapticFeedbackEnabled = true
+        var isEligibleDown = false
+        var downTime = 0L
+        var watchdogRunnable: Runnable? = null
+
+        view.setOnTouchListener { v, event ->
+            if (isSpaceTrackpadActive) {
+                if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
+                    onTrackpadSelectionToggle?.invoke()
+                }
+                return@setOnTouchListener true
+            }
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
+                    isEligibleDown = true
+                    downTime = System.currentTimeMillis()
+                    v.isPressed = true
+                    val r = Runnable {
+                        v.isPressed = false
+                        isEligibleDown = false
+                    }
+                    watchdogRunnable = r
+                    v.postDelayed(r, 1200L)
+                    true
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    // Multi-touch means user is typing letters with two thumbs -> cancel mic touch!
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
+                    isEligibleDown = false
+                    v.isPressed = false
+                    false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (isEligibleDown) {
+                        val inBounds = event.x in 0f..v.width.toFloat() && event.y in 0f..v.height.toFloat()
+                        if (!inBounds) {
+                            watchdogRunnable?.let { v.removeCallbacks(it) }
+                            isEligibleDown = false
+                            v.isPressed = false
+                        }
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
+                    v.isPressed = false
+                    if (isEligibleDown) {
+                        val inBounds = event.x in 0f..v.width.toFloat() && event.y in 0f..v.height.toFloat()
+                        val duration = System.currentTimeMillis() - downTime
+                        if (inBounds && duration in 20L..1200L) {
+                            try {
+                                v.performHapticFeedback(
+                                    android.view.HapticFeedbackConstants.KEYBOARD_TAP,
+                                    android.view.HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or android.view.HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+                                )
+                            } catch (_: Throwable) {}
+                            onTrigger()
+                        }
+                    }
+                    isEligibleDown = false
+                    true
+                }
+                MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_CANCEL -> {
+                    watchdogRunnable?.let { v.removeCallbacks(it) }
+                    isEligibleDown = false
+                    v.isPressed = false
+                    true
+                }
+                else -> false
+            }
+        }
+    }
 
     // High-Speed Auto Repeat Backspace ("Hapus Ngebut" with Multi-Touch + Safety Release Watchdog)
     private fun setupRapidBackspaceTouch(view: View, onBackspace: () -> Unit) {
