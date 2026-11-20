@@ -1765,8 +1765,11 @@ class IosInputMethodService : InputMethodService() {
         if (charStr == "8" && textBefore.endsWith("5/")) return Pair(2, "⅝")
         if (charStr == "8" && textBefore.endsWith("7/")) return Pair(2, "⅞")
 
-        // 6. Special symbols in parentheses: (c) -> ©, (r) -> ®, (tm) -> ™, (p) -> ℗
+        // 6. Special symbols & Dot Besar in parentheses: (.) -> •, (c) -> ©, (r) -> ®, (tm) -> ™, (p) -> ℗
         if (charStr == ")") {
+            if (textBefore.endsWith("(.")) return Pair(2, "•")
+            if (textBefore.endsWith("(*")) return Pair(2, "•")
+            if (textBefore.endsWith("(o", ignoreCase = true)) return Pair(2, "•")
             if (textBefore.endsWith("(c", ignoreCase = true)) return Pair(2, "©")
             if (textBefore.endsWith("(r", ignoreCase = true)) return Pair(2, "®")
             if (textBefore.endsWith("(tm", ignoreCase = true)) return Pair(3, "™")
@@ -2032,6 +2035,8 @@ class IosInputMethodService : InputMethodService() {
                     textBeforeForSpace.endsWith("3/4") -> Pair(3, "¾ ")
                     textBeforeForSpace.endsWith("1/3") -> Pair(3, "⅓ ")
                     textBeforeForSpace.endsWith("2/3") -> Pair(3, "⅔ ")
+                    textBeforeForSpace.endsWith("(.)") -> Pair(3, "• ")
+                    textBeforeForSpace.endsWith("(*)") -> Pair(3, "• ")
                     textBeforeForSpace.endsWith("(c)", true) -> Pair(3, "© ")
                     textBeforeForSpace.endsWith("(r)", true) -> Pair(3, "® ")
                     textBeforeForSpace.endsWith("(tm)", true) -> Pair(4, "™ ")

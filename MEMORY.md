@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.09 / build 109)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.10 / build 110)
 
 ---
 
@@ -712,3 +712,10 @@
         - *Root Cause Ketidaksesuaian Ukuran*: Sebelumnya `->` memakai Unicode dingbat tebal (`➔`) sedangkan `<-` memakai Unicode tipografi tipis (`←`), sehingga tampak tidak seimbang.
         - *Symmetrical Matching Pair*: Panah kanan kini diselaraskan menjadi `→` (U+2192) yang 100% simetris, presisi tinggi, dan sepadan dengan panah kiri `←` (U+2190).
         - *Dukungan Panah Bolak-Balik*: Mengetik `<->` kini otomatis bertransformasi menjadi panah dua arah `↔` (U+2194), dan `<=>` menjadi `⇔`.
+   - **Simetri Panah Tipografi, Dot Besar (.) -> • & Panduan Pintasan Interaktif (Release v1.1.10 / Build 110)**:
+     1. **Simetri Panah Tipografi & Dot Besar**:
+        - *Panah Sepadan Sempurna*: Mengganti panah tebal menjadi panah tipografi presisi seimbang `→` (U+2192) yang 100% simetris dengan `←` (U+2190).
+        - *Bullet / Dot Besar `(.)` ➔ `•`*: Mengetik `(.)` langsung otomatis berubah menjadi simbol bullet dot besar hitam `•` (U+2022) khas poin presentasi/catatan, baik saat ketik langsung maupun saat menekan tombol spasi.
+        - *Dukungan Panah Bolak-Balik*: Mengetik `<->` ➔ `↔`, `<=>` ➔ `⇔`, `<==` ➔ `⇐`.
+     2. **Modal Panduan Pintasan Simbol Interaktif di Pengaturan**:
+        - Mengetuk baris *Tanda Baca Pintar* di Cupertino Settings Hub membuka modal glassmorphism berisi daftar lengkap 23 kombinasi simbol cerdas beserta keterangannya yang tersusun rapi.

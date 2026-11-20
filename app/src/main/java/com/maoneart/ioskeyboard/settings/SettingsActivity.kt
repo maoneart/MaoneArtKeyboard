@@ -191,6 +191,10 @@ class SettingsActivity : AppCompatActivity() {
             prefs.isSmartPunctuationEnabled = isChecked
         }
 
+        findViewById<View>(R.id.rowSmartPunctuation)?.setOnClickListener {
+            showSmartPunctuationGuideDialog()
+        }
+
         rowDownloadLanguages.setOnClickListener {
             startActivity(Intent(this, LanguageDownloadActivity::class.java))
         }
@@ -1150,6 +1154,169 @@ class SettingsActivity : AppCompatActivity() {
 
         dialog.setContentView(rootCard)
         val dialogWidth = (resources.displayMetrics.widthPixels * 0.90f).toInt()
+        dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
+        try {
+            dialog.show()
+        } catch (_: Throwable) {}
+    }
+
+    private fun showSmartPunctuationGuideDialog() {
+        if (isFinishing || isDestroyed) return
+        val dialog = android.app.Dialog(this).apply {
+            requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+            window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+            window?.setDimAmount(0.45f)
+        }
+
+        val rootCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_modal)
+            val pad = dp(20)
+            setPadding(pad, pad, pad, pad)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val iconTv = TextView(this).apply {
+            text = "✨"
+            textSize = 28f
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+        }
+        rootCard.addView(iconTv)
+
+        val tvTitle = TextView(this).apply {
+            text = "Daftar Tanda Baca Pintar"
+            textSize = 17f
+            setTextColor(Color.BLACK)
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(0, dp(6), 0, dp(2))
+        }
+        rootCard.addView(tvTitle)
+
+        val tvDesc = TextView(this).apply {
+            text = "Ketik simbol di kiri, otomatis berubah jadi simbol di kanan saat diketik atau ditekan spasi:"
+            textSize = 12.5f
+            setTextColor(Color.parseColor("#8E8E93"))
+            gravity = android.view.Gravity.CENTER_HORIZONTAL
+            setPadding(0, 0, 0, dp(12))
+        }
+        rootCard.addView(tvDesc)
+
+        val scroll = android.widget.ScrollView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(280)
+            )
+        }
+
+        val listContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val items = listOf(
+            Triple("Panah Kanan", "->", "→"),
+            Triple("Panah Kiri", "<-", "←"),
+            Triple("Panah Bolak-Balik", "<->", "↔"),
+            Triple("Panah Ganda Kanan", "=>", "⇒"),
+            Triple("Panah Ganda Kiri", "<==", "⇐"),
+            Triple("Panah Ganda 2 Arah", "<=>", "⇔"),
+            Triple("Bullet / Dot Besar", "(.)", "•"),
+            Triple("Strip Panjang Em-Dash", "--", "—"),
+            Triple("Titik Tiga Ellipsis", "...", "…"),
+            Triple("Hak Cipta (Copyright)", "(c)", "©"),
+            Triple("Merek Terdaftar (Reg)", "(r)", "®"),
+            Triple("Merek Dagang (Trade)", "(tm)", "™"),
+            Triple("Sound Recording", "(p)", "℗"),
+            Triple("Pecahan Setengah", "1/2", "½"),
+            Triple("Pecahan Seperempat", "1/4", "¼"),
+            Triple("Pecahan Tiga Perempat", "3/4", "¾"),
+            Triple("Pecahan Sepertiga", "1/3", "⅓"),
+            Triple("Pecahan Dua Pertiga", "2/3", "⅔"),
+            Triple("Tidak Sama Dengan", "!=", "≠"),
+            Triple("Lebih Besar Sama Dengan", ">=", "≥"),
+            Triple("Lebih Kecil Sama Dengan", "<=", "≤"),
+            Triple("Plus Minus", "+-", "±"),
+            Triple("Derajat", "^o", "°")
+        )
+
+        for ((name, shortcut, result) in items) {
+            val itemRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                val pV = dp(8)
+                val pH = dp(12)
+                setPadding(pH, pV, pH, pV)
+                background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.card_bg_ios_inner)
+                val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                lp.setMargins(0, 0, 0, dp(6))
+                layoutParams = lp
+            }
+
+            val tvName = TextView(this).apply {
+                text = name
+                textSize = 13.5f
+                setTextColor(Color.parseColor("#3C3C43"))
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f)
+            }
+
+            val tvShortcut = TextView(this).apply {
+                text = shortcut
+                textSize = 13.5f
+                typeface = android.graphics.Typeface.MONOSPACE
+                setTextColor(Color.parseColor("#007AFF"))
+                setBackgroundColor(Color.parseColor("#E5F0FF"))
+                setPadding(dp(6), dp(2), dp(6), dp(2))
+            }
+
+            val tvArrow = TextView(this).apply {
+                text = " ➔ "
+                textSize = 12f
+                setTextColor(Color.parseColor("#8E8E93"))
+            }
+
+            val tvResult = TextView(this).apply {
+                text = result
+                textSize = 16f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                setTextColor(Color.parseColor("#000000"))
+                setPadding(dp(4), dp(2), dp(4), dp(2))
+            }
+
+            itemRow.addView(tvName)
+            itemRow.addView(tvShortcut)
+            itemRow.addView(tvArrow)
+            itemRow.addView(tvResult)
+            listContainer.addView(itemRow)
+        }
+
+        scroll.addView(listContainer)
+        rootCard.addView(scroll)
+
+        val btnClose = TextView(this).apply {
+            text = "Oke, Paham"
+            textSize = 15.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            gravity = android.view.Gravity.CENTER
+            background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.btn_apple_action)
+            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(44)).apply {
+                setMargins(0, dp(14), 0, 0)
+            }
+            layoutParams = lp
+            isClickable = true
+            setOnClickListener { dialog.dismiss() }
+        }
+        rootCard.addView(btnClose)
+
+        dialog.setContentView(rootCard)
+        val dialogWidth = (resources.displayMetrics.widthPixels * 0.92f).toInt()
         dialog.window?.setLayout(dialogWidth, android.view.WindowManager.LayoutParams.WRAP_CONTENT)
         try {
             dialog.show()

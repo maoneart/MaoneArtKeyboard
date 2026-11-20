@@ -821,12 +821,16 @@
 
             <!-- Smart Punctuation Row -->
             <LinearLayout
+                android:id="@+id/rowSmartPunctuation"
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingStart="14dp"
-                android:paddingEnd="14dp">
+                android:paddingEnd="14dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?android:attr/selectableItemBackground">
 
                 <FrameLayout
                     android:layout_width="30dp"
@@ -856,9 +860,9 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ubah -- jadi —, ... jadi …, 1/2 jadi ½, (c) jadi ©"
+                        android:text="Ubah -> jadi →, (.) jadi •, -- jadi — (Lihat Daftar)"
                         android:textSize="11.5sp"
-                        android:textColor="#8E8E93" />
+                        android:textColor="#007AFF" />
                 </LinearLayout>
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
