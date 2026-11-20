@@ -993,7 +993,7 @@ class KeyboardLayout(private val context: Context) {
             }
         }
         val symSpaceKeyBg = if (isOnePiece) R.drawable.key_bg_onepiece_space else keyBg
-        val symSpaceLabel = if (activeLanguage == "en") "space" else "spasi"
+        val symSpaceLabel = "spasi"
         val btnSpace = TextView(context).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, spaceWeight)
                 .apply { setMargins(dp(2), 0, dp(2), 0) }
