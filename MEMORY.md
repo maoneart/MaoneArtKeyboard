@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.08 / build 108)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.09 / build 109)
 
 ---
 
@@ -707,3 +707,8 @@
      2. **Robust WhatsApp & Third-Party IPC Deletion Engine**:
         - Menggunakan `ic.beginBatchEdit()`, `deleteSurroundingTextInCodePoints`, fallback `deleteSurroundingText`, serta `KEYCODE_DEL` hardware fallback untuk menjamin teks sebelumnya terhapus 100% di WhatsApp, Telegram, dan Chrome.
         - Ditambah getaran haptik feedback dan efek suara klik saat simbol terpilih berhasil dikonversi.
+   - **Penyelarasan Simetri Panah Tipografi Apple (Release v1.1.09 / Build 109)**:
+     1. **Harmonisasi Simbol Panah Kiri-Kanan**:
+        - *Root Cause Ketidaksesuaian Ukuran*: Sebelumnya `->` memakai Unicode dingbat tebal (`➔`) sedangkan `<-` memakai Unicode tipografi tipis (`←`), sehingga tampak tidak seimbang.
+        - *Symmetrical Matching Pair*: Panah kanan kini diselaraskan menjadi `→` (U+2192) yang 100% simetris, presisi tinggi, dan sepadan dengan panah kiri `←` (U+2190).
+        - *Dukungan Panah Bolak-Balik*: Mengetik `<->` kini otomatis bertransformasi menjadi panah dua arah `↔` (U+2194), dan `<=>` menjadi `⇔`.

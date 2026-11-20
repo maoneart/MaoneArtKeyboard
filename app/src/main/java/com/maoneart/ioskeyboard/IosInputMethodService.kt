@@ -1730,12 +1730,14 @@ class IosInputMethodService : InputMethodService() {
             return Pair(2, "…")
         }
 
-        // 3. Arrows: "->" or "- >" or "-->" -> "➔", "<-" -> "←", "=>" -> "⇒"
+        // 3. Symmetrical Arrows: "->" -> "→", "<-" -> "←", "<->" -> "↔", "=>" -> "⇒"
         if (charStr == ">") {
-            if (textBefore.endsWith("-->")) return Pair(3, "➔")
-            if (textBefore.endsWith("--")) return Pair(2, "➔")
-            if (textBefore.endsWith("- ") || textBefore.endsWith("- ")) return Pair(2, "➔")
-            if (textBefore.endsWith("-")) return Pair(1, "➔")
+            if (textBefore.endsWith("<->") || textBefore.endsWith("<-")) return Pair(if (textBefore.endsWith("<->")) 3 else 2, "↔")
+            if (textBefore.endsWith("-->")) return Pair(3, "→")
+            if (textBefore.endsWith("--")) return Pair(2, "→")
+            if (textBefore.endsWith("- ") || textBefore.endsWith("- ")) return Pair(2, "→")
+            if (textBefore.endsWith("-")) return Pair(1, "→")
+            if (textBefore.endsWith("<=>") || textBefore.endsWith("<=")) return Pair(if (textBefore.endsWith("<=>")) 3 else 2, "⇔")
             if (textBefore.endsWith("= ") || textBefore.endsWith("= ")) return Pair(2, "⇒")
             if (textBefore.endsWith("==")) return Pair(2, "⇒")
             if (textBefore.endsWith("=")) return Pair(1, "⇒")
@@ -2007,18 +2009,21 @@ class IosInputMethodService : InputMethodService() {
                 }
 
                 val spaceReplacement: Pair<Int, String>? = when {
-                    textBeforeForSpace.endsWith("-->") -> Pair(3, "➔ ")
-                    textBeforeForSpace.endsWith("->") -> Pair(2, "➔ ")
-                    textBeforeForSpace.endsWith("- >") -> Pair(3, "➔ ")
+                    textBeforeForSpace.endsWith("<->") -> Pair(3, "↔ ")
+                    textBeforeForSpace.endsWith("<=>") -> Pair(3, "⇔ ")
+                    textBeforeForSpace.endsWith("-->") -> Pair(3, "→ ")
+                    textBeforeForSpace.endsWith("->") -> Pair(2, "→ ")
+                    textBeforeForSpace.endsWith("- >") -> Pair(3, "→ ")
                     textBeforeForSpace.endsWith("==>") -> Pair(3, "⇒ ")
                     textBeforeForSpace.endsWith("=>") -> Pair(2, "⇒ ")
                     textBeforeForSpace.endsWith("= >") -> Pair(3, "⇒ ")
                     textBeforeForSpace.endsWith("<--") -> Pair(3, "← ")
                     textBeforeForSpace.endsWith("<-") -> Pair(2, "← ")
                     textBeforeForSpace.endsWith("< -") -> Pair(3, "← ")
+                    textBeforeForSpace.endsWith("<==") -> Pair(3, "⇐ ")
+                    textBeforeForSpace.endsWith("<=") -> Pair(2, "≤ ")
                     textBeforeForSpace.endsWith("!=") -> Pair(2, "≠ ")
                     textBeforeForSpace.endsWith(">=") -> Pair(2, "≥ ")
-                    textBeforeForSpace.endsWith("<=") -> Pair(2, "≤ ")
                     textBeforeForSpace.endsWith("+-") -> Pair(2, "± ")
                     textBeforeForSpace.endsWith("--") -> Pair(2, "— ")
                     textBeforeForSpace.endsWith("...") -> Pair(3, "… ")
