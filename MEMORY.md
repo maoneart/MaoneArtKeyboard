@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.10 / build 110)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.11 / build 111)
 
 ---
 
@@ -719,3 +719,14 @@
         - *Dukungan Panah Bolak-Balik*: Mengetik `<->` ➔ `↔`, `<=>` ➔ `⇔`, `<==` ➔ `⇐`.
      2. **Modal Panduan Pintasan Simbol Interaktif di Pengaturan**:
         - Mengetuk baris *Tanda Baca Pintar* di Cupertino Settings Hub membuka modal glassmorphism berisi daftar lengkap 23 kombinasi simbol cerdas beserta keterangannya yang tersusun rapi.
+   - **Panah Tipografi Anti-Samsung Hijack, Spasi One Piece Murni & QuickType Predictive Emoji (Release v1.1.11 / Build 111)**:
+     1. **Panah Tipografi 100% Simetris Bebas Pembajakan Font Samsung One UI**:
+        - *Root Cause Ketimpangan Ukuran di HP Samsung*: Font fallback One UI (SECFallback.ttf) hanya memiliki karakter → (U+2192, 23px) tanpa memiliki ← (U+2190, 12px), sehingga Android merender panah kanan dari font Samsung (besar) dan panah kiri dari Noto Sans (kecil).
+        - *Solusi Tipografi Presisi*: Menggunakan pasangan panah ⟶ (U+27F6) dan ⟵ (U+27F5) serta ⟷ (U+27F7) yang bebas dari pembajakan SECFallback.ttf. Keduanya 100% di-render oleh Google Noto Sans Symbols dengan tinggi, sudut, dan bobot garis yang persis matematis dan simetris.
+     2. **Pembersihan Total Tali Terputus & Restorasi Spasi One Piece Solid Mulus**:
+        - *Eliminasi Cacat Visual Tali Putus*: Membuang aset bitmap lama yang memiliki potongan tali tambang terputus di sisi kanan.
+        - *Bilah Kayu Bajak Laut Solid 9-Patch*: Mengadopsi tekstur bilah kayu solid berbingkai tembaga emas identik dengan tuts 123 dan Return, bebas dari sambungan atau grafis tali rusak. Label "spasi" / "space" kini tampil elegan dengan warna emas bajak laut (#FFE082).
+     3. **QuickType Predictive Emoji & Pemulihan Tinggi Penuh Laci Emoji**:
+        - *Pembersihan Header Pencarian*: Menghapus search bar dan chip filter di laci emoji yang sebelumnya memakan ~70dp ruang layar. Kisi emoji kini tampil penuh (full height), lega, dan mudah disentuh ala Apple iOS murni.
+        - *Integrasi QuickType Emoji Suggestions*: Mengetik kata seperti "senyum", "ketawa", "cinta", "kopi", "makan", "bunga", "mobil", "tidur", "jempol", dll. langsung memunculkan emoji yang cocok di bilah saran kata QuickType.
+        - *Apple iOS Emoji Replacement*: Mengetuk emoji di bilah saran saat mengetik kata langsung menggantikan kata tersebut dengan emoji pilihan (smart replacement).

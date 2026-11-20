@@ -1730,22 +1730,22 @@ class IosInputMethodService : InputMethodService() {
             return Pair(2, "…")
         }
 
-        // 3. Symmetrical Arrows: "->" -> "→", "<-" -> "←", "<->" -> "↔", "=>" -> "⇒"
+        // 3. Symmetrical Arrows: "->" -> "⟶", "<-" -> "⟵", "<->" -> "⟷", "=>" -> "⇒"
         if (charStr == ">") {
-            if (textBefore.endsWith("<->") || textBefore.endsWith("<-")) return Pair(if (textBefore.endsWith("<->")) 3 else 2, "↔")
-            if (textBefore.endsWith("-->")) return Pair(3, "→")
-            if (textBefore.endsWith("--")) return Pair(2, "→")
-            if (textBefore.endsWith("- ") || textBefore.endsWith("- ")) return Pair(2, "→")
-            if (textBefore.endsWith("-")) return Pair(1, "→")
+            if (textBefore.endsWith("<->") || textBefore.endsWith("<-")) return Pair(if (textBefore.endsWith("<->")) 3 else 2, "⟷")
+            if (textBefore.endsWith("-->")) return Pair(3, "⟶")
+            if (textBefore.endsWith("--")) return Pair(2, "⟶")
+            if (textBefore.endsWith("- ") || textBefore.endsWith("- ")) return Pair(2, "⟶")
+            if (textBefore.endsWith("-")) return Pair(1, "⟶")
             if (textBefore.endsWith("<=>") || textBefore.endsWith("<=")) return Pair(if (textBefore.endsWith("<=>")) 3 else 2, "⇔")
             if (textBefore.endsWith("= ") || textBefore.endsWith("= ")) return Pair(2, "⇒")
             if (textBefore.endsWith("==")) return Pair(2, "⇒")
             if (textBefore.endsWith("=")) return Pair(1, "⇒")
         }
         if (charStr == "-") {
-            if (textBefore.endsWith("< -") || textBefore.endsWith("< -")) return Pair(3, "←")
-            if (textBefore.endsWith("<-")) return Pair(2, "←")
-            if (textBefore.endsWith("<")) return Pair(1, "←")
+            if (textBefore.endsWith("< -") || textBefore.endsWith("< -")) return Pair(3, "⟵")
+            if (textBefore.endsWith("<-")) return Pair(2, "⟵")
+            if (textBefore.endsWith("<")) return Pair(1, "⟵")
         }
 
         // 4. Comparison & Math: "!=" -> "≠", ">=" -> "≥", "<=" -> "≤", "+-" -> "±"
@@ -2012,17 +2012,17 @@ class IosInputMethodService : InputMethodService() {
                 }
 
                 val spaceReplacement: Pair<Int, String>? = when {
-                    textBeforeForSpace.endsWith("<->") -> Pair(3, "↔ ")
+                    textBeforeForSpace.endsWith("<->") -> Pair(3, "⟷ ")
                     textBeforeForSpace.endsWith("<=>") -> Pair(3, "⇔ ")
-                    textBeforeForSpace.endsWith("-->") -> Pair(3, "→ ")
-                    textBeforeForSpace.endsWith("->") -> Pair(2, "→ ")
-                    textBeforeForSpace.endsWith("- >") -> Pair(3, "→ ")
+                    textBeforeForSpace.endsWith("-->") -> Pair(3, "⟶ ")
+                    textBeforeForSpace.endsWith("->") -> Pair(2, "⟶ ")
+                    textBeforeForSpace.endsWith("- >") -> Pair(3, "⟶ ")
                     textBeforeForSpace.endsWith("==>") -> Pair(3, "⇒ ")
                     textBeforeForSpace.endsWith("=>") -> Pair(2, "⇒ ")
                     textBeforeForSpace.endsWith("= >") -> Pair(3, "⇒ ")
-                    textBeforeForSpace.endsWith("<--") -> Pair(3, "← ")
-                    textBeforeForSpace.endsWith("<-") -> Pair(2, "← ")
-                    textBeforeForSpace.endsWith("< -") -> Pair(3, "← ")
+                    textBeforeForSpace.endsWith("<--") -> Pair(3, "⟵ ")
+                    textBeforeForSpace.endsWith("<-") -> Pair(2, "⟵ ")
+                    textBeforeForSpace.endsWith("< -") -> Pair(3, "⟵ ")
                     textBeforeForSpace.endsWith("<==") -> Pair(3, "⇐ ")
                     textBeforeForSpace.endsWith("<=") -> Pair(2, "≤ ")
                     textBeforeForSpace.endsWith("!=") -> Pair(2, "≠ ")
@@ -2667,11 +2667,37 @@ class IosInputMethodService : InputMethodService() {
                 val ic = currentInputConnection
                 if (isTranslatePanelOpen) {
                     val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
-                    translatePanelBuffer.insert(pos, " $cleanCandidate ")
-                    translateCursorPosition += cleanCandidate.length + 2
+                    val (currentWord, _) = getTypingContext()
+                    val lengthToDelete = currentWord.length
+                    if (lengthToDelete > 0 && pos >= lengthToDelete) {
+                        translatePanelBuffer.delete(pos - lengthToDelete, pos)
+                        translateCursorPosition = pos - lengthToDelete
+                    }
+                    translatePanelBuffer.insert(translateCursorPosition, "$cleanCandidate ")
+                    translateCursorPosition += cleanCandidate.length + 1
                     updateTranslateInputBoxVisual()
                 } else if (ic != null) {
-                    ic.commitText(" $cleanCandidate ", 1)
+                    ic.beginBatchEdit()
+                    try {
+                        val textBefore = ic.getTextBeforeCursor(40, 0)?.toString() ?: ""
+                        val (currentWord, _) = extractWordsFromContext(textBefore)
+                        val wordToDelete = if (currentWord.isNotEmpty()) currentWord else (if (composingWord.isNotEmpty()) composingWord.toString() else "")
+                        if (wordToDelete.isNotEmpty()) {
+                            // Apple iOS QuickType: replace the typed word (e.g., "senyum") with the emoji!
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                                try {
+                                    ic.deleteSurroundingTextInCodePoints(wordToDelete.length, 0)
+                                } catch (_: Throwable) {
+                                    ic.deleteSurroundingText(wordToDelete.length, 0)
+                                }
+                            } else {
+                                ic.deleteSurroundingText(wordToDelete.length, 0)
+                            }
+                        }
+                        ic.commitText("$cleanCandidate ", 1)
+                    } finally {
+                        ic.endBatchEdit()
+                    }
                 }
                 composingWord.clear()
                 updateSuggestions()

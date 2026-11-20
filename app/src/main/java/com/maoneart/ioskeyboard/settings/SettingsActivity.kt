@@ -1222,9 +1222,9 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         val items = listOf(
-            Triple("Panah Kanan", "->", "→"),
-            Triple("Panah Kiri", "<-", "←"),
-            Triple("Panah Bolak-Balik", "<->", "↔"),
+            Triple("Panah Kanan", "->", "⟶"),
+            Triple("Panah Kiri", "<-", "⟵"),
+            Triple("Panah Bolak-Balik", "<->", "⟷"),
             Triple("Panah Ganda Kanan", "=>", "⇒"),
             Triple("Panah Ganda Kiri", "<==", "⇐"),
             Triple("Panah Ganda 2 Arah", "<=>", "⇔"),

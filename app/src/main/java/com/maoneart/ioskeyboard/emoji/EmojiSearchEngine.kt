@@ -29,6 +29,19 @@ object EmojiSearchEngine {
         "win" to listOf("🏆", "💪"),
         "sukses" to listOf("🌟", "🚀"),
 
+        // Senyum & Bahagia
+        "senyum" to listOf("😊", "🙂", "😁"),
+        "smile" to listOf("😊", "😁", "🙂"),
+        "senang" to listOf("😊", "😄", "🎉"),
+        "ceria" to listOf("😊", "✨", "🌞"),
+        "gembira" to listOf("😃", "😊", "🎉"),
+        "bahagia" to listOf("🥰", "😊", "✨"),
+        "bunga" to listOf("🌸", "🌹", "💐"),
+        "flower" to listOf("🌸", "🌺"),
+        "jempol" to listOf("👍", "👌"),
+        "hati" to listOf("❤️", "💖"),
+        "ketawa" to listOf("😂", "🤣", "😆"),
+
         // Cinta & Perasaan
         "cinta" to listOf("❤️", "🥰", "💖"),
         "sayang" to listOf("🥰", "❤️", "😘"),
@@ -338,22 +351,34 @@ object EmojiSearchEngine {
     )
 
     /**
-     * Recommends contextual emojis based on typed word (for suggestion candidate strip).
+     * Recommends contextual emojis based on typed word (for suggestion candidate strip / QuickType bar).
+     * Instant O(1) direct map lookup + rich keyword tag search across the entire emoji vocabulary.
      */
     fun getContextualEmojis(word: String): List<String> {
         val clean = word.trim().lowercase()
-        if (clean.isEmpty()) return emptyList()
+        if (clean.isEmpty() || clean.length < 2) return emptyList()
 
+        // 1. Direct Contextual Map Match
         contextualMap[clean]?.let { return it }
 
-        // Also check sub-matches if word is long enough
+        // 2. Prefix / Substring Match in contextualMap
         if (clean.length >= 3) {
             for ((key, emojis) in contextualMap) {
-                if (clean.startsWith(key) || key.startsWith(clean)) {
+                if (clean == key || clean.startsWith(key) || key.startsWith(clean)) {
                     return emojis
                 }
             }
         }
+
+        // 3. Keyword Index Match across all categorized emoji tags
+        for ((tags, emojis) in keywordIndex) {
+            for (tag in tags) {
+                if (clean == tag || (clean.length >= 3 && (tag.startsWith(clean) || clean.startsWith(tag)))) {
+                    return emojis
+                }
+            }
+        }
+
         return emptyList()
     }
 
