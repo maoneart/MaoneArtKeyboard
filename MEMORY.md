@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.11 / build 111)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.12 / build 112)
 
 ---
 
@@ -730,3 +730,11 @@
         - *Pembersihan Header Pencarian*: Menghapus search bar dan chip filter di laci emoji yang sebelumnya memakan ~70dp ruang layar. Kisi emoji kini tampil penuh (full height), lega, dan mudah disentuh ala Apple iOS murni.
         - *Integrasi QuickType Emoji Suggestions*: Mengetik kata seperti "senyum", "ketawa", "cinta", "kopi", "makan", "bunga", "mobil", "tidur", "jempol", dll. langsung memunculkan emoji yang cocok di bilah saran kata QuickType.
         - *Apple iOS Emoji Replacement*: Mengetuk emoji di bilah saran saat mengetik kata langsung menggantikan kata tersebut dengan emoji pilihan (smart replacement).
+    - **Perbaikan Visibilitas & Kontras Teks Kolom Terjemahan (Release v1.1.12 / Build 112)**:
+      1. **Resolusi Kontras Teks Kotak Terjemahan**:
+         - *Root Cause Huruf Tidak Muncul*: Pada tema One Piece dan Woody, warna teks kolom terjemahan (`tvTranslateInputBox`) tertimpa oleh `applyThemeStyling` menjadi warna gelap (`#2A1808`), sehingga huruf yang diketik di atas latar belakang kayu gelap menjadi hitam di atas cokelat gelap (100% tak terlihat / tampak seolah tidak muncul).
+         - *Harmonisasi Warna Teks Terang Berkarakter*: Teks pada tema One Piece dan Woody diubah menjadi gading terang (`#FFF3E0`) dengan kontras tajam (rasio 12:1+).
+         - *Explicit ForegroundColorSpan Protection*: Di dalam `updateTranslateInputBoxVisual()`, seluruh karakter pada buffer kini dibungkus dengan `ForegroundColorSpan(textColor)` eksplisit agar tidak pernah terpengaruh oleh warna default sistem atau penimpaan dinamis.
+         - *Kursor Emas One Piece*: Kursor pengetikan pada tema One Piece diselaraskan menjadi emas bajak laut (`#FFE082`) yang senada dengan aksen tombol dan toolbar.
+         - *Penyempurnaan XML*: Mengganti `android:singleLine="true"` usang dengan `android:scrollHorizontally="true"` dan `android:ellipsize="none"` untuk mencegah pemotongan teks secara sepihak oleh sistem Android.
+         - *Styling Chip Bahasa Selaras Tema*: Chip bahasa tujuan cepat dan tombol aksi terjemahan kini mengadopsi palet kayu dan emas yang elegan pada tema One Piece dan Woody.

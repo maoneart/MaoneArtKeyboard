@@ -652,6 +652,12 @@ class IosInputMethodService : InputMethodService() {
                 else -> Color.BLACK
             }
 
+            val translateBoxTextColor = when {
+                isOnePiece || isWoody -> Color.parseColor("#FFF3E0")
+                isDark -> Color.WHITE
+                else -> Color.BLACK
+            }
+
             if (isOnePiece) {
                 // Background One Piece asli murni dari gambar sampel (Luffy & Sunny)
                 keyboardRoot?.setBackgroundResource(R.drawable.theme_onepiece_bg)
@@ -662,7 +668,7 @@ class IosInputMethodService : InputMethodService() {
                 btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_onepiece_action)
                 btnTranslateSend?.setTextColor(Color.WHITE)
                 tvTranslateInputBox?.background = null
-                tvTranslateInputBox?.setTextColor(textColor)
+                tvTranslateInputBox?.setTextColor(translateBoxTextColor)
             } else if (isWoody) {
                 keyboardRoot?.setBackgroundResource(R.drawable.theme_woody_bg)
                 keyboardRoot?.minimumHeight = 0
@@ -672,7 +678,7 @@ class IosInputMethodService : InputMethodService() {
                 btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_woody_action)
                 btnTranslateSend?.setTextColor(Color.WHITE)
                 tvTranslateInputBox?.background = null
-                tvTranslateInputBox?.setTextColor(textColor)
+                tvTranslateInputBox?.setTextColor(translateBoxTextColor)
             } else {
                 keyboardRoot?.setBackgroundColor(ContextCompat.getColor(this, if (isDark) R.color.ios_bg_dark else R.color.ios_bg_light))
                 keyboardRoot?.minimumHeight = 0
@@ -685,7 +691,7 @@ class IosInputMethodService : InputMethodService() {
                 btnTranslateSend?.setBackgroundResource(R.drawable.btn_apple_translate_send)
                 btnTranslateSend?.setTextColor(Color.WHITE)
                 tvTranslateInputBox?.background = null
-                tvTranslateInputBox?.setTextColor(textColor)
+                tvTranslateInputBox?.setTextColor(translateBoxTextColor)
             }
 
             val toolbarCandidateColor = if (isOnePiece) Color.parseColor("#FFE082") else textColor
@@ -905,17 +911,28 @@ class IosInputMethodService : InputMethodService() {
         prefs.saveAppShortcuts(current)
     }
 
-    // Render movable iOS blue cursor ('│') in Translate Input Box and auto-scroll to follow cursor
+    // Render movable iOS cursor ('│') in Translate Input Box and auto-scroll to follow cursor
     private fun updateTranslateInputBoxVisual() {
         try {
             val box = tvTranslateInputBox ?: return
             if (!isTranslatePanelOpen) return
 
+            val isDark = isDarkMode()
+            val isWoody = (prefs.themeMode == "woody")
+            val isOnePiece = (prefs.themeMode == "onepiece")
+            val textColor = when {
+                isOnePiece || isWoody -> Color.parseColor("#FFF3E0")
+                isDark -> Color.WHITE
+                else -> Color.BLACK
+            }
+            val cursorColor = if (isOnePiece) Color.parseColor("#FFE082") else Color.parseColor("#007AFF")
+            box.setTextColor(textColor)
+
             if (translatePanelBuffer.isEmpty()) {
                 val ssb = SpannableStringBuilder("│ Ketik kalimat di sini...")
-                ssb.setSpan(ForegroundColorSpan(Color.parseColor("#007AFF")), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                ssb.setSpan(ForegroundColorSpan(cursorColor), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 ssb.setSpan(StyleSpan(Typeface.BOLD), 0, 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                val hintColor = if (isDarkMode()) Color.parseColor("#636366") else Color.parseColor("#AEAEB2")
+                val hintColor = if (isDark || isOnePiece || isWoody) Color.parseColor("#A08C7D") else Color.parseColor("#AEAEB2")
                 ssb.setSpan(ForegroundColorSpan(hintColor), 2, ssb.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
                 box.text = ssb
                 scrollTranslateInput?.scrollTo(0, 0)
@@ -924,8 +941,12 @@ class IosInputMethodService : InputMethodService() {
 
             val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
             val ssb = SpannableStringBuilder(translatePanelBuffer)
+            // Explicitly set text color on the whole buffer so characters NEVER fail contrast
+            ssb.setSpan(ForegroundColorSpan(textColor), 0, ssb.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+            // Insert cursor with theme-appropriate accent color
             ssb.insert(pos, "│")
-            ssb.setSpan(ForegroundColorSpan(Color.parseColor("#007AFF")), pos, pos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            ssb.setSpan(ForegroundColorSpan(cursorColor), pos, pos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             ssb.setSpan(StyleSpan(Typeface.BOLD), pos, pos + 1, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             box.text = ssb
             scrollTranslateBoxToCursor()
@@ -982,6 +1003,8 @@ class IosInputMethodService : InputMethodService() {
         val container = layoutTranslateLangs ?: return
         container.removeAllViews()
         val isDark = isDarkMode()
+        val isWoody = (prefs.themeMode == "woody")
+        val isOnePiece = (prefs.themeMode == "onepiece")
         val currentTarget = prefs.translateTargetLang.lowercase()
 
         for ((label, code) in availableTargetLanguages) {
@@ -997,15 +1020,15 @@ class IosInputMethodService : InputMethodService() {
                 textSize = 11f
 
                 if (isSelected) {
-                    background = ContextCompat.getDrawable(this@IosInputMethodService, R.drawable.btn_apple_translate_send)
+                    val activeBg = if (isOnePiece) R.drawable.key_bg_onepiece_action else if (isWoody) R.drawable.key_bg_woody_action else R.drawable.btn_apple_translate_send
+                    background = ContextCompat.getDrawable(this@IosInputMethodService, activeBg)
                     setTextColor(Color.WHITE)
                     setTypeface(typeface, Typeface.BOLD)
                 } else {
-                    background = ContextCompat.getDrawable(
-                        this@IosInputMethodService,
-                        if (isDark) R.drawable.key_bg_special_dark else R.drawable.chip_bg_language_pill
-                    )
-                    setTextColor(if (isDark) Color.parseColor("#98989D") else Color.parseColor("#48484A"))
+                    val inactiveBg = if (isOnePiece) R.drawable.key_bg_onepiece else if (isWoody) R.drawable.key_bg_woody else if (isDark) R.drawable.key_bg_special_dark else R.drawable.chip_bg_language_pill
+                    background = ContextCompat.getDrawable(this@IosInputMethodService, inactiveBg)
+                    val unselectedTextColor = if (isOnePiece) Color.parseColor("#FFE082") else if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#98989D") else Color.parseColor("#48484A")
+                    setTextColor(unselectedTextColor)
                     setTypeface(typeface, Typeface.NORMAL)
                 }
 
@@ -1077,33 +1100,51 @@ class IosInputMethodService : InputMethodService() {
                 val isDark = isDarkMode()
                 val isWoody = (prefs.themeMode == "woody")
                 val isOnePiece = (prefs.themeMode == "onepiece")
-                translatePanel?.background = ContextCompat.getDrawable(
-                    this@IosInputMethodService,
-                    if (isDark) R.drawable.panel_bg_apple_translate_dark else R.drawable.panel_bg_apple_translate
-                )
+                val translateBoxTextColor = if (isOnePiece || isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
+
                 if (isOnePiece) {
+                    translatePanel?.setBackgroundColor(Color.parseColor("#F02A140A"))
                     scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_onepiece)
                     btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_onepiece_action)
                     btnTranslateSend?.setTextColor(Color.WHITE)
+                    tvTranslateLangPair?.setBackgroundResource(R.drawable.key_bg_onepiece_action)
+                    tvTranslateLangPair?.setTextColor(Color.parseColor("#FFE082"))
+                    btnCloseTranslate?.setTextColor(Color.parseColor("#FFE082"))
                 } else if (isWoody) {
+                    translatePanel?.setBackgroundColor(Color.parseColor("#661A0E08"))
                     scrollTranslateInput?.setBackgroundResource(R.drawable.key_bg_woody)
                     btnTranslateSend?.setBackgroundResource(R.drawable.key_bg_woody_action)
                     btnTranslateSend?.setTextColor(Color.WHITE)
+                    tvTranslateLangPair?.setBackgroundResource(R.drawable.key_bg_woody_action)
+                    tvTranslateLangPair?.setTextColor(Color.parseColor("#FFF3E0"))
+                    btnCloseTranslate?.setTextColor(Color.parseColor("#C4A587"))
                 } else {
+                    translatePanel?.background = ContextCompat.getDrawable(
+                        this@IosInputMethodService,
+                        if (isDark) R.drawable.panel_bg_apple_translate_dark else R.drawable.panel_bg_apple_translate
+                    )
                     scrollTranslateInput?.background = ContextCompat.getDrawable(
                         this@IosInputMethodService,
                         if (isDark) R.drawable.input_bg_apple_translate_dark else R.drawable.input_bg_apple_translate
                     )
                     btnTranslateSend?.setBackgroundResource(R.drawable.btn_apple_translate_send)
                     btnTranslateSend?.setTextColor(Color.WHITE)
+                    tvTranslateLangPair?.background = ContextCompat.getDrawable(
+                        this@IosInputMethodService,
+                        if (isDark) R.drawable.key_bg_special_dark else R.drawable.key_bg_special_light
+                    )
+                    tvTranslateLangPair?.setTextColor(ContextCompat.getColor(this, R.color.ios_blue))
+                    btnCloseTranslate?.setTextColor(if (isDark) Color.parseColor("#AEAEB2") else Color.parseColor("#8E8E93"))
                 }
                 tvTranslateInputBox?.background = null
-                val textColor = if (isOnePiece || isWoody) Color.parseColor("#FFF3E0") else if (isDark) Color.WHITE else Color.BLACK
-                tvTranslateInputBox?.setTextColor(textColor)
+                tvTranslateInputBox?.setTextColor(translateBoxTextColor)
 
                 val src = prefs.translateSourceLang.uppercase()
                 val tgt = prefs.translateTargetLang.uppercase()
                 tvTranslateLangPair?.text = "🌐 $src ⇄ $tgt"
+
+                val statusColor = if (isOnePiece) Color.parseColor("#FFE082") else if (isWoody) Color.parseColor("#C4A587") else if (isDark) Color.parseColor("#AEAEB2") else Color.parseColor("#8E8E93")
+                tvTranslateStatus?.setTextColor(statusColor)
 
                 if (translatePanelBuffer.isEmpty()) {
                     tvTranslateStatus?.text = "✦ Ketik kalimat lalu tap Kirim"

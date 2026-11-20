@@ -282,10 +282,11 @@
                     android:paddingEnd="14dp"
                     android:hint="Ketik kalimat di sini..."
                     android:textColorHint="#AEAEB2"
-                    android:textColor="#000000"
+                    android:textColor="#FFFFFF"
                     android:textSize="14sp"
                     android:maxLines="1"
-                    android:singleLine="true" />
+                    android:scrollHorizontally="true"
+                    android:ellipsize="none" />
             </HorizontalScrollView>
 
             <TextView
