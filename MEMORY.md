@@ -2,7 +2,7 @@
 
 > **Repository**: [https://github.com/maoneart/MaoneArtKeyboard](https://github.com/maoneart/MaoneArtKeyboard)  
 > **Workspace**: `/sdcard/www/MaoneArtKeyboard`  
-> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.12 / build 112)
+> **Target Release APK**: `/sdcard/Download/iOSKeyboard.apk` (v1.1.13 / build 113)
 
 ---
 
@@ -738,3 +738,8 @@
          - *Kursor Emas One Piece*: Kursor pengetikan pada tema One Piece diselaraskan menjadi emas bajak laut (`#FFE082`) yang senada dengan aksen tombol dan toolbar.
          - *Penyempurnaan XML*: Mengganti `android:singleLine="true"` usang dengan `android:scrollHorizontally="true"` dan `android:ellipsize="none"` untuk mencegah pemotongan teks secara sepihak oleh sistem Android.
          - *Styling Chip Bahasa Selaras Tema*: Chip bahasa tujuan cepat dan tombol aksi terjemahan kini mengadopsi palet kayu dan emas yang elegan pada tema One Piece dan Woody.
+     - **Restorasi Otentik Tombol Spasi One Piece Bergambar Kru & Logo Straw Hat (Release v1.1.13 / Build 113)**:
+       1. **Restorasi Penuh Karya Seni Spasi One Piece Asli**:
+          - *Root Cause "Polosan & Hilang Gambar"*: Pada build 111 sebelumnya, aset 9-patch spasi One Piece keliru diganti dengan tekstur bilah kayu polos (80x98 px) dengan teks label bertuliskan "spasi", menghilangkan logo ikonik Topi Jerami One Piece dan siluet kru bajak laut.
+          - *Pemulihan Master Aset 9-Patch*: Mengembalikan aset `key_onepiece_space_normal.9.png` dan `key_onepiece_space_pressed.9.png` (395x98 px, inner 393x96 px) beresolusi tinggi yang memuat siluet Jinbe, Sanji, Luffy, Zoro, teks artistik "spasi", serta logo resmi One Piece (tengkorak jerami & jangkar bajak laut).
+          - *Penyesuaian Label Teks Dinamis*: Pada `KeyboardLayout.kt` (baik di tampilan QWERTY maupun Simbol), `langLabel` dan `symSpaceLabel` dikunci menjadi string kosong `""` saat tema One Piece aktif, sehingga gambar logo One Piece tampil jernih, tajam, utuh, tanpa terhalang teks tumpuk, serta teks panduan `"│   geser kursor   │"` tetap muncul sempurna saat mode trackpad diaktifkan.
