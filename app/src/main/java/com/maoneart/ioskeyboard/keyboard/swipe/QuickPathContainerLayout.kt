@@ -36,10 +36,21 @@ class QuickPathContainerLayout(
         isFocusable = false
     }
 
-    private val touchSlop = 26f * resources.displayMetrics.density
+    private val touchSlop = 38f * resources.displayMetrics.density
     private var activeFallbackView: View? = null
     private val activeFallbackViews = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<View, Boolean>())
     private val keyPopupPositions = HashMap<View, Pair<Float, Float>>()
+    private var currentPopupOwner: View? = null
+
+    private fun getPointerRawX(ev: MotionEvent, pointerIndex: Int): Float {
+        if (pointerIndex < 0 || pointerIndex >= ev.pointerCount) return ev.rawX
+        return ev.getX(pointerIndex) + (ev.rawX - ev.x)
+    }
+
+    private fun getPointerRawY(ev: MotionEvent, pointerIndex: Int): Float {
+        if (pointerIndex < 0 || pointerIndex >= ev.pointerCount) return ev.rawY
+        return ev.getY(pointerIndex) + (ev.rawY - ev.y)
+    }
 
     fun clearPopupPositionCache() {
         keyPopupPositions.clear()
@@ -140,6 +151,7 @@ class QuickPathContainerLayout(
             keyPopupPositions[keyView] = pos
         }
 
+        currentPopupOwner = keyView
         popupBubble.translationX = pos.first
         popupBubble.translationY = pos.second
 
@@ -149,7 +161,11 @@ class QuickPathContainerLayout(
         }
     }
 
-    fun hidePopup() {
+    fun hidePopup(owner: View? = null) {
+        if (owner != null && currentPopupOwner != null && currentPopupOwner !== owner) {
+            return
+        }
+        currentPopupOwner = null
         if (popupBubble.visibility != View.GONE) {
             popupBubble.visibility = View.GONE
         }
@@ -169,8 +185,8 @@ class QuickPathContainerLayout(
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val pIdx = ev.actionIndex
-                val rawX = try { ev.getRawX(pIdx) } catch (_: Throwable) { ev.rawX }
-                val rawY = try { ev.getRawY(pIdx) } catch (_: Throwable) { ev.rawY }
+                val rawX = getPointerRawX(ev, pIdx)
+                val rawY = getPointerRawY(ev, pIdx)
                 startX = rawX
                 startY = rawY
 
@@ -252,8 +268,8 @@ class QuickPathContainerLayout(
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 val pIdx = ev.actionIndex
-                val pRawX = try { ev.getRawX(pIdx) } catch (_: Throwable) { ev.rawX }
-                val pRawY = try { ev.getRawY(pIdx) } catch (_: Throwable) { ev.rawY }
+                val pRawX = getPointerRawX(ev, pIdx)
+                val pRawY = getPointerRawY(ev, pIdx)
 
                 // Fallback Hit-Resolver: Catches touches landing in margins, padding, or dead gaps
                 val keyInfo = findKeyAtCoords(pRawX, pRawY)
@@ -273,7 +289,7 @@ class QuickPathContainerLayout(
                         tv.postDelayed({
                             tv.isPressed = false
                             activeFallbackViews.remove(tv)
-                            hidePopup()
+                            hidePopup(tv)
                         }, 180L)
                     }
                     onFallbackKeyAction(keyInfo.first, targetView)

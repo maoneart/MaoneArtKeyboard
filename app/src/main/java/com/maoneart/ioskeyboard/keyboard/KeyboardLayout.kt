@@ -683,7 +683,7 @@ class KeyboardLayout(private val context: Context) {
         return container
     }
 
-    private fun findKeyAt(rawX: Float, rawY: Float): Pair<String, android.graphics.Rect>? {
+    private fun findBestHitBox(rawX: Float, rawY: Float): KeyHitBox? {
         var boxes = cachedHitBoxes
         if (boxes.isEmpty()) {
             rebuildHitBoxCache()
@@ -691,13 +691,22 @@ class KeyboardLayout(private val context: Context) {
         }
         if (boxes.isEmpty()) return null
 
-        val maxSnapRadius = dp(38).toFloat()
+        val rx = rawX.toInt()
+        val ry = rawY.toInt()
+        val exactTol = dp(2)
+        for (box in boxes) {
+            val r = box.hitRect
+            if (rx in (r.left - exactTol)..(r.right + exactTol) &&
+                ry in (r.top - exactTol)..(r.bottom + exactTol)) {
+                return box
+            }
+        }
+
+        // Gentle predictive tie-breaker (max ~5% boundary shift) so big-thumb touches
+        // never get hijacked away from a clearly closer key.
+        val maxSnapRadius = dp(36).toFloat()
         val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
 
-        // 1. Ken Kocienda's Apple Dynamic Predictive Hit-Testing:
-        // Evaluates touch candidate against predicted next characters.
-        // If touch lands near the boundary between two keys, the key that matches
-        // the predicted next character has its effective hit zone expanded by 40%.
         var bestBox: KeyHitBox? = null
         var bestScore = Float.MAX_VALUE
 
@@ -707,8 +716,7 @@ class KeyboardLayout(private val context: Context) {
             val distSq = dx * dx + dy * dy
             if (distSq <= maxSnapRadiusSq) {
                 val charC = box.charStr.firstOrNull()?.lowercaseChar() ?: ' '
-                val isPredicted = predictedNextChars.contains(charC)
-                val weight = if (isPredicted) 0.65f else 1.25f
+                val weight = if (predictedNextChars.contains(charC)) 0.90f else 1.0f
                 val weightedDist = distSq * weight
                 if (weightedDist < bestScore) {
                     bestScore = weightedDist
@@ -717,74 +725,18 @@ class KeyboardLayout(private val context: Context) {
             }
         }
 
-        if (bestBox != null) {
-            val activeText = bestBox.tv.text.toString().ifEmpty { bestBox.charStr }
-            return Pair(activeText, bestBox.hitRect)
-        }
+        return bestBox
+    }
 
-        val rx = rawX.toInt()
-        val ry = rawY.toInt()
-        val tol = dp(4)
-
-        for (box in boxes) {
-            val r = box.hitRect
-            if (rx in (r.left - tol)..(r.right + tol) &&
-                ry in (r.top - tol)..(r.bottom + tol)) {
-                val activeText = box.tv.text.toString().ifEmpty { box.charStr }
-                return Pair(activeText, r)
-            }
-        }
-
-        return null
+    private fun findKeyAt(rawX: Float, rawY: Float): Pair<String, android.graphics.Rect>? {
+        val bestBox = findBestHitBox(rawX, rawY) ?: return null
+        val activeText = (bestBox.tv.tag as? String)?.ifEmpty { null }
+            ?: bestBox.tv.text.toString().ifEmpty { bestBox.charStr }
+        return Pair(activeText, bestBox.hitRect)
     }
 
     private fun findKeyViewAt(rawX: Float, rawY: Float): View? {
-        var boxes = cachedHitBoxes
-        if (boxes.isEmpty()) {
-            rebuildHitBoxCache()
-            boxes = cachedHitBoxes
-        }
-        if (boxes.isEmpty()) return null
-
-        val maxSnapRadius = dp(38).toFloat()
-        val maxSnapRadiusSq = maxSnapRadius * maxSnapRadius
-
-        var bestBox: KeyHitBox? = null
-        var bestScore = Float.MAX_VALUE
-
-        for (box in boxes) {
-            val dx = rawX - box.centerX
-            val dy = rawY - box.centerY
-            val distSq = dx * dx + dy * dy
-            if (distSq <= maxSnapRadiusSq) {
-                val charC = box.charStr.firstOrNull()?.lowercaseChar() ?: ' '
-                val isPredicted = predictedNextChars.contains(charC)
-                val weight = if (isPredicted) 0.65f else 1.25f
-                val weightedDist = distSq * weight
-                if (weightedDist < bestScore) {
-                    bestScore = weightedDist
-                    bestBox = box
-                }
-            }
-        }
-
-        if (bestBox != null) {
-            return bestBox.tv
-        }
-
-        val rx = rawX.toInt()
-        val ry = rawY.toInt()
-        val tol = dp(4)
-
-        for (box in boxes) {
-            val r = box.hitRect
-            if (rx in (r.left - tol)..(r.right + tol) &&
-                ry in (r.top - tol)..(r.bottom + tol)) {
-                return box.tv
-            }
-        }
-
-        return null
+        return findBestHitBox(rawX, rawY)?.tv
     }
 
     // --- 2. SYMBOLS LAYOUT (123 & #+=) ---
@@ -2980,7 +2932,7 @@ class KeyboardLayout(private val context: Context) {
                     // Anti-mendem watchdog: auto-release pressed state after 180ms if Android drops ACTION_UP
                     val r = Runnable {
                         v.isPressed = false
-                        popupController?.hidePopup()
+                        popupController?.hidePopup(v)
                     }
                     watchdogRunnable = r
                     v.postDelayed(r, 180L)
@@ -2991,7 +2943,7 @@ class KeyboardLayout(private val context: Context) {
                     watchdogRunnable?.let { v.removeCallbacks(it) }
                     watchdogRunnable = null
                     v.isPressed = false
-                    popupController?.hidePopup()
+                    popupController?.hidePopup(v)
                     true
                 }
                 else -> false
@@ -3025,7 +2977,7 @@ class KeyboardLayout(private val context: Context) {
                     onTrigger()
                     val r = Runnable {
                         v.isPressed = false
-                        popupController?.hidePopup()
+                        popupController?.hidePopup(v)
                     }
                     watchdogRunnable = r
                     v.postDelayed(r, 180L)
@@ -3035,7 +2987,7 @@ class KeyboardLayout(private val context: Context) {
                     watchdogRunnable?.let { v.removeCallbacks(it) }
                     watchdogRunnable = null
                     v.isPressed = false
-                    popupController?.hidePopup()
+                    popupController?.hidePopup(v)
                     true
                 }
                 else -> false

@@ -79,6 +79,7 @@ class IosInputMethodService : InputMethodService() {
     private var lastShiftPressTime: Long = 0
     private var lastSpacePressTime: Long = 0
     private var lastKeyTypingTime: Long = 0
+    private var lastCommittedChar: Char = '\u0000'
 
     // Live Translate Panel State with Movable Interactive Cursor
     private var isTranslatePanelOpen = false
@@ -471,6 +472,7 @@ class IosInputMethodService : InputMethodService() {
         try {
             audioHaptic.activeRootView = rootView
             composingWord.clear()
+            lastCommittedChar = '\u0000'
             layoutEngine.resetTrackpadState()
             layoutEngine.resetAllPressedStates()
 
@@ -599,12 +601,14 @@ class IosInputMethodService : InputMethodService() {
         candidatesStart: Int, candidatesEnd: Int
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        val isSingleForwardStep = (newSelStart == newSelEnd && (newSelStart - oldSelStart) == 1 && composingWord.isNotEmpty())
         // Reset composingWord only when cursor jumps, selects range, or resets to 0
         if ((newSelStart == 0 && newSelEnd == 0) || newSelStart != newSelEnd || Math.abs(newSelStart - oldSelStart) > 1) {
             composingWord.clear()
+            lastCommittedChar = '\u0000'
             updateSuggestions(immediate = false)
         }
-        if (!isCapsLock) {
+        if (!isCapsLock && !isSingleForwardStep) {
             updateAutoCapitalization()
         }
     }
@@ -1751,6 +1755,16 @@ class IosInputMethodService : InputMethodService() {
     private fun checkSmartPunctuation(charStr: String): Pair<Int, String>? {
         if (!prefs.isSmartPunctuationEnabled) return null
         if (isTerminalOrRawInput()) return null
+        if (charStr.length != 1) return null
+
+        val ch = charStr[0]
+        // Zero-IPC fast-path: skip Binder getTextBeforeCursor() completely for ordinary letter keystrokes!
+        val isTriggerChar = when (ch) {
+            '-', '.', '>', '=', '2', '3', '4', '8', ')' -> true
+            'o', 'O', '0' -> lastCommittedChar == '^'
+            else -> false
+        }
+        if (!isTriggerChar) return null
 
         val textBefore = if (isTranslatePanelOpen) {
             val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
@@ -1915,6 +1929,7 @@ class IosInputMethodService : InputMethodService() {
                 }
                 updateSuggestions(immediate = false)
             }
+            lastCommittedChar = charStr.lastOrNull() ?: '\u0000'
 
             val isAllCapField = (currentInputEditorInfo?.inputType?.and(InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS) ?: 0) != 0
             if (isShifted && !isCapsLock && !isAllCapField) {
@@ -1969,6 +1984,7 @@ class IosInputMethodService : InputMethodService() {
 
     private fun handleBackspace() {
         try {
+            lastCommittedChar = '\u0000'
             if (isTranslatePanelOpen) {
                 if (translatePanelBuffer.isNotEmpty() && translateCursorPosition > 0) {
                     val pos = translateCursorPosition.coerceIn(1, translatePanelBuffer.length)
@@ -2112,48 +2128,52 @@ class IosInputMethodService : InputMethodService() {
                         currentInputConnection?.deleteSurroundingText(len, 0)
                         currentInputConnection?.commitText("$replacement ", 1)
                     }
-                    correctionEngine.recordWordUsage(replacement, 2)
+                    correctionEngine.recordWordUsage(replacement, 2, forceLearn = true)
                     composingWord.clear()
+                    lastCommittedChar = ' '
                     updateSuggestions()
                     updateAutoCapitalization()
                     return
                 }
             }
 
-            // 2. Apple Auto-Correction on Spacebar (replaces typo with center candidate)
-            if (FancyFontManager.currentStyle == FancyFontManager.FancyStyle.NORMAL && prefs.isAutoCorrectEnabled && activeWord.length >= 3) {
-                var centerCandidate = candidate2?.text?.toString()?.trim() ?: ""
-                if (centerCandidate.startsWith("⚡ ")) centerCandidate = centerCandidate.removePrefix("⚡ ").trim()
-                if (centerCandidate.startsWith("✦ ")) centerCandidate = centerCandidate.removePrefix("✦ ").trim()
-
-                if (centerCandidate.isNotEmpty() && !centerCandidate.equals(activeWord, ignoreCase = true)) {
-                    if (correctionEngine.isCorrectionMatch(activeWord, centerCandidate, prefs.activeLanguage)) {
-                        val len = activeWord.length
-                        if (isTranslatePanelOpen) {
-                            val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
-                            if (pos >= len) {
-                                translatePanelBuffer.delete(pos - len, pos)
-                                translateCursorPosition = pos - len
-                            }
-                            translatePanelBuffer.insert(translateCursorPosition, "$centerCandidate ")
-                            translateCursorPosition += centerCandidate.length + 1
-                            updateTranslateInputBoxVisual()
-                        } else {
-                            currentInputConnection?.deleteSurroundingText(len, 0)
-                            currentInputConnection?.commitText("$centerCandidate ", 1)
+            // 2. Apple Auto-Correction on Spacebar (synchronous & race-free against 20ms UI debounce)
+            val hasInternalCaseOrDigit = activeWord.any { it.isDigit() } || activeWord.drop(1).any { it.isUpperCase() }
+            if (FancyFontManager.currentStyle == FancyFontManager.FancyStyle.NORMAL &&
+                prefs.isAutoCorrectEnabled &&
+                activeWord.length >= 3 &&
+                !hasInternalCaseOrDigit
+            ) {
+                val bestCorrection = correctionEngine.getBestAutoCorrection(activeWord, prefs.activeLanguage)
+                if (bestCorrection != null && !bestCorrection.equals(activeWord, ignoreCase = true)) {
+                    val formattedTarget = formatCandidateCase(bestCorrection, activeWord)
+                    val len = activeWord.length
+                    if (isTranslatePanelOpen) {
+                        val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
+                        if (pos >= len) {
+                            translatePanelBuffer.delete(pos - len, pos)
+                            translateCursorPosition = pos - len
                         }
-                        correctionEngine.recordWordUsage(centerCandidate, 2)
-                        composingWord.clear()
-                        updateSuggestions()
-                        updateAutoCapitalization()
-                        return
+                        translatePanelBuffer.insert(translateCursorPosition, "$formattedTarget ")
+                        translateCursorPosition += formattedTarget.length + 1
+                        updateTranslateInputBoxVisual()
+                    } else {
+                        currentInputConnection?.deleteSurroundingText(len, 0)
+                        currentInputConnection?.commitText("$formattedTarget ", 1)
                     }
+                    correctionEngine.recordWordUsage(bestCorrection, 2, forceLearn = true)
+                    composingWord.clear()
+                    lastCommittedChar = ' '
+                    updateSuggestions()
+                    updateAutoCapitalization()
+                    return
                 }
             }
 
             if (activeWord.length >= 2) {
                 correctionEngine.recordWordUsage(activeWord, 1)
             }
+            lastCommittedChar = ' '
 
             val preSpaceText = if (isTranslatePanelOpen) {
                 val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
@@ -2235,6 +2255,7 @@ class IosInputMethodService : InputMethodService() {
     // Dynamic Enter / Return Key handling (Search, WhatsApp new line, Send support)
     private fun handleReturn() {
         try {
+            lastCommittedChar = '\n'
             val (activeWord, _) = getTypingContext()
             if (activeWord.length >= 2) {
                 correctionEngine.recordWordUsage(activeWord, 1)
@@ -2545,8 +2566,13 @@ class IosInputMethodService : InputMethodService() {
             } else emptySet()
             layoutEngine.updatePredictedNextChars(nextChars)
 
-            // 0A. Instant In-Keyboard Math Calculator (e.g. "25000*4" -> "🧮 = 100.000")
-            val mathExprCandidate = if (prefs.isCalculatorEnabled) {
+            // 0A. Instant In-Keyboard Math Calculator (zero-IPC unless digits/math operators are involved)
+            val mightBeMath = prefs.isCalculatorEnabled && (
+                currentWord.any { it.isDigit() } ||
+                lastCommittedChar.isDigit() ||
+                lastCommittedChar in charArrayOf('=', '+', '-', '*', '/', 'x', 'X', '×', '÷')
+            )
+            val mathExprCandidate = if (mightBeMath) {
                 try {
                     val rawContext = if (isTranslatePanelOpen) {
                         val pos = translateCursorPosition.coerceIn(0, translatePanelBuffer.length)
@@ -2634,6 +2660,30 @@ class IosInputMethodService : InputMethodService() {
                     candidate1?.text = formatCandidateCase(suggestions[1], refWord, shouldCapNext)
                 } else if (suggestions.size == 1) {
                     candidate1?.text = formatCandidateCase(suggestions[0], refWord, shouldCapNext)
+                }
+                return
+            }
+
+            if (currentWord.isNotEmpty() && !correctionEngine.isKnownWord(currentWord, prefs.activeLanguage)) {
+                val top = suggestions.firstOrNull() ?: currentWord
+                val topClean = top.removePrefix("⚡ ").removePrefix("✦ ").trim()
+                val isTopShortcut = top.startsWith("⚡ ")
+                val isTopRelevant = isTopShortcut ||
+                    topClean.equals(currentWord, ignoreCase = true) ||
+                    topClean.startsWith(currentWord, ignoreCase = true) ||
+                    correctionEngine.isCorrectionMatch(currentWord, topClean, prefs.activeLanguage)
+
+                if (isTopRelevant && !topClean.equals(currentWord, ignoreCase = true)) {
+                    candidate1?.text = currentWord
+                    candidate2?.text = formatCandidateCase(top, refWord, shouldCapNext)
+                    val third = suggestions.drop(1).firstOrNull { !it.equals(currentWord, ignoreCase = true) }
+                    candidate3?.text = if (third != null) formatCandidateCase(third, refWord, shouldCapNext) else ""
+                } else {
+                    candidate2?.text = currentWord
+                    val alt1 = suggestions.firstOrNull { !it.equals(currentWord, ignoreCase = true) }
+                    val alt2 = suggestions.drop(1).firstOrNull { !it.equals(currentWord, ignoreCase = true) && !it.equals(alt1, ignoreCase = true) }
+                    candidate1?.text = if (alt1 != null) formatCandidateCase(alt1, refWord, shouldCapNext) else ""
+                    candidate3?.text = if (alt2 != null) formatCandidateCase(alt2, refWord, shouldCapNext) else ""
                 }
                 return
             }
@@ -2811,7 +2861,7 @@ class IosInputMethodService : InputMethodService() {
             val ic = currentInputConnection
 
             // Dynamic Self-Learning: Catat kata yang dipilih pengguna dengan prioritas frekuensi tinggi!
-            correctionEngine.recordWordUsage(cleanCandidate, 2)
+            correctionEngine.recordWordUsage(cleanCandidate, 2, forceLearn = true)
 
             if (isTranslatePanelOpen) {
                 val (currentWord, previousWord) = getTypingContext()
@@ -2986,7 +3036,7 @@ class IosInputMethodService : InputMethodService() {
                 } else {
                     currentInputConnection?.commitText("$matchedWord ", 1)
                 }
-                correctionEngine.recordWordUsage(rawMatched ?: matchedWord, 2)
+                correctionEngine.recordWordUsage(rawMatched ?: matchedWord, 2, forceLearn = true)
                 composingWord.clear()
                 updateSuggestions()
                 updateAutoCapitalization()

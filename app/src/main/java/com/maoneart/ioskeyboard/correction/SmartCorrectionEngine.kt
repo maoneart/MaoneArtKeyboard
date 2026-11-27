@@ -107,11 +107,9 @@ class SmartCorrectionEngine(private val context: Context) {
         "km" to listOf("kamu", "kami", "kemarin"),
         "kam" to listOf("kamu", "kami", "kamar", "kampus"),
         "ak" to listOf("aku", "akan", "ada", "apa"),
-        "aku" to listOf("aku", "akan", "akui"),
         "bsa" to listOf("bisa", "bisa-bisa", "bisa jadi"),
         "bs" to listOf("bisa", "besok"),
         "mw" to listOf("mau", "mungkin"),
-        "mau" to listOf("mau", "maupun", "maut"),
         "udh" to listOf("udah", "sudah", "udahan"),
         "sdh" to listOf("sudah", "sedang"),
         "blm" to listOf("belum", "bilang", "bulan"),
@@ -124,12 +122,8 @@ class SmartCorrectionEngine(private val context: Context) {
         "sy" to listOf("saya", "syarat"),
         "sya" to listOf("saya", "syair"),
         "tdk" to listOf("tidak", "tadi"),
-        "ga" to listOf("nggak", "tidak", "gimana"),
-        "gak" to listOf("nggak", "tidak"),
         "ngga" to listOf("nggak", "tidak"),
-        "nggak" to listOf("nggak", "tidak"),
         "gpp" to listOf("gapapa", "tidak apa-apa"),
-        "gapapa" to listOf("gapapa", "tidak apa-apa"),
         "tp" to listOf("tapi", "tempat"),
         "tpi" to listOf("tapi"),
         "dgn" to listOf("dengan", "dingin"),
@@ -151,15 +145,12 @@ class SmartCorrectionEngine(private val context: Context) {
         "gmn" to listOf("gimana", "bagaimana"),
         "knp" to listOf("kenapa", "mengapa"),
         "dmn" to listOf("dimana", "kemana"),
-        "bener" to listOf("benar", "beneran"),
         "bnr" to listOf("benar", "beneran"),
         "bgtu" to listOf("begitu"),
         "gt" to listOf("gitu", "begitu"),
-        "gitu" to listOf("gitu", "begitu"),
         "skrg" to listOf("sekarang"),
         "ntr" to listOf("nanti", "sebentar"),
         "bsk" to listOf("besok"),
-        "kemaren" to listOf("kemarin"),
         "kmrn" to listOf("kemarin"),
         "mkn" to listOf("makan", "maka"),
         "mnm" to listOf("minum", "mana"),
@@ -324,6 +315,11 @@ class SmartCorrectionEngine(private val context: Context) {
         "baper", "mager", "kepo", "curhat", "nongkrong", "ngopi", "otw", "kuy", "gaskeun", "gas",
         "mantap", "mantap jiwa", "keren abis", "kece", "parah", "anjay", "anjir", "gila", "asli",
         "bocil", "pansos", "sultan", "receh", "cuan", "halu", "julid", "bucin", "ambyar",
+        "mencet", "pencet", "dipencet", "kepencet", "muncul", "jempol", "kegedean", "kekecilan",
+        "ngelag", "ngelek", "lag", "lemot", "enggak", "ngerti", "pake", "dipake", "nyambung",
+        "soalnya", "malah", "kayak", "kayaknya", "emang", "doang", "nyari", "bales", "benerin",
+        "benarin", "koreksi", "kadang-kadang", "gitu", "gini", "begini", "begitu", "kemaren",
+        "teruskan", "lanjutkan", "maoneart", "android", "whatsapp", "google", "samsung", "iphone",
 
         // Extensive KBBI Affixed & Long Words (ke-...-an, pe-...-an, me-...-kan, ber-..., ter-...)
         "kehilangan", "keberhasilan", "kesejahteraan", "kesempatan", "keputusan", "kemenangan", "kekalahan",
@@ -379,9 +375,11 @@ class SmartCorrectionEngine(private val context: Context) {
     private val kbbiWords = ArrayList<String>(75000)
     private val kbbiSet = HashSet<String>(75000)
     @Volatile private var kbbiSnapshot: List<String> = emptyList()
+    @Volatile private var kbbiByCharLen: Map<Char, Map<Int, List<String>>> = emptyMap()
 
     // User Dynamic Self-Learning Dictionary (tracks words user frequently types, prioritizes top frequencies)
     private val userDictionary = ConcurrentHashMap<String, Int>()
+    private val unverifiedWordCounts = ConcurrentHashMap<String, Int>()
     private var isUserDictDirty = false
     private var saveUserDictJob: Job? = null
 
@@ -441,12 +439,20 @@ class SmartCorrectionEngine(private val context: Context) {
                             }
                         }
                         tempWords.sort()
+                        val byCharLen = HashMap<Char, HashMap<Int, ArrayList<String>>>()
+                        for (w in tempWords) {
+                            if (w.length >= 2) {
+                                val lenMap = byCharLen.getOrPut(w[0]) { HashMap() }
+                                lenMap.getOrPut(w.length) { ArrayList() }.add(w)
+                            }
+                        }
                         synchronized(kbbiWords) {
                             kbbiWords.clear()
                             kbbiWords.addAll(tempWords)
                             kbbiSet.clear()
                             kbbiSet.addAll(tempWords)
                             kbbiSnapshot = ArrayList(tempWords)
+                            kbbiByCharLen = byCharLen
                         }
                     }
                 }
@@ -454,16 +460,38 @@ class SmartCorrectionEngine(private val context: Context) {
         }
     }
 
+    private fun isCoreDictionaryWord(w: String): Boolean {
+        if (customWords.contains(w)) return true
+        if (indonesianWords.contains(w)) return true
+        if (englishWords.contains(w)) return true
+        if (nextWordMapId.containsKey(w) || nextWordMapEn.containsKey(w)) return true
+        synchronized(kbbiWords) {
+            if (kbbiSet.contains(w)) return true
+        }
+        return false
+    }
+
     /**
      * Record words typed or selected by the user to boost their prediction ranking.
-     * Frequently typed words become highest priority recommendations automatically.
+     * Unrecognized words typed freely must appear at least twice before entering userDictionary,
+     * preventing one-off typos from poisoning future suggestions and auto-correction.
      */
-    fun recordWordUsage(rawWord: String, weight: Int = 1) {
+    fun recordWordUsage(rawWord: String, weight: Int = 1, forceLearn: Boolean = false) {
         val cleaned = rawWord.trim().lowercase().filter { it.isLetter() || it == '-' }
         if (cleaned.length < 2) return
 
-        val current = userDictionary[cleaned] ?: 0
-        userDictionary[cleaned] = current + weight
+        val existingFreq = userDictionary[cleaned] ?: 0
+        if (!forceLearn && existingFreq < 2 && !isCoreDictionaryWord(cleaned)) {
+            val seenCount = (unverifiedWordCounts[cleaned] ?: 0) + 1
+            if (seenCount < 2) {
+                unverifiedWordCounts[cleaned] = seenCount
+                return
+            }
+            unverifiedWordCounts.remove(cleaned)
+            userDictionary[cleaned] = 2
+        } else {
+            userDictionary[cleaned] = existingFreq + weight
+        }
         isUserDictDirty = true
 
         saveUserDictJob?.cancel()
@@ -540,31 +568,26 @@ class SmartCorrectionEngine(private val context: Context) {
         val nextChars = HashSet<Char>(26)
 
         // 1. High priority: User's dynamic learned dictionary
-        for (w in userDictionary.keys) {
-            if (w.length > p.length && w.startsWith(p)) {
+        for ((w, freq) in userDictionary) {
+            if (freq >= 2 && w.length > p.length && w.startsWith(p)) {
                 nextChars.add(w[p.length])
             }
         }
 
-        // 2. Comprehensive 74,500+ KBBI Vocabulary (Instant O(log N) Binary Search)
+        // 2. Comprehensive 74,500+ KBBI Vocabulary (O(26 log N) unbiased next-char lookup)
         val list = kbbiSnapshot
-        if (list.isNotEmpty()) {
-            var idx = Collections.binarySearch(list, p)
-            if (idx < 0) idx = -(idx + 1)
-            var count = 0
-            while (idx < list.size && count < 60) {
-                val candidate = list[idx]
-                if (candidate.startsWith(p)) {
-                    if (candidate.length > p.length) {
-                        nextChars.add(candidate[p.length])
-                    }
-                    count++
-                    idx++
-                } else break
+        if (list.isNotEmpty() && lang != "en") {
+            for (ch in 'a'..'z') {
+                val probe = p + ch
+                var idx = Collections.binarySearch(list, probe)
+                if (idx < 0) idx = -(idx + 1)
+                if (idx < list.size && list[idx].startsWith(probe)) {
+                    nextChars.add(ch)
+                }
             }
         }
 
-        // 3. Fallback / English dictionary
+        // 3. Built-in high-frequency / English dictionary
         val baseDict = if (lang == "en") englishWords else indonesianWords
         for (w in baseDict) {
             if (w.length > p.length && w.startsWith(p)) {
@@ -580,12 +603,12 @@ class SmartCorrectionEngine(private val context: Context) {
      */
     fun isCommonWord(word: String): Boolean {
         val w = word.lowercase()
-        return indonesianWords.contains(w) || userDictionary.containsKey(w) || nextWordMapId.containsKey(w)
+        return indonesianWords.contains(w) || (userDictionary[w] ?: 0) >= 2 || nextWordMapId.containsKey(w)
     }
 
     /**
      * Checks if a word is a valid, recognized word in any of our dictionaries:
-     * - User's self-learned personal vocabulary (highest priority)
+     * - User's verified personal vocabulary (freq >= 2)
      * - 74,500+ Official KBBI vocabulary
      * - Indonesian or English common vocabulary
      * - Next-word conversational models
@@ -593,15 +616,8 @@ class SmartCorrectionEngine(private val context: Context) {
     fun isKnownWord(word: String, lang: String = "id"): Boolean {
         val w = word.trim().lowercase()
         if (w.isEmpty()) return false
-        if (userDictionary.containsKey(w)) return true
-        if (customWords.contains(w)) return true
-        if (indonesianWords.contains(w)) return true
-        if (englishWords.contains(w)) return true
-        if (nextWordMapId.containsKey(w) || nextWordMapEn.containsKey(w)) return true
-        synchronized(kbbiWords) {
-            if (kbbiSet.contains(w)) return true
-        }
-        return false
+        if ((userDictionary[w] ?: 0) >= 2) return true
+        return isCoreDictionaryWord(w)
     }
 
     /**
@@ -703,6 +719,7 @@ class SmartCorrectionEngine(private val context: Context) {
 
         if (word.isEmpty()) {
             val frequentUserWords = userDictionary.entries
+                .filter { it.value >= 2 || isCoreDictionaryWord(it.key) }
                 .sortedByDescending { it.value }
                 .take(6)
                 .map { it.key }
@@ -718,6 +735,8 @@ class SmartCorrectionEngine(private val context: Context) {
         }
 
         val result = linkedSetOf<String>()
+        val isCoreKnown = isKnownWord(word, lang)
+        val isCommon = isCommonWord(word)
 
         // 1. Direct Abbreviation / Chat Slang match
         commonAbbreviations[word]?.let { expansions ->
@@ -727,10 +746,10 @@ class SmartCorrectionEngine(private val context: Context) {
             }
         }
 
-        // 2. SELF-LEARNING USER DICTIONARY (Prioritas tertinggi: kata yang sering diketik pengguna!)
+        // 2. SELF-LEARNING USER DICTIONARY (verified words only: freq >= 2 or valid dictionary word)
         val learnedMatches = userDictionary.entries
-            .filter { it.key.startsWith(word) }
-            .sortedByDescending { it.value }
+            .filter { (it.value >= 2 || isCoreDictionaryWord(it.key)) && it.key.startsWith(word) }
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.key == word }.thenByDescending { it.value })
             .take(6)
             .map { it.key }
         for (lm in learnedMatches) {
@@ -739,11 +758,22 @@ class SmartCorrectionEngine(private val context: Context) {
         }
 
         // 3. Exact match in dictionary
-        if (dict.contains(word) || (lang != "en" && kbbiSet.contains(word))) {
+        if (isCoreKnown) {
             result.add(word)
         }
 
-        // 4. Prefix Matches from High-Frequency Built-in words
+        // 4A. For unrecognized words OR uncommon KBBI words (e.g. "ladang" vs "kadang"):
+        // Run Typo Buster before obscure KBBI prefixes flood the suggestion bar.
+        if ((!isCoreKnown && word.length >= 2) || (isCoreKnown && !isCommon && word.length >= 4)) {
+            val onlyDist1Common = isCoreKnown
+            val typoMatches = collectTypoCandidates(word, lang, dict, onlyDist1Common = onlyDist1Common)
+            for (tm in typoMatches) {
+                result.add(tm)
+                if (result.size >= 8) return result.toList()
+            }
+        }
+
+        // 5. Prefix Matches from High-Frequency Built-in words
         val prefixMatches = dict.filter { it.startsWith(word) }
             .sortedWith(compareBy({ it.length }, { it }))
         for (pm in prefixMatches) {
@@ -751,7 +781,7 @@ class SmartCorrectionEngine(private val context: Context) {
             if (result.size >= 8) return result.toList()
         }
 
-        // 5. Prefix Matches from Comprehensive 74,500+ KBBI Dictionary (Instant Binary Search)
+        // 6. Prefix Matches from Comprehensive 74,500+ KBBI Dictionary (Instant Binary Search)
         if (lang != "en") {
             val kbbiMatches = findKbbiPrefixMatches(word, maxCount = 8)
             for (km in kbbiMatches) {
@@ -760,8 +790,8 @@ class SmartCorrectionEngine(private val context: Context) {
             }
         }
 
-        // 6. Subsequence matches for common missing-vowel typos (e.g. "kmu" -> "kamu", "bsa" -> "bisa", "mkn" -> "makan")
-        if (word.length in 2..6) {
+        // 7. Subsequence matches ONLY for short missing-vowel abbreviations (length 2..4)
+        if (!isCoreKnown && word.length in 2..4) {
             val subseqMatches = dict.filter { candidate ->
                 candidate.length <= word.length + 3 && isSubsequence(word, candidate)
             }.sortedBy { it.length }
@@ -771,63 +801,104 @@ class SmartCorrectionEngine(private val context: Context) {
             }
         }
 
-        // 7. Typo Buster: Damerau-Levenshtein distance + QWERTY keyboard proximity
-        if (result.size < 5 && word.length >= 2) {
-            val maxDist = if (word.length <= 3) 1 else 2
-            val typoCandidates = mutableListOf<Pair<String, Int>>()
-
-            val checkCandidate: (String) -> Unit = { candidate ->
-                if (abs(candidate.length - word.length) <= 2) {
-                    if (!(word.length >= 3 && candidate.isNotEmpty() && candidate[0] != word[0] && !isQwertyNeighbor(word[0], candidate[0]))) {
-                        val dist = damerauLevenshtein(word, candidate)
-                        if (dist <= maxDist) {
-                            var score = dist * 10
-                            // Bonus if first letter matches
-                            if (candidate.isNotEmpty() && candidate[0] == word[0]) {
-                                score -= 3
-                            }
-                            // Bonus for QWERTY neighbor substitutions
-                            if (candidate.length == word.length) {
-                                var neighborMatches = 0
-                                for (i in word.indices) {
-                                    if (word[i] != candidate[i] && isQwertyNeighbor(word[i], candidate[i])) {
-                                        neighborMatches++
-                                    }
-                                }
-                                score -= neighborMatches * 3
-                            }
-                            val userFreq = userDictionary[candidate] ?: 0
-                            if (userFreq > 0) {
-                                score -= min(15, userFreq * 2)
-                            }
-                            typoCandidates.add(Pair(candidate, score))
-                        }
-                    }
-                }
-            }
-
-            for (c in dict) {
-                checkCandidate(c)
-                if (typoCandidates.size >= 12) break
-            }
-            for (c in userDictionary.keys) {
-                checkCandidate(c)
-                if (typoCandidates.size >= 16) break
-            }
-
-            typoCandidates.sortBy { it.second }
-            for ((cand, _) in typoCandidates) {
-                result.add(cand)
-                if (result.size >= 8) break
-            }
-        }
-
         // Fallback: If still empty, preserve user input
         if (result.isEmpty()) {
             result.add(input)
         }
 
         return result.take(8).toList()
+    }
+
+    private fun collectTypoCandidates(
+        word: String,
+        lang: String,
+        dict: Set<String>,
+        onlyDist1Common: Boolean
+    ): List<String> {
+        val maxDist = if (onlyDist1Common || word.length <= 4) 1 else 2
+        val typoCandidates = mutableListOf<Pair<String, Int>>()
+        val seen = HashSet<String>(64)
+
+        fun evaluateCandidate(candidate: String) {
+            if (candidate == word || candidate.length < 2) return
+            if (!seen.add(candidate)) return
+            if (abs(candidate.length - word.length) > maxDist) return
+            if (onlyDist1Common && !isCommonWord(candidate)) return
+
+            val firstMatchesOrNeighbor = candidate[0] == word[0] || isQwertyNeighbor(word[0], candidate[0])
+            val isFirstTwoTransposed = word.length >= 2 && candidate.length >= 2 &&
+                word[0] == candidate[1] && word[1] == candidate[0]
+            if (word.length >= 3 && !firstMatchesOrNeighbor && !isFirstTwoTransposed) {
+                return
+            }
+
+            val dist = damerauLevenshtein(word, candidate)
+            if (dist <= maxDist) {
+                var score = dist * 25
+                if (candidate[0] == word[0]) {
+                    score -= 8
+                } else if (isQwertyNeighbor(word[0], candidate[0])) {
+                    score -= 2
+                }
+                if (candidate.length == word.length) {
+                    var neighborMatches = 0
+                    for (i in word.indices) {
+                        if (word[i] != candidate[i] && isQwertyNeighbor(word[i], candidate[i])) {
+                            neighborMatches++
+                        }
+                    }
+                    score -= neighborMatches * 6
+                }
+                if (isCommonWord(candidate)) {
+                    score -= 12
+                }
+                val userFreq = userDictionary[candidate] ?: 0
+                if (userFreq >= 2) {
+                    score -= min(14, userFreq * 2)
+                }
+                score += abs(candidate.length - word.length) * 2
+                typoCandidates.add(Pair(candidate, score))
+            }
+        }
+
+        // 1. Scan all built-in high-frequency words (never break early!)
+        for (c in dict) {
+            evaluateCandidate(c)
+        }
+
+        // 2. Scan verified user personal dictionary
+        for ((c, freq) in userDictionary) {
+            if (freq >= 2) {
+                evaluateCandidate(c)
+            }
+        }
+
+        // 3. Scan indexed 74,500+ KBBI buckets matching start char / QWERTY neighbors and length
+        if (lang != "en" && !onlyDist1Common) {
+            val index = kbbiByCharLen
+            if (index.isNotEmpty()) {
+                val startChars = LinkedHashSet<Char>(8)
+                startChars.add(word[0])
+                qwertyNeighbors[word[0]]?.forEach { startChars.add(it) }
+                if (word.length >= 2) {
+                    startChars.add(word[1])
+                }
+                val minLen = (word.length - maxDist).coerceAtLeast(2)
+                val maxLen = word.length + maxDist
+                for (sc in startChars) {
+                    val lenMap = index[sc] ?: continue
+                    for (len in minLen..maxLen) {
+                        val bucket = lenMap[len] ?: continue
+                        for (c in bucket) {
+                            evaluateCandidate(c)
+                        }
+                    }
+                }
+            }
+        }
+
+        typoCandidates.sortWith(compareBy<Pair<String, Int>> { it.second }.thenBy { it.first.length })
+        return typoCandidates.take(6).map { it.first }
     }
 
     private fun isSubsequence(sub: String, target: String): Boolean {
@@ -906,8 +977,35 @@ class SmartCorrectionEngine(private val context: Context) {
             }
         }
 
-        val maxDist = if (typed.length <= 4) 1 else 2
+        val maxDist = if (typed.length <= 5) 1 else 2
         val dist = damerauLevenshtein(typed, cand)
-        return dist <= maxDist
+        if (dist > maxDist) return false
+        if (dist == 2 && !isCommonWord(cand)) {
+            return false
+        }
+        return true
+    }
+
+    /**
+     * Synchronous, race-free auto-correction resolver called on Spacebar press.
+     * Bypasses UI debounce lag so rapid two-thumb typists never get corrected against stale prefixes.
+     */
+    fun getBestAutoCorrection(typedWord: String, lang: String = "id"): String? {
+        val typed = typedWord.trim().lowercase()
+        if (typed.length < 3) return null
+        if (isKnownWord(typed, lang)) return null
+
+        val abbrev = commonAbbreviations[typed]?.firstOrNull()
+        if (abbrev != null && !abbrev.equals(typed, ignoreCase = true)) {
+            return abbrev
+        }
+
+        val dict = when (lang) {
+            "en" -> englishWords + customWords
+            else -> indonesianWords + customWords
+        }
+        val bestTypo = collectTypoCandidates(typed, lang, dict, onlyDist1Common = false).firstOrNull()
+            ?: return null
+        return if (isCorrectionMatch(typed, bestTypo, lang)) bestTypo else null
     }
 }
